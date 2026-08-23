@@ -7,7 +7,7 @@ import { Banner } from "@/components/sidhu/fields";
 type LibraryAsset = MediaAsset & { inUse?: boolean };
 
 async function fetchLibrary() {
-  const response = await fetch("/api/sidhu/media", { cache: "no-store" });
+  const response = await fetch("/api/sidhu/media", { cache: "no-store", credentials: "same-origin" });
   const json = (await response.json()) as {
     ok: boolean;
     configured?: boolean;
@@ -44,7 +44,7 @@ export function MediaLibrary({
     const body = new FormData();
     body.append("file", file);
     body.append("folder", folder);
-    const response = await fetch("/api/sidhu/media", { method: "POST", body });
+    const response = await fetch("/api/sidhu/media", { method: "POST", body, credentials: "same-origin" });
     const json = (await response.json()) as { ok: boolean; error?: string };
     setBusy(false);
     if (!response.ok || !json.ok) {
@@ -67,6 +67,7 @@ export function MediaLibrary({
     setBusy(true);
     const response = await fetch("/api/sidhu/media", {
       method: "DELETE",
+      credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: asset.id }),
     });
@@ -84,9 +85,9 @@ export function MediaLibrary({
     <div className="space-y-4">
       {!configured ? (
         <Banner tone="info">
-          Cloudinary is not fully configured. Add CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to
-          .env.local. Uploads and deletes stay disabled until those values exist. Do not put the API
-          secret in client-side code.
+          Cloudinary is not configured. Uploads and deletes stay disabled until CLOUDINARY_API_KEY
+          and CLOUDINARY_API_SECRET are set in environment variables. The API secret must stay
+          server-only.
         </Banner>
       ) : null}
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}

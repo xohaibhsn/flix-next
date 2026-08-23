@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
+import { requireAdminApi } from "@/lib/auth/guards";
 import { createId } from "@/lib/cms/ids";
 import { cms } from "@/lib/cms/repository";
 import {
@@ -25,6 +26,8 @@ function revalidateMedia() {
 }
 
 export async function GET() {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
   const settings = await cms.getSettings();
   const usedIds = [
@@ -43,9 +46,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   if (!isCloudinaryConfigured()) {
     return jsonError(
-      "Cloudinary is not configured. Add CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to .env.local.",
+      "Cloudinary is not configured. Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in the server environment.",
       503,
     );
   }
@@ -94,9 +99,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const unauthorized = await requireAdminApi();
+  if (unauthorized) return unauthorized;
   if (!isCloudinaryConfigured()) {
     return jsonError(
-      "Cloudinary is not configured. Add CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to .env.local.",
+      "Cloudinary is not configured. Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in the server environment.",
       503,
     );
   }

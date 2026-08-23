@@ -16,6 +16,7 @@ import {
   Tag,
   X,
 } from "lucide-react";
+import { LogoutButton } from "@/components/sidhu/LogoutButton";
 
 const NAV = [
   { href: "/sidhu/", label: "Dashboard", icon: LayoutDashboard },
@@ -52,7 +53,7 @@ export function AdminShell({
         <div className="border-b border-white/10 px-5 py-5">
           <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
           <p className="mt-1 text-sm font-bold">THE FLIX CMS</p>
-          <p className="mt-1 text-[11px] text-white/45">Local admin · no auth yet</p>
+          <p className="mt-1 text-[11px] text-white/45">Protected admin session</p>
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map((item) => {
@@ -76,6 +77,9 @@ export function AdminShell({
           <Link href="/" className="hover:text-white">
             View website →
           </Link>
+          <div className="mt-3">
+            <LogoutButton />
+          </div>
         </div>
       </aside>
 
@@ -106,6 +110,9 @@ export function AdminShell({
                 {item.label}
               </Link>
             ))}
+            <div className="px-3 py-2">
+              <LogoutButton />
+            </div>
           </div>
         ) : null}
         <div className="flex-1 p-4 lg:p-8">{children}</div>

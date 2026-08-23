@@ -24,7 +24,7 @@ function configuredClient() {
   const { cloudName, apiKey, apiSecret } = getCloudinaryConfig();
   if (!apiKey || !apiSecret) {
     throw new Error(
-      "Cloudinary is not configured. Add CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET to .env.local.",
+      "Cloudinary is not configured. Add CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in environment variables.",
     );
   }
   cloudinary.config({

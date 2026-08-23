@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
 import type { CmsPage, SiteSettings } from "@/lib/cms/types";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
@@ -20,6 +21,8 @@ function revalidatePublic() {
 }
 
 export async function savePageAction(page: CmsPage) {
+  const unauthorized = await requireAdminAction();
+  if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePage(page);
     revalidatePublic();
@@ -33,6 +36,8 @@ export async function savePageAction(page: CmsPage) {
 }
 
 export async function saveSettingsAction(settings: SiteSettings) {
+  const unauthorized = await requireAdminAction();
+  if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveSettings(settings);
     revalidatePublic();
@@ -46,6 +51,10 @@ export async function saveSettingsAction(settings: SiteSettings) {
 }
 
 export async function getCloudinaryStatusAction() {
+  const unauthorized = await requireAdminAction();
+  if (unauthorized) {
+    return { configured: false, cloudName: "" };
+  }
   const { getCloudinaryConfig } = await import("@/lib/cloudinary");
   const { cloudName } = getCloudinaryConfig();
   return {
