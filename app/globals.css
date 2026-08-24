@@ -104,6 +104,52 @@ body {
   color: #6b7280;
 }
 
+.cms-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  margin: 1rem 0;
+}
+
+.prose-cms table {
+  width: 100%;
+  min-width: 28rem;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.prose-cms caption {
+  caption-side: bottom;
+  padding: 0.5rem 0;
+  color: #6b7280;
+  text-align: left;
+}
+
+.prose-cms th,
+.prose-cms td {
+  border: 1px solid #e7e9ee;
+  padding: 0.65rem 0.8rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose-cms th {
+  background: #fff5f5;
+  color: #0b0d12;
+  font-weight: 700;
+  border-bottom: 2px solid #e50914;
+}
+
+.prose-cms tbody tr:nth-child(even) td {
+  background: #f6f7f9;
+}
+
+.prose-cms th p,
+.prose-cms td p {
+  margin: 0;
+}
+
 .rich-scroll {
   overflow-y: auto;
   overscroll-behavior: contain;

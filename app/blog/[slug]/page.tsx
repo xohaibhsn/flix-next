@@ -8,7 +8,7 @@ import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
 import { blogPostingJsonLd } from "@/lib/cms/json-ld";
 import { pageMetadata, postSeoMetadata } from "@/lib/metadata";
-import { sanitizeHtml } from "@/lib/cms/html";
+import { renderCmsHtml } from "@/lib/cms/html";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -59,7 +59,7 @@ export default async function BlogPostPage({ params }: Props) {
           ) : null}
           <div
             className="prose-cms mt-8 text-[15px] leading-relaxed text-ink/80"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.content) }}
+            dangerouslySetInnerHTML={{ __html: renderCmsHtml(post.content) }}
           />
           <Link href="/blog/" className="mt-10 inline-block text-sm font-semibold text-brand hover:underline">
             Back to blog

@@ -1,5 +1,5 @@
 import { Clock3, Mail, MessageCircle, Phone, Send } from "lucide-react";
-import { sanitizeHtml } from "@/lib/cms/html";
+import { renderCmsHtml } from "@/lib/cms/html";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { publicEmail, publicPhone, publicPhoneHref, publicTelegramUrl, publicWhatsAppSalesUrl } from "@/lib/cms/public-contact";
@@ -26,7 +26,7 @@ export function RichTextBlock({ data }: { data: RichTextData }) {
         {data.heading ? <h2 className="text-2xl font-extrabold text-ink">{data.heading}</h2> : null}
         <div
           className="prose-cms mt-4 text-sm leading-relaxed text-muted"
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html) }}
+          dangerouslySetInnerHTML={{ __html: renderCmsHtml(data.html) }}
         />
       </Container>
     </section>
@@ -53,7 +53,7 @@ export function RichContentBlock({
   settings?: SiteSettings;
 }) {
   const width = RICH_WIDTH[data.width] || RICH_WIDTH.narrow;
-  const html = sanitizeHtml(data.html);
+  const html = renderCmsHtml(data.html);
   const whatsappHref = settings ? publicWhatsAppSalesUrl(settings) : "";
   const ctaHref =
     data.ctaSource === "whatsapp" || (whatsappHref && isSalesCtaLabel(data.buttonLabel))
