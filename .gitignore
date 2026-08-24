@@ -47,6 +47,15 @@ Desktop.ini
 /data/contact-messages.json
 /data/redirects.json
 /data/redirect-seeds.json
+/data/wordpress/
+
+# WordPress backups / incoming dumps — never commit
+/tmp/
+/migrations/incoming/
+*.sql
+!db/cms-schema.sql
+*.sql.gz
+*.wpress
 
 
 # vercel

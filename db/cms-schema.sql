@@ -1,5 +1,6 @@
 -- CMS tables for THE FLIX. Safe to run repeatedly (IF NOT EXISTS).
 -- Do not DROP tables. Seed is handled in application code only when tables are empty.
+-- Runtime also adds any missing blog/media columns via information_schema checks. Do not overwrite rows.
 
 CREATE TABLE IF NOT EXISTS pages (
   id VARCHAR(80) NOT NULL,

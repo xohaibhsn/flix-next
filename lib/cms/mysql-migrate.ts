@@ -19,6 +19,64 @@ import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
 export const SITE_SETTINGS_KEY = "site";
 
 type CountRow = RowDataPacket & { n: number };
+type ColumnRow = RowDataPacket & { COLUMN_NAME: string };
+
+const REQUIRED_COLUMNS: Array<{ table: string; column: string; definition: string }> = [
+  { table: "blog_posts", column: "excerpt", definition: "excerpt TEXT NULL" },
+  { table: "blog_posts", column: "content", definition: "content LONGTEXT NULL" },
+  { table: "blog_posts", column: "category_id", definition: "category_id VARCHAR(80) NULL" },
+  { table: "blog_posts", column: "featured_image", definition: "featured_image LONGTEXT NULL" },
+  { table: "blog_posts", column: "status", definition: "status VARCHAR(20) NOT NULL DEFAULT 'draft'" },
+  { table: "blog_posts", column: "featured", definition: "featured TINYINT(1) NOT NULL DEFAULT 0" },
+  { table: "blog_posts", column: "published_at", definition: "published_at DATETIME NULL" },
+  { table: "blog_posts", column: "seo_title", definition: "seo_title VARCHAR(200) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "seo_description", definition: "seo_description VARCHAR(300) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "focus_keyword", definition: "focus_keyword VARCHAR(120) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "canonical_url", definition: "canonical_url VARCHAR(255) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "robots_index", definition: "robots_index TINYINT(1) NOT NULL DEFAULT 1" },
+  { table: "blog_posts", column: "robots_follow", definition: "robots_follow TINYINT(1) NOT NULL DEFAULT 1" },
+  { table: "blog_posts", column: "og_title", definition: "og_title VARCHAR(200) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "og_description", definition: "og_description VARCHAR(300) NOT NULL DEFAULT ''" },
+  { table: "blog_posts", column: "og_image", definition: "og_image LONGTEXT NULL" },
+  { table: "blog_posts", column: "sitemap_include", definition: "sitemap_include TINYINT(1) NOT NULL DEFAULT 1" },
+  { table: "blog_categories", column: "description", definition: "description VARCHAR(255) NOT NULL DEFAULT ''" },
+  { table: "blog_categories", column: "is_active", definition: "is_active TINYINT(1) NOT NULL DEFAULT 1" },
+  { table: "media_assets", column: "filename", definition: "filename VARCHAR(160) NOT NULL DEFAULT ''" },
+  { table: "media_assets", column: "width", definition: "width INT NULL" },
+  { table: "media_assets", column: "height", definition: "height INT NULL" },
+  { table: "media_assets", column: "format", definition: "format VARCHAR(40) NOT NULL DEFAULT ''" },
+  { table: "media_assets", column: "resource_type", definition: "resource_type VARCHAR(40) NOT NULL DEFAULT 'image'" },
+  { table: "media_assets", column: "folder", definition: "folder VARCHAR(160) NOT NULL DEFAULT ''" },
+  { table: "media_assets", column: "bytes", definition: "bytes INT NULL" },
+  { table: "media_assets", column: "alt", definition: "alt VARCHAR(160) NOT NULL DEFAULT ''" },
+];
+
+async function ensureMissingColumns() {
+  const pool = getDbPool();
+  const tables = [...new Set(REQUIRED_COLUMNS.map((item) => item.table))];
+  const existing = new Map<string, Set<string>>();
+  for (const table of tables) {
+    const [rows] = await pool.query<ColumnRow[]>(
+      `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+      [table],
+    );
+    existing.set(table, new Set(rows.map((row) => row.COLUMN_NAME)));
+  }
+  for (const item of REQUIRED_COLUMNS) {
+    if (existing.get(item.table)?.has(item.column)) continue;
+    await pool.query(`ALTER TABLE \`${item.table}\` ADD COLUMN ${item.definition}`);
+  }
+}
+
+export async function ensureCmsSchema() {
+  const pool = getDbPool();
+  await pool.query("SELECT 1");
+  for (const statement of CMS_SCHEMA_STATEMENTS) {
+    await pool.query(statement);
+  }
+  await ensureMissingColumns();
+}
 
 async function tableCount(table: "pages" | "media_assets" | "site_settings") {
   const [rows] = await getDbPool().query<CountRow[]>(
@@ -28,14 +86,6 @@ async function tableCount(table: "pages" | "media_assets" | "site_settings") {
     table === "site_settings" ? [SITE_SETTINGS_KEY] : [],
   );
   return Number(rows[0]?.n ?? 0);
-}
-
-export async function ensureCmsSchema() {
-  const pool = getDbPool();
-  await pool.query("SELECT 1");
-  for (const statement of CMS_SCHEMA_STATEMENTS) {
-    await pool.query(statement);
-  }
 }
 
 export async function seedCmsIfEmpty() {

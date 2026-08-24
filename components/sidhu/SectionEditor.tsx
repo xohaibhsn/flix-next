@@ -29,7 +29,8 @@ import { FAQ_CATEGORIES } from "@/lib/cms/faq-categories";
 import { Field, IconSelect, RowActions, TextArea, TextInput } from "@/components/sidhu/fields";
 import { MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
-import { RichTextEditor, insertEditorImage } from "@/components/sidhu/RichTextEditor";
+import { ClientRichTextEditor } from "@/components/sidhu/ClientRichTextEditor";
+import { insertEditorImage } from "@/lib/cms/blog";
 
 function move<T>(items: T[], index: number, direction: -1 | 1) {
   const next = index + direction;
@@ -1022,7 +1023,7 @@ function RichContentEditor({
     <>
       <MediaSpecHint specId="blogContent" />
       <div className="mt-2">
-        <RichTextEditor
+        <ClientRichTextEditor
           value={data.html}
           onChange={(html) => onChange({ ...data, html })}
           onRequestImage={() => setPicker(true)}

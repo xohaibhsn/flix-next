@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { savePostAction } from "@/lib/cms/actions";
-import { createId } from "@/lib/cms/ids";
+import { insertEditorImage } from "@/lib/cms/blog";
 import { slugify } from "@/lib/cms/slug";
 import type { BlogCategory, BlogPost, MediaAsset } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
+import { ClientRichTextEditor } from "@/components/sidhu/ClientRichTextEditor";
 import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
-import { RichTextEditor } from "@/components/sidhu/RichTextEditor";
 
 export function BlogEditor({
   post,
@@ -70,7 +70,7 @@ export function BlogEditor({
           <Field label="Excerpt">
             <TextArea value={draft.excerpt} onChange={(event) => setDraft({ ...draft, excerpt: event.target.value })} />
           </Field>
-          <RichTextEditor
+          <ClientRichTextEditor
             value={draft.content}
             onChange={(content) => setDraft({ ...draft, content })}
             onRequestImage={() => setPicker(true)}
@@ -190,7 +190,7 @@ export function BlogEditor({
           onSelect={(asset) => {
             setDraft({
               ...draft,
-              content: `${draft.content}<p><img src="${asset.secureUrl}" alt="" /></p>`,
+              content: insertEditorImage(draft.content, asset.secureUrl, asset.alt || ""),
             });
             setPicker(false);
             notice("Image inserted into the article. Save the post to keep it.", "info");
@@ -199,32 +199,4 @@ export function BlogEditor({
       ) : null}
     </div>
   );
-}
-
-export function emptyPost(): BlogPost {
-  const now = new Date().toISOString();
-  return {
-    id: createId("post"),
-    title: "",
-    slug: "",
-    excerpt: "",
-    content: "<p></p>",
-    categoryId: null,
-    featuredImage: null,
-    status: "draft",
-    featured: false,
-    publishedAt: null,
-    createdAt: now,
-    updatedAt: now,
-    seoTitle: "",
-    seoDescription: "",
-    focusKeyword: "",
-    canonicalUrl: "",
-    robotsIndex: true,
-    robotsFollow: true,
-    ogTitle: "",
-    ogDescription: "",
-    ogImage: null,
-    sitemapInclude: true,
-  };
 }

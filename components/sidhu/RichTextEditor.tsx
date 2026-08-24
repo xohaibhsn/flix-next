@@ -112,6 +112,4 @@ export function RichTextEditor({
   );
 }
 
-export function insertEditorImage(html: string, url: string, alt: string) {
-  return `${html}<p><img src="${url}" alt="${alt.replace(/"/g, "")}" /></p>`;
-}
+export { insertEditorImage } from "@/lib/cms/blog";

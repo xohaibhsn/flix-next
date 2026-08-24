@@ -299,6 +299,11 @@ export class MysqlCatalogRepository implements CatalogRepository {
     const [rows] = await getDbPool().query<PostRow[]>("SELECT * FROM blog_posts WHERE slug = ? LIMIT 1", [slug]);
     return rows[0] ? mapPost(rows[0]) : null;
   }
+  async getPostById(id: string) {
+    await this.ready();
+    const [rows] = await getDbPool().query<PostRow[]>("SELECT * FROM blog_posts WHERE id = ? LIMIT 1", [id]);
+    return rows[0] ? mapPost(rows[0]) : null;
+  }
   async savePost(post: BlogPost) {
     await this.ready();
     const safe = sanitizePost(post);

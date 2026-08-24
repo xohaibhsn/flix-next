@@ -1,4 +1,5 @@
 export const CMS_SCHEMA_STATEMENTS = [
+  // Tables are created IF NOT EXISTS. Missing columns are added at runtime in ensureCmsSchema().
   `CREATE TABLE IF NOT EXISTS pages (
     id VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,

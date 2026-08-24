@@ -20,6 +20,7 @@ export interface CatalogRepository {
   deleteCategory(id: string): Promise<void>;
   listPosts(): Promise<BlogPost[]>;
   getPostBySlug(slug: string): Promise<BlogPost | null>;
+  getPostById(id: string): Promise<BlogPost | null>;
   savePost(post: BlogPost): Promise<BlogPost>;
   deletePost(id: string): Promise<void>;
   listRedirects(): Promise<RedirectRule[]>;

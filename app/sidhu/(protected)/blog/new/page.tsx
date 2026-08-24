@@ -1,19 +1,28 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
-import { BlogEditor, emptyPost } from "@/components/sidhu/BlogEditor";
+import { BlogEditor } from "@/components/sidhu/BlogEditor";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { emptyPost } from "@/lib/cms/blog";
 import { cms } from "@/lib/cms/repository";
+import { logServerError } from "@/lib/security/errors";
 
 export const dynamic = "force-dynamic";
 
 export default async function SidhuNewPostPage() {
-  const [categories, assets, cloud] = await Promise.all([
-    cms.listCategories(),
-    cms.listMedia(),
-    getCloudinaryStatusAction(),
-  ]);
+  const post = emptyPost();
+  let categories;
+  let assets;
+  let cloud;
+  try {
+    categories = await cms.listCategories();
+    assets = await cms.listMedia();
+    cloud = await getCloudinaryStatusAction();
+  } catch (error) {
+    logServerError("sidhu:blog-new", error);
+    throw error;
+  }
   return (
     <AdminShell title="New post" subtitle="Draft is the default. Publish when the article is ready.">
-      <BlogEditor post={emptyPost()} categories={categories} assets={assets} configured={cloud.configured} />
+      <BlogEditor post={post} categories={categories} assets={assets} configured={cloud.configured} />
     </AdminShell>
   );
 }

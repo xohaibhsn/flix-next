@@ -10,7 +10,8 @@
     "build": "next build --webpack",
     "build:default": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import:wordpress": "tsx tools/import-wordpress.ts"
   },
   "dependencies": {
     "@tiptap/extension-character-count": "^3.30.2",
@@ -40,6 +41,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
+    "tsx": "^4.20.5",
     "typescript": "^5"
   }
 }

@@ -122,6 +122,10 @@ export class JsonCatalogRepository implements CatalogRepository {
     const items = await this.listPosts();
     return items.find((item) => item.slug === slug) ?? null;
   }
+  async getPostById(id: string) {
+    const items = await this.listPosts();
+    return items.find((item) => item.id === id) ?? null;
+  }
   async savePost(post: BlogPost) {
     const safe = sanitizePost(post);
     const items = await this.listPosts();
