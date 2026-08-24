@@ -11,7 +11,8 @@ import {
 } from "@/lib/cms/defaults";
 import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
-import type { MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
+import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, SectionType, SiteSettings } from "@/lib/cms/types";
+import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
@@ -384,4 +385,78 @@ export async function seedManagedRedirectsIfNeeded() {
      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
     [MANAGED_REDIRECT_SEED_KEY],
   );
+}
+
+export async function seedSeoLongformIfNeeded() {
+  const pool = getDbPool();
+  for (const slug of ["/", "/iptv-subscriptions-uk/"]) {
+    const [pages] = await pool.query<Array<RowDataPacket & { id: string; name: string; slug: string; status: string; cms_enabled: number }>>(
+      "SELECT id, name, slug, status, cms_enabled FROM pages WHERE slug = ? LIMIT 1",
+      [slug],
+    );
+    const row = pages[0];
+    if (!row) continue;
+    const [sectionRows] = await pool.query<
+      Array<
+        RowDataPacket & {
+          id: string;
+          section_type: string;
+          label: string;
+          sort_order: number;
+          visible: number;
+          section_data: unknown;
+        }
+      >
+    >(
+      `SELECT id, section_type, label, sort_order, visible, section_data
+       FROM page_sections
+       WHERE page_id = ?
+       ORDER BY sort_order ASC`,
+      [row.id],
+    );
+    const page: CmsPage = {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      status: row.status === "draft" ? "draft" : "published",
+      cmsEnabled: Boolean(row.cms_enabled),
+      sections: sectionRows.map((section) => ({
+        id: String(section.id),
+        type: section.section_type as SectionType,
+        label: String(section.label),
+        order: Number(section.sort_order) || 0,
+        visible: Boolean(section.visible),
+        data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
+      })),
+    };
+    const result = applySeoLongformToPage(sanitizePage(page));
+    if (!result.changed) continue;
+    const conn = await pool.getConnection();
+    await conn.beginTransaction();
+    try {
+      await conn.execute("DELETE FROM page_sections WHERE page_id = ?", [row.id]);
+      for (const section of result.page.sections) {
+        await conn.execute(
+          `INSERT INTO page_sections
+            (id, page_id, section_type, label, sort_order, visible, section_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            section.id,
+            row.id,
+            section.type,
+            section.label,
+            section.order,
+            section.visible ? 1 : 0,
+            JSON.stringify(section.data),
+          ],
+        );
+      }
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
 }

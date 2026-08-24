@@ -1029,9 +1029,28 @@ function RichContentFields({
       <Field label="Optional CTA label">
         <TextInput value={data.buttonLabel} onChange={(event) => onChange({ ...data, buttonLabel: event.target.value })} />
       </Field>
-      <Field label="Optional CTA URL">
-        <TextInput value={data.buttonHref} onChange={(event) => onChange({ ...data, buttonHref: event.target.value })} />
+      <Field label="CTA destination">
+        <select
+          className="w-full rounded-md border border-line px-3 py-2 text-sm"
+          value={data.ctaSource === "whatsapp" ? "whatsapp" : "custom"}
+          onChange={(event) =>
+            onChange({
+              ...data,
+              ctaSource: event.target.value === "whatsapp" ? "whatsapp" : "custom",
+            })
+          }
+        >
+          <option value="whatsapp">Global WhatsApp</option>
+          <option value="custom">Custom URL</option>
+        </select>
       </Field>
+      {data.ctaSource === "whatsapp" ? (
+        <p className="text-xs text-muted">Uses the WhatsApp number and message from Site Settings. No phone number is stored in this section.</p>
+      ) : (
+        <Field label="Optional CTA URL">
+          <TextInput value={data.buttonHref} onChange={(event) => onChange({ ...data, buttonHref: event.target.value })} />
+        </Field>
+      )}
     </div>
   );
 }

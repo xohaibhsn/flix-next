@@ -216,6 +216,7 @@ export type RichTextData = {
 
 export type RichContentWidth = "normal" | "narrow" | "wide";
 export type RichContentScrollHeight = "compact" | "standard" | "tall";
+export type RichContentCtaSource = "custom" | "whatsapp";
 
 export type RichContentData = {
   eyebrow: string;
@@ -226,6 +227,7 @@ export type RichContentData = {
   width: RichContentWidth;
   scrollable: boolean;
   scrollHeight: RichContentScrollHeight;
+  ctaSource: RichContentCtaSource;
 };
 
 export type InfoCardsData = {

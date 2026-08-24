@@ -11,6 +11,7 @@ import type {
   SiteSettings,
 } from "@/lib/cms/types";
 import { createId } from "@/lib/cms/ids";
+import { HOME_SEO_LONGFORM, SEO_LONGFORM_HOME_ID, SUBSCRIPTION_SEO_LONGFORM } from "@/lib/cms/seo-longform";
 
 const PLAN_FEATURES = [
   "20,000+ Live Channels (demo)",
@@ -353,6 +354,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         width: "narrow",
         scrollable: false,
         scrollHeight: "standard",
+        ctaSource: "custom",
       };
     case "info-cards":
       return {
@@ -426,12 +428,12 @@ export function createHomeSections(): CmsSection[] {
     "cta",
   ];
   return types.map((type, index) => ({
-    id: `sec-home-${type}`,
+    id: type === "rich-content" ? SEO_LONGFORM_HOME_ID : `sec-home-${type}`,
     type,
     label: SECTION_LABELS[type],
     order: index + 1,
     visible: true,
-    data: createDefaultSectionData(type),
+    data: type === "rich-content" ? HOME_SEO_LONGFORM : createDefaultSectionData(type),
   }));
 }
 
@@ -454,22 +456,13 @@ export function createSubscriptionSections(): CmsSection[] {
   intro.label = "Intro";
   intro.data = {
     heading: "",
-    html: "<p>Choose a plan, receive login details, and start watching. Channel lists and checkout will be connected later; this page is fully editable in Sidhu.</p>",
+    html: "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page are editable in Sidhu.</p>",
   };
   const pricing = createSection("pricing", 3);
   pricing.id = "sec-sub-pricing";
   const longform = createSection("rich-content", 4);
   longform.id = "sec-sub-longform";
-  longform.data = {
-    eyebrow: "Guide",
-    heading: "What you get with a The Flix IPTV subscription",
-    html: "<p>Use this block for a longer SEO description. Enable Scrollable Content if the copy should stay in a contained panel.</p>",
-    buttonLabel: "",
-    buttonHref: "",
-    width: "narrow",
-    scrollable: true,
-    scrollHeight: "standard",
-  };
+  longform.data = SUBSCRIPTION_SEO_LONGFORM;
   const benefits = createSection("info-cards", 5);
   benefits.id = "sec-sub-benefits";
   benefits.label = "Benefits";

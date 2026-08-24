@@ -43,9 +43,18 @@ const RICH_SCROLL_HEIGHT = {
   tall: "rich-scroll rich-scroll-tall",
 } as const;
 
-export function RichContentBlock({ data }: { data: RichContentData }) {
+export function RichContentBlock({
+  data,
+  settings,
+}: {
+  data: RichContentData;
+  settings?: SiteSettings;
+}) {
   const width = RICH_WIDTH[data.width] || RICH_WIDTH.narrow;
   const html = sanitizeHtml(data.html);
+  const whatsappHref = settings ? publicWhatsAppUrl(settings) : "";
+  const ctaHref = data.ctaSource === "whatsapp" ? whatsappHref : data.buttonHref;
+  const showCta = Boolean(data.buttonLabel && ctaHref);
   const body = (
     <div
       className="prose-cms text-[15px] leading-relaxed text-ink/80"
@@ -72,8 +81,8 @@ export function RichContentBlock({ data }: { data: RichContentData }) {
         ) : (
           <div className={data.heading || data.eyebrow ? "mt-6" : ""}>{body}</div>
         )}
-        {data.buttonLabel && data.buttonHref ? (
-          <ButtonLink href={data.buttonHref} className="mt-8">
+        {showCta ? (
+          <ButtonLink href={ctaHref} className="mt-8">
             {data.buttonLabel}
           </ButtonLink>
         ) : null}

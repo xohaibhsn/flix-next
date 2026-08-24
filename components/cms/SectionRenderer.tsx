@@ -83,7 +83,7 @@ function renderSection(
     case "rich-text":
       return <RichTextBlock data={data as RichTextData} />;
     case "rich-content":
-      return <RichContentBlock data={data as RichContentData} />;
+      return <RichContentBlock data={data as RichContentData} settings={settings} />;
     case "info-cards":
       return <InfoCards data={data as InfoCardsData} />;
     case "contact-info":

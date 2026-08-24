@@ -1,6 +1,7 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
+import { applySeoLongformToPages } from "@/lib/cms/seo-longform";
 import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import { MysqlCatalogRepository } from "@/lib/cms/mysql-catalog";
@@ -28,7 +29,20 @@ export interface CmsRepository {
 export class LocalJsonRepository implements CmsRepository {
   async listPages() {
     const file = await readJsonFile<PagesFile>(PAGES_FILE, { pages: defaultPages() });
-    return Array.isArray(file.pages) ? file.pages : defaultPages();
+    const raw = Array.isArray(file.pages) ? file.pages : defaultPages();
+    const defaults = defaultPages();
+    const pages = raw.map((page) => {
+      if (page.slug === "/iptv-subscriptions-uk/" && (!page.sections || page.sections.length === 0)) {
+        const fallback = defaults.find((item) => item.slug === page.slug);
+        if (fallback) return { ...page, cmsEnabled: true, sections: fallback.sections };
+      }
+      return page;
+    });
+    const result = applySeoLongformToPages(pages.map((page) => sanitizePage(page)));
+    if (result.changed) {
+      await writeJsonFile(PAGES_FILE, { pages: result.pages } satisfies PagesFile);
+    }
+    return result.pages;
   }
 
   async getPageById(id: string) {

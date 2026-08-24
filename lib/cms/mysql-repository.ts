@@ -11,6 +11,7 @@ import {
   seedCmsIfEmpty,
   seedExtendedIfEmpty,
   seedManagedRedirectsIfNeeded,
+  seedSeoLongformIfNeeded,
 } from "@/lib/cms/mysql-migrate";
 import type { CmsPage, CmsSection, MediaAsset, SectionType, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
@@ -112,6 +113,7 @@ export class MysqlCmsRepository {
         await seedCmsIfEmpty();
         await seedExtendedIfEmpty();
         await seedManagedRedirectsIfNeeded();
+        await seedSeoLongformIfNeeded();
       })().catch((error) => {
         this.readyPromise = null;
         throw cmsDbError(error);

@@ -13,6 +13,7 @@ import type {
   PricingData,
   PricingPlan,
   RedirectRule,
+  RichContentCtaSource,
   RichContentData,
   RichContentScrollHeight,
   RichContentWidth,
@@ -236,6 +237,7 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       current.width === "wide" || current.width === "normal" ? current.width : "narrow";
     const scrollHeight: RichContentScrollHeight =
       current.scrollHeight === "compact" || current.scrollHeight === "tall" ? current.scrollHeight : "standard";
+    const ctaSource: RichContentCtaSource = current.ctaSource === "whatsapp" ? "whatsapp" : "custom";
     return {
       eyebrow: sanitizeText(current.eyebrow, 80),
       heading: sanitizeText(current.heading, 160),
@@ -245,6 +247,7 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       width,
       scrollable: Boolean(current.scrollable),
       scrollHeight,
+      ctaSource,
     };
   }
   if (type === "cta") {
