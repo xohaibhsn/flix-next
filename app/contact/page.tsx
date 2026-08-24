@@ -15,7 +15,7 @@ export async function generateMetadata() {
 
 export default function ContactPage() {
   return (
-    <SiteShell>
+    <SiteShell pageSeoKey="contact">
       <CmsPageView slug="/contact/" />
     </SiteShell>
   );

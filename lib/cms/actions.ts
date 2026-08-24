@@ -12,6 +12,7 @@ import type {
   RedirectRule,
   SiteSettings,
 } from "@/lib/cms/types";
+import { normalizeJsonLdInput } from "@/lib/cms/json-ld-input";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
 
 import { publicErrorMessage } from "@/lib/security/errors";
@@ -32,15 +33,60 @@ export async function savePageAction(page: CmsPage) {
   }
 }
 
+const PAGE_SEO_LABELS: Record<keyof SiteSettings["pageSeo"], string> = {
+  home: "Welcome / Home",
+  subscriptions: "IPTV Subscription",
+  contact: "Contact",
+  blog: "Blog listing",
+};
+
+function normalizeIncomingSeo(settings: SiteSettings) {
+  const pageSeo = { ...settings.pageSeo };
+  for (const key of Object.keys(PAGE_SEO_LABELS) as Array<keyof SiteSettings["pageSeo"]>) {
+    const result = normalizeJsonLdInput(pageSeo[key].customJsonLd);
+    if (!result.ok) {
+      return { ok: false as const, error: `${PAGE_SEO_LABELS[key]}: ${result.error}` };
+    }
+    pageSeo[key] = { ...pageSeo[key], customJsonLd: result.stored };
+  }
+  const site = normalizeJsonLdInput(settings.siteCustomJsonLd);
+  if (!site.ok) return { ok: false as const, error: `Site-wide schema: ${site.error}` };
+  return { ok: true as const, pageSeo, siteCustomJsonLd: site.stored };
+}
+
 export async function saveSettingsAction(settings: SiteSettings) {
   const unauthorized = await requireAdminAction();
   if (unauthorized) return unauthorized;
   try {
-    const saved = await cms.saveSettings(settings);
+    const current = await cms.getSettings();
+    const saved = await cms.saveSettings({
+      ...settings,
+      pageSeo: current.pageSeo,
+      siteCustomJsonLd: current.siteCustomJsonLd,
+    });
     revalidateAfterSettingsSave();
     return { ok: true as const, settings: saved };
   } catch (error) {
     return fail(error, "Could not save settings.");
+  }
+}
+
+export async function saveSeoSettingsAction(settings: SiteSettings) {
+  const unauthorized = await requireAdminAction();
+  if (unauthorized) return unauthorized;
+  try {
+    const normalized = normalizeIncomingSeo(settings);
+    if (!normalized.ok) return { ok: false as const, error: normalized.error };
+    const current = await cms.getSettings();
+    const saved = await cms.saveSettings({
+      ...current,
+      pageSeo: normalized.pageSeo,
+      siteCustomJsonLd: normalized.siteCustomJsonLd,
+    });
+    revalidateAfterSettingsSave();
+    return { ok: true as const, settings: saved };
+  } catch (error) {
+    return fail(error, "Could not save SEO settings.");
   }
 }
 

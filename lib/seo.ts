@@ -23,6 +23,7 @@ export function defaultPageSeo(title: string, description: string, path: string)
     ogDescription: "",
     ogImage: null,
     sitemapInclude: true,
+    customJsonLd: "",
   };
 }
 
@@ -45,8 +46,8 @@ export function seoToMetadata(
   fallbackDescription: string,
   path: string,
 ): Metadata {
-  const title = seo.title || fallbackTitle;
-  const description = seo.description || fallbackDescription || settings.tagline || siteConfig.description;
+  const title = seo.title.trim() || fallbackTitle;
+  const description = seo.description.trim() || fallbackDescription || settings.tagline || siteConfig.description;
   const ogTitle = seo.ogTitle || title;
   const ogDescription = seo.ogDescription || description;
   const image = resolveOpenGraphImageFromSettings(seo.ogImage, settings, ogTitle);

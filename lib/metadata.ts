@@ -11,7 +11,6 @@ import type { BlogPost, SiteSettings } from "@/lib/cms/types";
 export async function getSiteMetadata(): Promise<Metadata> {
   await connection();
   const settings = await cms.getSettings();
-  const description = settings.tagline || siteConfig.description;
   const image = resolveOpenGraphImageFromSettings(null, settings);
   const social = socialImageMeta(image);
   return {
@@ -20,11 +19,9 @@ export async function getSiteMetadata(): Promise<Metadata> {
       default: `${settings.siteName} | ${settings.tagline || siteConfig.tagline}`,
       template: `%s | ${settings.siteName}`,
     },
-    description,
     icons: siteIconMetadata(settings),
     openGraph: {
       siteName: settings.siteName,
-      description,
       type: "website",
       images: social.openGraph?.images,
     },
@@ -91,6 +88,7 @@ export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
       ogDescription: post.ogDescription,
       ogImage: post.ogImage || post.featuredImage,
       sitemapInclude: post.sitemapInclude,
+      customJsonLd: "",
     },
     settings,
     post.title,

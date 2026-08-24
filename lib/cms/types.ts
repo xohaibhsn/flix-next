@@ -80,6 +80,7 @@ export type PageSeo = {
   ogDescription: string;
   ogImage: MediaRef | null;
   sitemapInclude: boolean;
+  customJsonLd: string;
 };
 
 export type HeroData = {
@@ -344,6 +345,7 @@ export type SiteSettings = {
     contact: PageSeo;
     blog: PageSeo;
   };
+  siteCustomJsonLd: string;
 };
 
 export type PricingPlan = {

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { saveSettingsAction } from "@/lib/cms/actions";
+import { useRef, useState } from "react";
+import { saveSeoSettingsAction } from "@/lib/cms/actions";
 import type { MediaAsset, PageSeo, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
 
 const PAGES: Array<{ key: keyof SiteSettings["pageSeo"]; label: string }> = [
   { key: "home", label: "Welcome / Home" },
@@ -12,6 +13,62 @@ const PAGES: Array<{ key: keyof SiteSettings["pageSeo"]; label: string }> = [
   { key: "contact", label: "Contact" },
   { key: "blog", label: "Blog listing" },
 ];
+
+const JSON_LD_HINT =
+  "Paste JSON-LD or a <script type=\"application/ld+json\"> wrapper. Invalid JSON is rejected and the last valid value is kept. Leave empty to render nothing.";
+
+function JsonLdField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const [feedback, setFeedback] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+
+  function validate() {
+    const parsed = parseJsonLdInput(value);
+    if (!parsed.ok) {
+      setFeedback({ tone: "error", text: parsed.error });
+      return;
+    }
+    if (!parsed.data) {
+      setFeedback({ tone: "info", text: "Empty — nothing will be rendered." });
+      return;
+    }
+    setFeedback({ tone: "ok", text: "Valid JSON-LD." });
+  }
+
+  return (
+    <Field label={label} hint={hint}>
+      <TextArea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        spellCheck={false}
+        className="min-h-40 font-mono text-xs leading-relaxed"
+        placeholder='{ "@context": "https://schema.org", "@type": "Service" }'
+      />
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="rounded border border-line px-3 py-1 text-xs font-semibold"
+          onClick={validate}
+        >
+          Validate
+        </button>
+        {feedback ? (
+          <span className={feedback.tone === "error" ? "text-xs text-red-700" : "text-xs text-muted"}>
+            {feedback.text}
+          </span>
+        ) : null}
+      </div>
+    </Field>
+  );
+}
 
 export function SeoForm({
   settings: initial,
@@ -26,6 +83,7 @@ export function SeoForm({
   const [assets, setAssets] = useState(initialAssets);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  const savingLock = useRef(false);
 
   function notice(text: string, tone: "ok" | "error" | "info" = "info") {
     setMessage({ tone, text });
@@ -39,9 +97,11 @@ export function SeoForm({
   }
 
   async function save() {
+    if (savingLock.current) return;
+    savingLock.current = true;
     setSaving(true);
     try {
-      const result = await saveSettingsAction(settings);
+      const result = await saveSeoSettingsAction(settings);
       if (!result.ok) {
         setMessage({ tone: "error", text: result.error });
         return;
@@ -54,6 +114,7 @@ export function SeoForm({
         text: error instanceof Error ? error.message : "Could not save SEO settings.",
       });
     } finally {
+      savingLock.current = false;
       setSaving(false);
     }
   }
@@ -61,6 +122,19 @@ export function SeoForm({
   return (
     <div className="space-y-4">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <section className="space-y-4 rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Site-wide Custom JSON-LD Schema</h2>
+        <p className="text-sm text-muted">
+          Organization schema is automatically rendered on Home only. Use this field only for additional
+          schema you intentionally want across the site.
+        </p>
+        <JsonLdField
+          label="Site-wide Custom JSON-LD Schema"
+          hint={JSON_LD_HINT}
+          value={settings.siteCustomJsonLd || ""}
+          onChange={(siteCustomJsonLd) => setSettings({ ...settings, siteCustomJsonLd })}
+        />
+      </section>
       {PAGES.map((page) => {
         const seo = settings.pageSeo[page.key];
         return (
@@ -105,6 +179,12 @@ export function SeoForm({
                 <p className="mt-2 text-muted">{seo.description || "Meta description"}</p>
               </div>
             </div>
+            <JsonLdField
+              label="Custom JSON-LD Schema"
+              hint={`${JSON_LD_HINT} This is added to this page only and does not replace built-in schema.`}
+              value={seo.customJsonLd || ""}
+              onChange={(customJsonLd) => update(page.key, { customJsonLd })}
+            />
             <ImageField
               title={`${page.label} OG image`}
               specId="pageOg"

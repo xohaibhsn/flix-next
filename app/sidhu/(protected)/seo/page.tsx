@@ -14,7 +14,7 @@ export default async function SidhuSeoPage() {
   return (
     <AdminShell
       title="SEO"
-      subtitle="Per-page titles, descriptions, robots, Open Graph, and sitemap include. Blog posts have their own SEO panel."
+      subtitle="Per-page titles, descriptions, robots, Open Graph, sitemap include, and custom JSON-LD. Organization schema is automatic on Home only. Blog posts have their own SEO panel."
     >
       <SeoForm settings={settings} assets={assets} configured={cloud.configured} />
     </AdminShell>

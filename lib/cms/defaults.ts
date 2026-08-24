@@ -592,6 +592,7 @@ export function defaultSettings(): SiteSettings {
       contact: defaultPageSeo("Contact", "Contact THE FLIX IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
       blog: defaultPageSeo("Blog", "Guides and updates from THE FLIX IPTV.", "/blog/"),
     },
+    siteCustomJsonLd: "",
   };
 }
 

@@ -10,7 +10,7 @@ export async function generateMetadata() {
 
 export default function WelcomePage() {
   return (
-    <SiteShell overlayHeader>
+    <SiteShell overlayHeader showOrganization pageSeoKey="home">
       <CmsPageView slug="/" />
     </SiteShell>
   );

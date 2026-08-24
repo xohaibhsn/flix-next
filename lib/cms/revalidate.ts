@@ -53,6 +53,7 @@ export function revalidatePublicSite() {
 }
 
 export function revalidateAfterSettingsSave() {
+  revalidatePath("/", "layout");
   for (const path of PUBLIC_PATHS) {
     revalidatePath(path);
   }

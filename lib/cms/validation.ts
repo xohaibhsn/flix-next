@@ -27,6 +27,7 @@ import type {
 import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import { sanitizeHtml } from "@/lib/cms/html";
+import { sanitizeJsonLdField } from "@/lib/cms/json-ld-input";
 import { sanitizeHttpUrl } from "@/lib/cms/contact";
 import {
   isReservedRedirectSource,
@@ -180,6 +181,7 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
       contact: sanitizePageSeo(source.pageSeo?.contact, fallback.pageSeo.contact),
       blog: sanitizePageSeo(source.pageSeo?.blog, fallback.pageSeo.blog),
     },
+    siteCustomJsonLd: sanitizeJsonLdField(source.siteCustomJsonLd),
   };
 
   const telegramUrl =
@@ -338,6 +340,7 @@ export function sanitizePageSeo(value: unknown, fallback: PageSeo): PageSeo {
     ogDescription: sanitizeText(input.ogDescription, 180),
     ogImage: sanitizeMediaRef(input.ogImage),
     sitemapInclude: input.sitemapInclude !== false,
+    customJsonLd: sanitizeJsonLdField(input.customJsonLd),
   };
 }
 

@@ -15,7 +15,7 @@ export async function generateMetadata() {
 
 export default function SubscriptionsPage() {
   return (
-    <SiteShell>
+    <SiteShell pageSeoKey="subscriptions">
       <CmsPageView slug="/iptv-subscriptions-uk/" />
     </SiteShell>
   );

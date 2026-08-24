@@ -56,7 +56,7 @@ export default async function BlogPage() {
     categories.find((category) => category.id === id)?.name || "Guides";
 
   return (
-    <SiteShell>
+    <SiteShell pageSeoKey="blog">
       <PageHero
         eyebrow="Guides"
         title="The Flix"
