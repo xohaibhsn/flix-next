@@ -1,6 +1,7 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
+import { applyPublicCopyCleanupToPages } from "@/lib/cms/public-copy-cleanup";
 import { applySeoLongformToPages } from "@/lib/cms/seo-longform";
 import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
@@ -38,11 +39,12 @@ export class LocalJsonRepository implements CmsRepository {
       }
       return page;
     });
-    const result = applySeoLongformToPages(pages.map((page) => sanitizePage(page)));
-    if (result.changed) {
-      await writeJsonFile(PAGES_FILE, { pages: result.pages } satisfies PagesFile);
+    const longform = applySeoLongformToPages(pages.map((page) => sanitizePage(page)));
+    const cleaned = applyPublicCopyCleanupToPages(longform.pages);
+    if (longform.changed || cleaned.changed) {
+      await writeJsonFile(PAGES_FILE, { pages: cleaned.pages } satisfies PagesFile);
     }
-    return result.pages;
+    return cleaned.pages;
   }
 
   async getPageById(id: string) {

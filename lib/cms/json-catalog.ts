@@ -5,6 +5,7 @@ import {
   defaultFaqs,
   defaultPricingPlans,
 } from "@/lib/cms/defaults";
+import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/lib/cms/managed-redirects";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import {
@@ -76,7 +77,15 @@ export class JsonCatalogRepository implements CatalogRepository {
   }
   async listFaqs() {
     const items = await readJsonFile<FaqItem[]>(FAQS_FILE, defaultFaqs());
-    return (Array.isArray(items) ? items : defaultFaqs()).map(sanitizeFaq);
+    const source = Array.isArray(items) ? items : defaultFaqs();
+    let changed = false;
+    const next = source.map((item) => {
+      const answer = rewriteDemoCopy(item.answer);
+      if (answer !== item.answer) changed = true;
+      return sanitizeFaq({ ...item, answer });
+    });
+    if (changed) await saveList(FAQS_FILE, next);
+    return next;
   }
   async saveFaq(item: FaqItem) {
     const safe = sanitizeFaq(item);

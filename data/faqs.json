@@ -2,72 +2,72 @@
   {
     "id": "faq1",
     "question": "What do I need to get started?",
-    "answer": "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer.",
+    "answer": "A stable internet connection and a compatible device: Firestick, Smart TV, Android TV, phone, tablet or laptop.",
     "category": "General",
     "sortOrder": 1,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "faq2",
     "question": "How fast will I receive my subscription?",
-    "answer": "Activation is typically instant after payment. This local site does not process payments yet — copy is a placeholder for later CMS content.",
+    "answer": "Activation follows payment. Message us on WhatsApp if you need help getting started.",
     "category": "General",
     "sortOrder": 2,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "faq3",
     "question": "Can I use it on more than one device?",
-    "answer": "Yes. You can install the service on multiple devices. Simultaneous streams depend on the plan — contact us if you need extra connections.",
+    "answer": "You can use the service on compatible devices in the house. If two rooms need to watch at once, ask on WhatsApp before you start so you pick a package that fits.",
     "category": "General",
     "sortOrder": 3,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "faq4",
     "question": "Do you offer a refund or trial?",
-    "answer": "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only.",
+    "answer": "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
     "category": "General",
     "sortOrder": 4,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "faq5",
     "question": "Which apps should I use?",
-    "answer": "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins.",
+    "answer": "Compatible streaming apps depend on your device. Message us on WhatsApp and we will recommend a player that fits your Firestick, Smart TV, or phone.",
     "category": "General",
     "sortOrder": 5,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "faq6",
     "question": "Is my payment secure?",
-    "answer": "Checkout will use trusted payment providers in production. This local foundation has no payment gateway connected.",
+    "answer": "If you have a billing question, message us on WhatsApp.",
     "category": "General",
     "sortOrder": 6,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "cf1",
     "question": "How quickly do you reply?",
-    "answer": "Support aims to reply around the clock on WhatsApp and email.",
+    "answer": "Support aims to reply around the clock on WhatsApp.",
     "category": "Contact",
     "sortOrder": 1,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "cf2",
@@ -77,16 +77,16 @@
     "sortOrder": 2,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   },
   {
     "id": "cf3",
     "question": "Do you help with Firestick setup?",
-    "answer": "Setup help is one of the most common requests. We send steps with each new login.",
+    "answer": "Yes. Message us on WhatsApp and we will talk you through Firestick setup.",
     "category": "Contact",
     "sortOrder": 3,
     "visible": true,
     "createdAt": "2026-08-24T01:35:36.992Z",
-    "updatedAt": "2026-08-24T01:35:36.992Z"
+    "updatedAt": "2026-08-24T15:07:47.762Z"
   }
 ]

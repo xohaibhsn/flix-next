@@ -1,3 +1,4 @@
+import { assertProfessionalSeedCopy } from "@/lib/cms/dev-copy";
 import { defaultPageSeo } from "@/lib/seo";
 import type {
   BlogCategory,
@@ -14,14 +15,12 @@ import { createId } from "@/lib/cms/ids";
 import { HOME_SEO_LONGFORM, SEO_LONGFORM_HOME_ID, SUBSCRIPTION_SEO_LONGFORM } from "@/lib/cms/seo-longform";
 
 const PLAN_FEATURES = [
-  "20,000+ Live Channels (demo)",
-  "80,000+ Movies & Series (demo)",
-  "4K / FHD / HD Quality",
-  "Anti-Freeze Technology",
-  "All Devices Supported",
-  "Instant Activation",
-  "TV Guide (EPG)",
-  "24/7 Customer Support",
+  "Live TV on compatible devices",
+  "Films and series on demand",
+  "HD and FHD, with 4K where available",
+  "Firestick, Smart TV, mobile and laptop",
+  "Setup help through WhatsApp",
+  "7-Day Money Back Guarantee",
 ];
 
 export const SECTION_LABELS: Record<SectionType, string> = {
@@ -49,19 +48,19 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
   switch (type) {
     case "hero":
       return {
-        badge: "Reliable Streaming. Anytime. Anywhere.",
+        badge: "UK streaming for British households",
         heading: "Your Entertainment.",
         highlight: "Your Way.",
         description:
-          "Stream 20,000+ live TV channels and 80,000+ movies & series in stunning 4K. Instant setup on Smart TVs, phones, Firestick, and more.",
+          "Live TV, films and series on the devices you already use at home — Firestick, Smart TV, phone, tablet and laptop. Message us on WhatsApp to get set up.",
         primaryLabel: "Get Started",
         primaryHref: "/iptv-subscriptions-uk/",
         secondaryLabel: "View Plans",
         secondaryHref: "/iptv-subscriptions-uk/",
         trustItems: [
-          { id: "hero-t1", icon: "Zap", label: "Instant Setup" },
-          { id: "hero-t2", icon: "ShieldCheck", label: "99.9% Uptime" },
-          { id: "hero-t3", icon: "Clock3", label: "24/7 Support" },
+          { id: "hero-t1", icon: "Zap", label: "Simple Setup" },
+          { id: "hero-t2", icon: "ShieldCheck", label: "7-Day Guarantee" },
+          { id: "hero-t3", icon: "Clock3", label: "WhatsApp Support" },
         ],
         showcaseBrand: "THE FLIX",
         showcaseEyebrow: "Featured",
@@ -79,12 +78,12 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
     case "highlights":
       return {
         items: [
-          { id: "hl1", icon: "Radio", label: "20,000+ Live TV Channels", subtitle: "" },
-          { id: "hl2", icon: "Clapperboard", label: "80,000+ Movies & Series", subtitle: "" },
+          { id: "hl1", icon: "Radio", label: "Live TV streaming", subtitle: "" },
+          { id: "hl2", icon: "Clapperboard", label: "Films and series", subtitle: "" },
           { id: "hl3", icon: "SignalHigh", label: "HD / FHD / 4K", subtitle: "" },
           { id: "hl4", icon: "MonitorSmartphone", label: "Multi-device", subtitle: "" },
-          { id: "hl5", icon: "Headphones", label: "24/7 Support", subtitle: "" },
-          { id: "hl6", icon: "Zap", label: "99.9% Uptime", subtitle: "" },
+          { id: "hl5", icon: "Headphones", label: "WhatsApp support", subtitle: "" },
+          { id: "hl6", icon: "ShieldCheck", label: "7-Day Guarantee", subtitle: "" },
         ],
       };
     case "how-it-works":
@@ -92,7 +91,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         eyebrow: "",
         heading: "Get Started in 3 Simple Steps",
         description:
-          "From choosing a plan to first stream in under 5 minutes. No technician, no complicated setup.",
+          "Choose a plan, message us on WhatsApp, and start watching on the device you already own.",
         steps: [
           {
             id: "hiw1",
@@ -100,15 +99,15 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "ShoppingCart",
             title: "Choose a Plan",
             description:
-              "Pick the package that fits you — 1, 3, or 12 months. No hidden fees in this demo copy.",
+              "Pick the streaming package that fits your household. Names and prices are listed on the subscription page.",
           },
           {
             id: "hiw2",
             number: "2",
-            icon: "Mail",
-            title: "Get Your Details",
+            icon: "MessageCircle",
+            title: "Message us on WhatsApp",
             description:
-              "After payment, login details arrive by email. Real checkout is not connected yet.",
+              "After you choose a plan, message us on WhatsApp for setup and account details.",
           },
           {
             id: "hiw3",
@@ -116,7 +115,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "Play",
             title: "Start Watching",
             description:
-              "Open any compatible player, add your details, and enjoy live TV, movies & sports.",
+              "Open the apps on your Firestick, Smart TV, phone or laptop and start watching.",
           },
         ],
       };
@@ -164,7 +163,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         eyebrow: "",
         heading: "Simple, Transparent Pricing",
         description:
-          "Temporary local demo prices only. One package, full access — checkout is not connected yet.",
+          "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
         useCentralPlans: true,
         plans: [
           {
@@ -218,10 +217,10 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
     case "trust-stats":
       return {
         items: [
-          { id: "ts1", icon: "Tv", value: "20K+", label: "Live Channels" },
-          { id: "ts2", icon: "Clapperboard", value: "80K+", label: "Movies & Series" },
-          { id: "ts3", icon: "Users", value: "10K+", label: "Happy Customers" },
-          { id: "ts4", icon: "SignalHigh", value: "99.9%", label: "Uptime" },
+          { id: "ts1", icon: "Tv", value: "Live TV", label: "On your television" },
+          { id: "ts2", icon: "Clapperboard", value: "On demand", label: "Films & series" },
+          { id: "ts3", icon: "ShieldCheck", value: "7-day", label: "Money Back Guarantee" },
+          { id: "ts4", icon: "Headphones", value: "WhatsApp", label: "Setup & support" },
         ],
       };
     case "why-choose":
@@ -235,21 +234,21 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "SignalHigh",
             title: "High Quality Streams",
             description:
-              "Stable HD and 4K streams with anti-freeze servers so big games and premieres stay smooth.",
+              "Watchable HD and 4K on the devices you already own, for everyday British evenings.",
           },
           {
             id: "wc2",
             icon: "Zap",
             title: "Instant Activation",
             description:
-              "Pay once and start watching in minutes. Login details arrive by email — no waiting around.",
+              "Pay once and start watching in minutes. Message us on WhatsApp for setup and account details.",
           },
           {
             id: "wc3",
             icon: "MonitorSmartphone",
             title: "All Devices Welcome",
             description:
-              "Smart TVs, Firestick, Android, iPhone, MAG, Windows, and Mac. One subscription, every screen.",
+              "Firestick, Fire TV, Smart TV, Android TV, phone, tablet and laptop — one subscription for the house.",
           },
           {
             id: "wc4",
@@ -263,14 +262,14 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "ShieldCheck",
             title: "Reliable Network",
             description:
-              "Premium capacity and 99.9% uptime so your evening watch isn’t a buffering session.",
+              "A UK-focused streaming service with a 7-Day Money Back Guarantee if it is not the right fit.",
           },
           {
             id: "wc6",
             icon: "Headphones",
             title: "24/7 Support",
             description:
-              "Real people on WhatsApp and email around the clock — setup help, channel requests, and more.",
+              "Real people on WhatsApp when you need help with setup, devices, or your plan.",
           },
         ],
       };
@@ -290,46 +289,46 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             id: "faq1",
             question: "What do I need to get started?",
             answer:
-              "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer.",
+              "A stable internet connection and a compatible device: Firestick, Smart TV, Android TV, phone, tablet or laptop.",
           },
           {
             id: "faq2",
             question: "How fast will I receive my subscription?",
             answer:
-              "Activation is typically instant after payment. This local site does not process payments yet — copy is a placeholder for later CMS content.",
+              "Activation follows payment. Message us on WhatsApp if you need help getting started.",
           },
           {
             id: "faq3",
             question: "Can I use it on more than one device?",
             answer:
-              "Yes. You can install the service on multiple devices. Simultaneous streams depend on the plan — contact us if you need extra connections.",
+              "You can use the service on compatible devices in the house. If two rooms need to watch at once, ask on WhatsApp before you start so you pick a package that fits.",
           },
           {
             id: "faq4",
             question: "Do you offer a refund or trial?",
             answer:
-              "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only.",
+              "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
           },
           {
             id: "faq5",
             question: "Which apps should I use?",
             answer:
-              "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins.",
+              "Compatible streaming apps depend on your device. Message us on WhatsApp and we will recommend a player that fits your Firestick, Smart TV, or phone.",
           },
           {
             id: "faq6",
             question: "Is my payment secure?",
             answer:
-              "Checkout will use trusted payment providers in production. This local foundation has no payment gateway connected.",
+              "If you have a billing question, message us on WhatsApp.",
           },
         ],
       };
     case "cta":
       return {
-        heading: "Ready to Start Your Streaming Journey?",
+        heading: "Ready to start watching?",
         description:
-          "Join thousands of viewers already watching live sports, movies, and international TV — tonight.",
-        buttonLabel: "Get Started Now",
+          "Choose a streaming package, then message us on WhatsApp for setup on Firestick, Smart TV, or the device you already own.",
+        buttonLabel: "View streaming packages",
         buttonHref: "/iptv-subscriptions-uk/",
       };
     case "page-hero":
@@ -445,18 +444,18 @@ export function createSubscriptionSections(): CmsSection[] {
   const hero = createSection("page-hero", 1);
   hero.id = "sec-sub-hero";
   hero.data = {
-    eyebrow: "UK IPTV subscriptions",
-    heading: "IPTV Subscriptions",
+    eyebrow: "UK streaming packages",
+    heading: "Streaming subscriptions",
     highlight: "Built for Everyday Watching",
     description:
-      "Live TV, movies, and series on the devices you already own. Plans, setup, and FAQs are managed from Sidhu.",
+      "Live TV, films and series on the devices you already own. Choose a package, then message us on WhatsApp to get set up.",
   };
   const intro = createSection("rich-text", 2);
   intro.id = "sec-sub-intro";
   intro.label = "Intro";
   intro.data = {
     heading: "",
-    html: "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page are editable in Sidhu.</p>",
+    html: "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page can be reviewed before you get in touch.</p>",
   };
   const pricing = createSection("pricing", 3);
   pricing.id = "sec-sub-pricing";
@@ -469,12 +468,12 @@ export function createSubscriptionSections(): CmsSection[] {
   benefits.data = {
     eyebrow: "",
     heading: "Why subscribers choose The Flix",
-    description: "The same visual language as Home, with copy you can edit per page.",
+    description: "Enjoy reliable streaming, flexible plans, easy setup, and WhatsApp support.",
     cards: [
       { id: "ben-1", icon: "Tv", title: "Live sports & news", description: "Follow leagues, breaking news, and international channels without juggling apps." },
       { id: "ben-2", icon: "Clapperboard", title: "On-demand library", description: "Movies and series in HD, FHD, and 4K so you can catch up whenever you want." },
       { id: "ben-3", icon: "Zap", title: "Simple setup", description: "Most customers are watching within minutes on Firestick, Smart TV, or phone." },
-      { id: "ben-4", icon: "Headphones", title: "Support when you need it", description: "WhatsApp and email help for playlist setup, device questions, and plan changes." },
+      { id: "ben-4", icon: "Headphones", title: "Support when you need it", description: "WhatsApp help for setup, device questions, and plan changes." },
     ],
   };
   const how = createSection("how-it-works", 6);
@@ -487,11 +486,11 @@ export function createSubscriptionSections(): CmsSection[] {
   info.data = {
     eyebrow: "",
     heading: "Good to know",
-    description: "Structured informational content you can replace from Sidhu.",
+    description: "A few practical notes before you message us on WhatsApp.",
     cards: [
-      { id: "info-1", icon: "Users", title: "Who this is for", description: "Households that want live TV, sports, and a large VOD library on the devices they already own." },
-      { id: "info-2", icon: "Mail", title: "What you receive", description: "Login details, a short setup guide, and access for the billed period." },
-      { id: "info-3", icon: "ShieldCheck", title: "What this page is not", description: "There is no checkout or reseller portal on this build. Plan buttons go to Contact." },
+      { id: "info-1", icon: "Users", title: "Who this is for", description: "British households that want live TV and on-demand titles on the devices they already own." },
+      { id: "info-2", icon: "Headphones", title: "What you receive", description: "Account information and setup help through WhatsApp, for the billed period you choose." },
+      { id: "info-3", icon: "ShieldCheck", title: "If it is not a fit", description: "A 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period." },
     ],
   };
   const faq = createSection("faq", 9);
@@ -501,7 +500,7 @@ export function createSubscriptionSections(): CmsSection[] {
   cta.id = "sec-sub-cta";
   cta.data = {
     heading: "Ready to choose a plan?",
-    description: "Use Contact for this local preview. Payment is not live yet.",
+    description: "Choose a streaming package above, then message us on WhatsApp to get set up.",
     buttonLabel: "Talk to support",
     buttonHref: "/contact/",
   };
@@ -657,7 +656,7 @@ export function defaultFaqs(): FaqItem[] {
     {
       id: "cf1",
       question: "How quickly do you reply?",
-      answer: "Support aims to reply around the clock on WhatsApp and email.",
+      answer: "Support aims to reply around the clock on WhatsApp.",
       category: "Contact",
     },
     {
@@ -669,7 +668,7 @@ export function defaultFaqs(): FaqItem[] {
     {
       id: "cf3",
       question: "Do you help with Firestick setup?",
-      answer: "Setup help is one of the most common requests. We send steps with each new login.",
+      answer: "Yes. Message us on WhatsApp and we will talk you through Firestick setup.",
       category: "Contact",
     },
   ];
@@ -787,7 +786,7 @@ export function defaultBlogPosts(): BlogPost[] {
       slug: "getting-started-with-the-flix",
       excerpt: "Choose a plan, receive details, and start watching. A walkthrough that mirrors How It Works on Home.",
       content:
-        "<p>Pick a 1, 3, or 12 month plan on the subscription page.</p><p>When payments are connected, details will arrive by email. For now, use the Contact page if you need help.</p>",
+        "<p>Pick a plan on the subscription page.</p><p>Message us on WhatsApp for setup and account details. Sales and setup are handled there, not by email.</p>",
       categoryId: "cat-guides",
       featuredImage: null,
       status: "published",
@@ -814,3 +813,6 @@ export function mergeSectionData(type: SectionType, data: unknown): CmsSection["
   if (!data || typeof data !== "object" || Array.isArray(data)) return fallback;
   return { ...fallback, ...(data as Record<string, unknown>) } as CmsSection["data"];
 }
+
+assertProfessionalSeedCopy(JSON.stringify(defaultPages()), "default pages");
+assertProfessionalSeedCopy(JSON.stringify(defaultFaqs()), "default FAQs");

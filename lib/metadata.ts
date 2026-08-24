@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
 import { cms } from "@/lib/cms/repository";
+import { siteIconMetadata } from "@/lib/cms/favicon";
 import { siteConfig } from "@/lib/site-config";
 import { seoToMetadata } from "@/lib/seo";
 import { getSiteOrigin } from "@/lib/site-url";
@@ -9,7 +10,6 @@ import type { BlogPost, SiteSettings } from "@/lib/cms/types";
 export async function getSiteMetadata(): Promise<Metadata> {
   await connection();
   const settings = await cms.getSettings();
-  const favicon = settings.branding.favicon?.secureUrl;
   const og = settings.branding.defaultOgImage?.secureUrl;
   const description = settings.tagline || siteConfig.description;
   return {
@@ -19,7 +19,7 @@ export async function getSiteMetadata(): Promise<Metadata> {
       template: `%s | ${settings.siteName}`,
     },
     description,
-    icons: favicon ? { icon: [{ url: favicon }] } : { icon: "/favicon.svg" },
+    icons: siteIconMetadata(settings),
     openGraph: {
       siteName: settings.siteName,
       description,
@@ -40,13 +40,12 @@ export async function pageMetadata(
   await connection();
   const settings = await cms.getSettings();
   const og = settings.branding.defaultOgImage?.secureUrl;
-  const favicon = settings.branding.favicon?.secureUrl;
   const resolvedDescription = description || settings.tagline || siteConfig.description;
   return {
     title,
     description: resolvedDescription,
     alternates: { canonical: path },
-    icons: favicon ? { icon: [{ url: favicon }] } : { icon: "/favicon.svg" },
+    icons: siteIconMetadata(settings),
     openGraph: {
       title: `${title} | ${settings.siteName}`,
       description: resolvedDescription,

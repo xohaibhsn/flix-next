@@ -1,3 +1,4 @@
+import { assertProfessionalSeedCopy, containsLeakedDevCopy, isExactTestTitle } from "@/lib/cms/dev-copy";
 import type { CmsPage, CmsSection, RichContentData } from "@/lib/cms/types";
 
 export const SEO_LONGFORM_HOME_ID = "sec-home-seo-longform";
@@ -28,6 +29,14 @@ export function isPlaceholderRichHtml(html: string) {
   const text = plainTextFromHtml(html).toLowerCase();
   if (text.length < 80) return true;
   return PLACEHOLDER_SNIPPETS.some((snippet) => text.includes(snippet));
+}
+
+export function isLeakedTestRichContent(section: CmsSection) {
+  if (section.type !== "rich-content") return false;
+  const data = section.data as RichContentData;
+  const html = typeof data.html === "string" ? data.html : "";
+  if (containsLeakedDevCopy(`${data.eyebrow || ""} ${data.heading || ""} ${html}`)) return true;
+  return isExactTestTitle(data.heading || "") || isExactTestTitle(data.eyebrow || "");
 }
 
 export const HOME_SEO_HTML = `<p>British households do not need another complicated entertainment setup. They need something that works on the telly already in the living room, and on the phone when someone is upstairs. The Flix is a UK streaming service built around that idea: live TV, films and series through familiar streaming apps, with setup handled in a conversation rather than a pile of instructions.</p>
@@ -171,44 +180,72 @@ function isPlaceholderSection(section: CmsSection) {
   return isPlaceholderRichHtml(html);
 }
 
+function isReplaceableRichSection(section: CmsSection) {
+  return isPlaceholderSection(section) || isLeakedTestRichContent(section);
+}
+
 function hasCustomLongform(sections: CmsSection[]) {
   return sections.some((section) => {
     if (section.type !== "rich-content") return false;
     const html = typeof (section.data as RichContentData).html === "string" ? (section.data as RichContentData).html : "";
-    return !isPlaceholderRichHtml(html) && wordCountFromHtml(html) >= 250;
+    return !isReplaceableRichSection(section) && wordCountFromHtml(html) >= 250;
   });
+}
+
+function fillRichContent(section: CmsSection, spec: PageSpec): CmsSection {
+  return {
+    ...section,
+    label: spec.label,
+    data: {
+      ...spec.data,
+      scrollable: true,
+      scrollHeight: spec.data.scrollHeight,
+      width: spec.data.width,
+    },
+  };
 }
 
 export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed: boolean } {
   const spec = SPECS.find((item) => item.slug === page.slug);
   if (!spec) return { page, changed: false };
 
-  const sections = [...page.sections].sort((a, b) => a.order - b.order);
+  let sections = [...page.sections].sort((a, b) => a.order - b.order);
+  const leaked = sections.filter((section) => isLeakedTestRichContent(section));
+  const professional = hasCustomLongform(sections);
+
+  if (leaked.length && professional) {
+    const drop = new Set(leaked.map((section) => section.id));
+    return {
+      page: { ...page, sections: reindex(sections.filter((section) => !drop.has(section.id))) },
+      changed: true,
+    };
+  }
+
+  if (leaked.length) {
+    const [first, ...extras] = leaked;
+    const drop = new Set(extras.map((section) => section.id));
+    sections = sections
+      .filter((section) => !drop.has(section.id))
+      .map((section) => (section.id === first.id ? fillRichContent(section, spec) : section));
+    return { page: { ...page, sections: reindex(sections) }, changed: true };
+  }
+
   const rich = sections.filter((section) => section.type === "rich-content");
   const byId = rich.find((section) => spec.preferredIds.includes(section.id));
   const placeholder = rich.find((section) => isPlaceholderSection(section));
 
-  if (byId && !isPlaceholderSection(byId)) {
+  if (byId && !isReplaceableRichSection(byId)) {
     return { page, changed: false };
   }
 
-  const target = byId && isPlaceholderSection(byId) ? byId : placeholder;
+  const target = byId && isReplaceableRichSection(byId) ? byId : placeholder;
 
-  if (!target && hasCustomLongform(sections)) {
+  if (!target && professional) {
     return { page, changed: false };
   }
 
   if (target) {
-    const next = sections.map((section) =>
-      section.id === target.id
-        ? {
-            ...section,
-            label: spec.label,
-            visible: true,
-            data: spec.data,
-          }
-        : section,
-    );
+    const next = sections.map((section) => (section.id === target.id ? fillRichContent(section, spec) : section));
     return { page: { ...page, sections: reindex(next) }, changed: true };
   }
 
@@ -236,3 +273,8 @@ export function applySeoLongformToPages(pages: CmsPage[]) {
   });
   return { pages: next, changed };
 }
+
+assertProfessionalSeedCopy(HOME_SEO_HTML, "Home SEO longform");
+assertProfessionalSeedCopy(SUBSCRIPTION_SEO_HTML, "Subscription SEO longform");
+assertProfessionalSeedCopy(HOME_SEO_LONGFORM.heading, "Home SEO heading");
+assertProfessionalSeedCopy(SUBSCRIPTION_SEO_LONGFORM.heading, "Subscription SEO heading");

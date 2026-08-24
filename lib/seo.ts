@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { MediaRef, PageSeo, SiteSettings } from "@/lib/cms/types";
+import { siteIconMetadata } from "@/lib/cms/favicon";
 import { siteConfig } from "@/lib/site-config";
 
 export function isSiteIndexable() {
@@ -48,13 +49,12 @@ export function seoToMetadata(
   const ogDescription = seo.ogDescription || description;
   const image: MediaRef | null = seo.ogImage || settings.branding.defaultOgImage;
   const canonical = seo.canonicalUrl || path;
-  const favicon = settings.branding.favicon?.secureUrl;
   return {
     title,
     description,
     alternates: { canonical },
     robots: robotsContent(seo.robotsIndex, seo.robotsFollow),
-    icons: favicon ? { icon: [{ url: favicon }] } : { icon: "/favicon.svg" },
+    icons: siteIconMetadata(settings),
     openGraph: {
       title: `${ogTitle} | ${settings.siteName}`,
       description: ogDescription,

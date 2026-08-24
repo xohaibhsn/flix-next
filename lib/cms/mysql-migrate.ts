@@ -12,6 +12,7 @@ import {
 import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, SectionType, SiteSettings } from "@/lib/cms/types";
+import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
@@ -387,6 +388,66 @@ export async function seedManagedRedirectsIfNeeded() {
   );
 }
 
+async function persistPageSectionDiff(
+  pageId: string,
+  before: CmsSection[],
+  after: CmsSection[],
+) {
+  const conn = await getDbPool().getConnection();
+  await conn.beginTransaction();
+  try {
+    const afterIds = new Set(after.map((section) => section.id));
+    const beforeMap = new Map(before.map((section) => [section.id, section]));
+    for (const section of before) {
+      if (!afterIds.has(section.id)) {
+        await conn.execute("DELETE FROM page_sections WHERE id = ? AND page_id = ?", [section.id, pageId]);
+      }
+    }
+    for (const section of after) {
+      const previous = beforeMap.get(section.id);
+      if (previous && JSON.stringify(previous) === JSON.stringify(section)) continue;
+      await conn.execute(
+        `INSERT INTO page_sections
+          (id, page_id, section_type, label, sort_order, visible, section_data)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           section_type = VALUES(section_type),
+           label = VALUES(label),
+           sort_order = VALUES(sort_order),
+           visible = VALUES(visible),
+           section_data = VALUES(section_data)`,
+        [
+          section.id,
+          pageId,
+          section.type,
+          section.label,
+          section.order,
+          section.visible ? 1 : 0,
+          JSON.stringify(section.data),
+        ],
+      );
+    }
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
+async function cleanupDemoFaqAnswers() {
+  const pool = getDbPool();
+  const [rows] = await pool.query<Array<RowDataPacket & { id: string; answer: string }>>(
+    "SELECT id, answer FROM faqs",
+  );
+  for (const row of rows) {
+    const next = rewriteDemoCopy(String(row.answer || ""));
+    if (next === row.answer) continue;
+    await pool.execute("UPDATE faqs SET answer = ? WHERE id = ?", [next, row.id]);
+  }
+}
+
 export async function seedSeoLongformIfNeeded() {
   const pool = getDbPool();
   for (const slug of ["/", "/iptv-subscriptions-uk/"]) {
@@ -429,34 +490,11 @@ export async function seedSeoLongformIfNeeded() {
         data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
       })),
     };
-    const result = applySeoLongformToPage(sanitizePage(page));
-    if (!result.changed) continue;
-    const conn = await pool.getConnection();
-    await conn.beginTransaction();
-    try {
-      await conn.execute("DELETE FROM page_sections WHERE page_id = ?", [row.id]);
-      for (const section of result.page.sections) {
-        await conn.execute(
-          `INSERT INTO page_sections
-            (id, page_id, section_type, label, sort_order, visible, section_data)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            section.id,
-            row.id,
-            section.type,
-            section.label,
-            section.order,
-            section.visible ? 1 : 0,
-            JSON.stringify(section.data),
-          ],
-        );
-      }
-      await conn.commit();
-    } catch (error) {
-      await conn.rollback();
-      throw error;
-    } finally {
-      conn.release();
-    }
+    const safe = sanitizePage(page);
+    const longform = applySeoLongformToPage(safe);
+    const cleaned = applyPublicCopyCleanupToPage(longform.page);
+    if (!longform.changed && !cleaned.changed) continue;
+    await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
   }
+  await cleanupDemoFaqAnswers();
 }

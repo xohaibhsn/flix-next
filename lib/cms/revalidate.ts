@@ -46,6 +46,8 @@ export function revalidatePublicSite() {
   for (const path of PUBLIC_PATHS) {
     revalidatePath(path);
   }
+  revalidatePath("/icon");
+  revalidatePath("/favicon.ico");
   revalidatePath("/sitemap.xml");
   revalidatePath("/robots.txt");
 }

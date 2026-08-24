@@ -124,28 +124,28 @@
           "data": {
             "eyebrow": "",
             "heading": "Get Started in 3 Simple Steps",
-            "description": "From choosing a plan to first stream in under 5 minutes. No technician, no complicated setup.",
+            "description": "Choose a plan, message us on WhatsApp, and start watching on the device you already own.",
             "steps": [
               {
                 "id": "hiw1",
                 "number": "1",
                 "icon": "ShoppingCart",
                 "title": "Choose a Plan",
-                "description": "Pick the package that fits you — 1, 3, or 12 months. No hidden fees in this demo copy."
+                "description": "Pick the streaming package that fits your household. Names and prices are listed on the subscription page."
               },
               {
                 "id": "hiw2",
                 "number": "2",
-                "icon": "Mail",
+                "icon": "MessageCircle",
                 "title": "Get Your Details",
-                "description": "After payment, login details arrive by email. Real checkout is not connected yet."
+                "description": "After you choose a plan, message us on WhatsApp for setup and account details."
               },
               {
                 "id": "hiw3",
                 "number": "3",
                 "icon": "Play",
                 "title": "Start Watching",
-                "description": "Open any compatible player, add your details, and enjoy live TV, movies & sports."
+                "description": "Open the apps on your Firestick, Smart TV, phone or laptop and start watching."
               }
             ]
           }
@@ -200,7 +200,7 @@
           "data": {
             "eyebrow": "",
             "heading": "Simple, Transparent Pricing",
-            "description": "Temporary local demo prices only. One package, full access — checkout is not connected yet.",
+            "description": "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
             "useCentralPlans": true,
             "plans": [
               {
@@ -359,13 +359,13 @@
                 "id": "wc1",
                 "icon": "SignalHigh",
                 "title": "High Quality Streams",
-                "description": "Stable HD and 4K streams with anti-freeze servers so big games and premieres stay smooth."
+                "description": "Watchable HD and 4K on the devices you already own, for everyday British evenings."
               },
               {
                 "id": "wc2",
                 "icon": "Zap",
                 "title": "Instant Activation",
-                "description": "Pay once and start watching in minutes. Login details arrive by email — no waiting around."
+                "description": "Pay once and start watching in minutes. Message us on WhatsApp for setup and account details."
               },
               {
                 "id": "wc3",
@@ -383,13 +383,13 @@
                 "id": "wc5",
                 "icon": "ShieldCheck",
                 "title": "Reliable Network",
-                "description": "Premium capacity and 99.9% uptime so your evening watch isn’t a buffering session."
+                "description": "A UK-focused streaming service with a 7-Day Money Back Guarantee if it is not the right fit."
               },
               {
                 "id": "wc6",
                 "icon": "Headphones",
                 "title": "24/7 Support",
-                "description": "Real people on WhatsApp and email around the clock — setup help, channel requests, and more."
+                "description": "Real people on WhatsApp when you need help with setup, devices, or your plan."
               }
             ]
           }
@@ -431,12 +431,12 @@
               {
                 "id": "faq1",
                 "question": "What do I need to get started?",
-                "answer": "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer."
+                "answer": "A stable internet connection and a compatible device: Firestick, Smart TV, Android TV, phone, tablet or laptop."
               },
               {
                 "id": "faq2",
                 "question": "How fast will I receive my subscription?",
-                "answer": "Activation is typically instant after payment. This local site does not process payments yet — copy is a placeholder for later CMS content."
+                "answer": "Activation follows payment. Message us on WhatsApp if you need help getting started."
               },
               {
                 "id": "faq3",
@@ -446,17 +446,17 @@
               {
                 "id": "faq4",
                 "question": "Do you offer a refund or trial?",
-                "answer": "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only."
+                "answer": "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period."
               },
               {
                 "id": "faq5",
                 "question": "Which apps should I use?",
-                "answer": "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins."
+                "answer": "Compatible streaming apps depend on your device. Message us on WhatsApp and we will recommend a player that fits your Firestick, Smart TV, or phone."
               },
               {
                 "id": "faq6",
                 "question": "Is my payment secure?",
-                "answer": "Checkout will use trusted payment providers in production. This local foundation has no payment gateway connected."
+                "answer": "If you have a billing question, message us on WhatsApp."
               }
             ]
           }
@@ -468,8 +468,8 @@
           "order": 11,
           "visible": true,
           "data": {
-            "heading": "Ready to Start Your Streaming Journey?",
-            "description": "Join thousands of viewers already watching live sports, movies, and international TV — tonight.",
+            "heading": "Ready to start watching?",
+            "description": "Choose a streaming package, then message us on WhatsApp for setup on Firestick, Smart TV, or the device you already own.",
             "buttonLabel": "Get Started Now",
             "buttonHref": "/iptv-subscriptions-uk/"
           }
@@ -493,7 +493,7 @@
             "eyebrow": "UK IPTV subscriptions",
             "heading": "IPTV Subscriptions",
             "highlight": "Built for Everyday Watching",
-            "description": "Live TV, movies, and series on the devices you already own. Plans, setup, and FAQs are managed from Sidhu."
+            "description": "Live TV, movies, and series on the devices you already own. Message us on WhatsApp when you are ready to get set up."
           }
         },
         {
@@ -504,7 +504,7 @@
           "visible": true,
           "data": {
             "heading": "",
-            "html": "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page are editable in Sidhu.</p>"
+            "html": "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page can be reviewed before you message us on WhatsApp.</p>"
           }
         },
         {
@@ -516,7 +516,7 @@
           "data": {
             "eyebrow": "",
             "heading": "Simple, Transparent Pricing",
-            "description": "Temporary local demo prices only. One package, full access — checkout is not connected yet.",
+            "description": "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
             "useCentralPlans": true,
             "plans": [
               {
@@ -609,7 +609,7 @@
           "data": {
             "eyebrow": "",
             "heading": "Why subscribers choose The Flix",
-            "description": "The same visual language as Home, with copy you can edit per page.",
+            "description": "Enjoy reliable streaming, flexible plans, easy setup, and WhatsApp support.",
             "cards": [
               {
                 "id": "ben-1",
@@ -633,7 +633,7 @@
                 "id": "ben-4",
                 "icon": "Headphones",
                 "title": "Support when you need it",
-                "description": "WhatsApp and email help for playlist setup, device questions, and plan changes."
+                "description": "WhatsApp help for setup, device questions, and plan changes."
               }
             ]
           }
@@ -647,28 +647,28 @@
           "data": {
             "eyebrow": "",
             "heading": "Get Started in 3 Simple Steps",
-            "description": "From choosing a plan to first stream in under 5 minutes. No technician, no complicated setup.",
+            "description": "Choose a plan, message us on WhatsApp, and start watching on the device you already own.",
             "steps": [
               {
                 "id": "hiw1",
                 "number": "1",
                 "icon": "ShoppingCart",
                 "title": "Choose a Plan",
-                "description": "Pick the package that fits you — 1, 3, or 12 months. No hidden fees in this demo copy."
+                "description": "Pick the streaming package that fits your household. Names and prices are listed on the subscription page."
               },
               {
                 "id": "hiw2",
                 "number": "2",
-                "icon": "Mail",
+                "icon": "MessageCircle",
                 "title": "Get Your Details",
-                "description": "After payment, login details arrive by email. Real checkout is not connected yet."
+                "description": "After you choose a plan, message us on WhatsApp for setup and account details."
               },
               {
                 "id": "hiw3",
                 "number": "3",
                 "icon": "Play",
                 "title": "Start Watching",
-                "description": "Open any compatible player, add your details, and enjoy live TV, movies & sports."
+                "description": "Open the apps on your Firestick, Smart TV, phone or laptop and start watching."
               }
             ]
           }
@@ -725,7 +725,7 @@
           "data": {
             "eyebrow": "",
             "heading": "Good to know",
-            "description": "Structured informational content you can replace from Sidhu.",
+            "description": "A few practical notes before you message us on WhatsApp.",
             "cards": [
               {
                 "id": "info-1",
@@ -737,13 +737,13 @@
                 "id": "info-2",
                 "icon": "Mail",
                 "title": "What you receive",
-                "description": "Login details, a short setup guide, and access for the billed period."
+                "description": "Account information and setup help through WhatsApp, for the billed period you choose."
               },
               {
                 "id": "info-3",
                 "icon": "ShieldCheck",
                 "title": "What this page is not",
-                "description": "There is no checkout or reseller portal on this build. Plan buttons go to Contact."
+                "description": "Choose a package above, then message us on WhatsApp to get started."
               }
             ]
           }
@@ -767,12 +767,12 @@
               {
                 "id": "faq1",
                 "question": "What do I need to get started?",
-                "answer": "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer."
+                "answer": "A stable internet connection and a compatible device: Firestick, Smart TV, Android TV, phone, tablet or laptop."
               },
               {
                 "id": "faq2",
                 "question": "How fast will I receive my subscription?",
-                "answer": "Activation is typically instant after payment. This local site does not process payments yet — copy is a placeholder for later CMS content."
+                "answer": "Activation follows payment. Message us on WhatsApp if you need help getting started."
               },
               {
                 "id": "faq3",
@@ -782,17 +782,17 @@
               {
                 "id": "faq4",
                 "question": "Do you offer a refund or trial?",
-                "answer": "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only."
+                "answer": "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period."
               },
               {
                 "id": "faq5",
                 "question": "Which apps should I use?",
-                "answer": "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins."
+                "answer": "Compatible streaming apps depend on your device. Message us on WhatsApp and we will recommend a player that fits your Firestick, Smart TV, or phone."
               },
               {
                 "id": "faq6",
                 "question": "Is my payment secure?",
-                "answer": "Checkout will use trusted payment providers in production. This local foundation has no payment gateway connected."
+                "answer": "If you have a billing question, message us on WhatsApp."
               }
             ]
           }
@@ -805,7 +805,7 @@
           "visible": true,
           "data": {
             "heading": "Ready to choose a plan?",
-            "description": "Use Contact for this local preview. Payment is not live yet.",
+            "description": "Choose a streaming package above, then message us on WhatsApp to get set up.",
             "buttonLabel": "Talk to support",
             "buttonHref": "/contact/"
           }
