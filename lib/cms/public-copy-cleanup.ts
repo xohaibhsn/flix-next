@@ -1,4 +1,4 @@
-import type { CmsPage, CmsSection, HowItWorksData } from "@/lib/cms/types";
+import type { BlogPost, CmsPage, CmsSection, FaqItem, HowItWorksData, PricingPlan } from "@/lib/cms/types";
 import { isLegacyHowItWorks, ORDER_PROCESS_HOW_IT_WORKS } from "@/lib/cms/order-process";
 
 const EXACT_REPLACEMENTS: Array<[string, string]> = [
@@ -16,7 +16,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Temporary local demo prices only. One package, full access — checkout is not connected yet.",
-    "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
+    "Choose the streaming package that best suits your needs.",
   ],
   [
     "WhatsApp and email help for playlist setup, device questions, and plan changes.",
@@ -158,6 +158,198 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
     "View streaming packages",
     "Get Started",
   ],
+  [
+    "Enjoy reliable IPTV streaming across the UK with 20,000+ live TV channels and 80,000+ movies & series in HD, FHD, 4K and 8K. Instant setup on Smart TVs, phones, Firestick, and more.",
+    "UK streaming on the devices you already use — Firestick, Fire TV, Smart TV, Android TV and mobile. Message us on WhatsApp to get set up.",
+  ],
+  [
+    "Stream 20,000+ live TV channels and 80,000+ movies & series in stunning 4K. Instant setup on Smart TVs, phones, Firestick, and more.",
+    "UK streaming on the devices you already use — Firestick, Fire TV, Smart TV, Android TV and mobile. Message us on WhatsApp to get set up.",
+  ],
+  [
+    "20,000+ live TV channels and 80,000+ movies & series",
+    "a wide range of live TV and an extensive entertainment selection",
+  ],
+  [
+    "in HD, FHD, 4K and 8K",
+    "in HD, FHD and 4K where compatible",
+  ],
+  [
+    "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
+    "Choose the streaming package that best suits your needs.",
+  ],
+  [
+    "Prices and package names are managed centrally, so this article does not quote figures that might go out of date.",
+    "View current packages and prices there.",
+  ],
+  [
+    "This page does not freeze prices in the article because packages are managed in one place and can change.",
+    "This page does not freeze prices in the article because packages can change.",
+  ],
+  [
+    "20,000+ Live Channels (demo)",
+    "Wide range of live TV",
+  ],
+  [
+    "80,000+ Movies & Series (demo)",
+    "Extensive entertainment selection",
+  ],
+  [
+    "20,000+ Live TV Channels",
+    "Wide range of live TV",
+  ],
+  [
+    "20,000+ Live Channels",
+    "Wide range of live TV",
+  ],
+  [
+    "80,000+ Movies & Series",
+    "Extensive entertainment selection",
+  ],
+  [
+    "Anti-Freeze Technology",
+    "Reliable streaming experience",
+  ],
+  [
+    "4K / FHD / HD Quality",
+    "HD / FHD / 4K where compatible",
+  ],
+  [
+    "All Devices Supported",
+    "Firestick, Fire TV, Smart TV and Android TV",
+  ],
+  [
+    "Instant Activation",
+    "Fast setup through WhatsApp",
+  ],
+  [
+    "24/7 Customer Support",
+    "Customer support via WhatsApp",
+  ],
+  [
+    "99.9% Uptime",
+    "WhatsApp Support",
+  ],
+  [
+    "Instant Setup",
+    "Fast Setup",
+  ],
+  [
+    "Happy Customers",
+    "Money Back Guarantee",
+  ],
+  [
+    "20K+",
+    "Live TV",
+  ],
+  [
+    "80K+",
+    "On demand",
+  ],
+  [
+    "10K+",
+    "7-day",
+  ],
+  [
+    "99.9%",
+    "WhatsApp",
+  ],
+  [
+    "Uptime",
+    "Setup & support",
+  ],
+  [
+    "Encrypted checkout and private connections. We don't share your data or flood you with ads.",
+    "Account details stay private. Payment instructions are sent on WhatsApp, not published on the website.",
+  ],
+  [
+    "Encrypted checkout and private connections. We don’t share your data or flood you with ads.",
+    "Account details stay private. Payment instructions are sent on WhatsApp, not published on the website.",
+  ],
+  [
+    "A massive on-demand library with the latest releases, classics, and binge-worthy series in HD & 4K.",
+    "Films and series on demand, including recent titles and classics, in HD and 4K where compatible.",
+  ],
+  [
+    "Best IPTV Service Providers in UK",
+    "UK Streaming Service for Firestick & Smart TV",
+  ],
+  [
+    "Best IPTV UK | Premium IPTV Subscription",
+    "UK Streaming Subscriptions for Firestick & Smart TV",
+  ],
+  [
+    "Stream your favourite live TV, sports, movies & series in HD and 4K with the UK's best IPTV service provider. Get reliable streaming with The Flix IPTV today.",
+    "UK streaming for Firestick, Fire TV, Smart TV and Android TV. Choose a plan, then message us on WhatsApp to get set up.",
+  ],
+  [
+    "Stream your favourite live TV, sports, movies & series in HD and 4K with the UK’s best IPTV service provider. Get reliable streaming with The Flix IPTV today.",
+    "UK streaming for Firestick, Fire TV, Smart TV and Android TV. Choose a plan, then message us on WhatsApp to get set up.",
+  ],
+  [
+    "Get a premium IPTV subscription in the UK with HD & 4K channels, reliable streaming, 24/7 support and a free trial. Join The Flix IPTV and start watching today.",
+    "Streaming packages for UK homes on Firestick, Fire TV, Smart TV and Android TV. Payment details and setup are sent on WhatsApp.",
+  ],
+  [
+    "Contact THE FLIX IPTV support by WhatsApp, email, or form.",
+    "Contact THE FLIX IPTV on WhatsApp for plans, payment details, and setup.",
+  ],
+  [
+    "A local demo guide covering the usual Firestick apps, playlist steps, and what to check if the stream will not load.",
+    "How to install a player on Firestick, add your details, and what to check if a stream will not load.",
+  ],
+  [
+    "This is demo blog content for the local Next.js foundation. The real TipTap/MySQL CMS is not connected yet.",
+    "Most Firestick viewers install a player, add a playlist or Xtream details, then pin the app to the home row.",
+  ],
+  [
+    "This article is placeholder copy so the /blog/ and /blog/[slug]/ routes can be reviewed locally.",
+    "Ask on WhatsApp if you need a player recommendation for your Smart TV.",
+  ],
+  [
+    "Here is a plain-language demo explainer.",
+    "Here is a plain-language explainer.",
+  ],
+  [
+    "Final production copy will be written in the CMS later.",
+    "If the picture stutters, drop to FHD before assuming the service is down.",
+  ],
+  [
+    "Pick a 1, 3, or 12 month demo plan on the subscription page. Prices here are temporary local values.",
+    "Pick a plan on the subscription page.",
+  ],
+  [
+    "When payments are connected, details will arrive by email. For now, use the Contact page to rehearse the journey.",
+    "Message us on WhatsApp for setup and account details. Sales and setup are handled there, not by email.",
+  ],
+  [
+    "Yes — include your email in the form so we can match your request.",
+    "Yes. Message us on WhatsApp with your details so we can match your request.",
+  ],
+  [
+    "Yes — include your email in the form. The form is UI-only on this local site and does not send messages yet.",
+    "Yes. Message us on WhatsApp with your details so we can match your request.",
+  ],
+  [
+    "24/7 support (demo placeholder)",
+    "Support available on WhatsApp",
+  ],
+  [
+    "Available worldwide · local demo",
+    "Available worldwide",
+  ],
+  [
+    "Stream live TV, movies, and series in HD, FHD, and 4K. Local demo site for The Flix — contact values are placeholders.",
+    "UK streaming for Firestick, Fire TV, Smart TV and Android TV. Message us on WhatsApp to get set up.",
+  ],
+  [
+    "Hours come from Site Settings so they stay consistent across the site.",
+    "Message us on WhatsApp during support hours for setup, payment details and account help.",
+  ],
+  [
+    "What this page is not",
+    "Ready to start",
+  ],
 ];
 
 export function rewriteDemoCopy(value: string) {
@@ -243,4 +435,40 @@ export function applyPublicCopyCleanupToPages(pages: CmsPage[]) {
     return result.page;
   });
   return { pages: next, changed };
+}
+
+export function applyPublicCopyCleanupToPlan(plan: PricingPlan): { plan: PricingPlan; changed: boolean } {
+  const features = plan.features.map((feature) => rewriteDemoCopy(feature));
+  const changed = features.some((feature, index) => feature !== plan.features[index]);
+  if (!changed) return { plan, changed: false };
+  return { plan: { ...plan, features }, changed: true };
+}
+
+export function applyPublicCopyCleanupToFaq(item: FaqItem): { item: FaqItem; changed: boolean } {
+  const question = rewriteDemoCopy(item.question);
+  const answer = rewriteDemoCopy(item.answer);
+  const changed = question !== item.question || answer !== item.answer;
+  if (!changed) return { item, changed: false };
+  return { item: { ...item, question, answer }, changed: true };
+}
+
+export function applyPublicCopyCleanupToPost(post: BlogPost): { post: BlogPost; changed: boolean } {
+  const excerpt = rewriteDemoCopy(post.excerpt);
+  const content = rewriteDemoCopy(post.content);
+  const seoTitle = rewriteDemoCopy(post.seoTitle);
+  const seoDescription = rewriteDemoCopy(post.seoDescription);
+  const ogTitle = rewriteDemoCopy(post.ogTitle);
+  const ogDescription = rewriteDemoCopy(post.ogDescription);
+  const changed =
+    excerpt !== post.excerpt ||
+    content !== post.content ||
+    seoTitle !== post.seoTitle ||
+    seoDescription !== post.seoDescription ||
+    ogTitle !== post.ogTitle ||
+    ogDescription !== post.ogDescription;
+  if (!changed) return { post, changed: false };
+  return {
+    post: { ...post, excerpt, content, seoTitle, seoDescription, ogTitle, ogDescription },
+    changed: true,
+  };
 }

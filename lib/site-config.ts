@@ -5,13 +5,13 @@ export const siteConfig = {
   shortName: "THE FLIX",
   tagline: "Your Entertainment. Your Way.",
   description:
-    "Stream live TV, movies, and series in HD, FHD, and 4K. Local demo site for The Flix — contact values are placeholders.",
+    "UK streaming for Firestick, Fire TV, Smart TV and Android TV. Message us on WhatsApp to get set up.",
   url: "http://localhost:3000",
   email: "support@theflixiptv.com",
   phone: "+1 (234) 567-8900",
   whatsapp: "1234567890",
-  hours: "24/7 support (demo placeholder)",
-  location: "Available worldwide · local demo",
+  hours: "Support available on WhatsApp",
+  location: "Available worldwide",
   nav: [
     { label: "Home", href: "/" },
     { label: "IPTV Subscription", href: "/iptv-subscriptions-uk/" },

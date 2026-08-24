@@ -56,7 +56,7 @@ export const HOME_SEO_HTML = `<p>British households do not need another complica
 <h2>Flexible streaming for UK homes</h2>
 <p>UK streaming should feel ordinary: the news in the morning, a film on Friday, sport when it is on, something for the children at the weekend. The Flix is aimed at that rhythm, not at people who want to tinker with settings all evening.</p>
 <p>Live TV streaming sits alongside on-demand titles, so you are not locked into one way of watching. Entertainment streaming on the main television still matters most, but it helps when the same subscription can follow you to a tablet if the living room is busy.</p>
-<p>Plans are listed on our IPTV Subscription page. Prices and package names are managed centrally, so this article does not quote figures that might go out of date. View the current streaming packages on that page, then message us on WhatsApp if you want a recommendation for your devices.</p>
+<p>Plans are listed on our IPTV Subscription page. View the current streaming packages there, then message us on WhatsApp if you want a recommendation for your devices.</p>
 <h2>Why customers choose The Flix</h2>
 <p>People stay with a streaming service when it is easy to start, easy to ask a question, and honest about what happens if it is not a fit. We do not claim to be the number one provider in the United Kingdom, and we will not invent channel counts or uptime badges to sound bigger than we are.</p>
 <p>What we do offer is a UK-focused streaming subscription, setup through WhatsApp, and a 7-Day Money Back Guarantee if the service is not suitable. That combination is enough for many British households: Firestick or Smart TV in the lounge, a phone for later, and a person on the other end of WhatsApp if you get stuck.</p>
@@ -93,7 +93,7 @@ export const SUBSCRIPTION_SEO_HTML = `<p>This page is for UK customers who want 
 <h2>A UK-focused streaming experience</h2>
 <p>UK streaming is its own habit. People want the news, sport when it is on, a film without a lecture, and something on in the background on a Sunday. A streaming subscription for British households should respect that. The Flix is organised around everyday watching, not around a marketing list of countries and servers.</p>
 <p>Searches for IPTV subscriptions in the UK often mean the same practical need: live channels and on-demand titles on a Firestick or Smart TV, without a second satellite dish. We keep the language plain so you know what you are signing up for. If a friend forwarded you an IPTV link, this page is still the right place to compare packages and then continue on WhatsApp.</p>
-<p>You remain in control of the plan you pick. This page does not freeze prices in the article because packages are managed in one place and can change. View our current streaming packages above, then decide. If you want a steer for Firestick versus Smart TV, ask on WhatsApp — that is a better use of five minutes than comparing outdated numbers in a blog post.</p>
+<p>You remain in control of the plan you pick. This page does not freeze prices in the article because packages can change. View our current streaming packages above, then decide. If you want a steer for Firestick versus Smart TV, ask on WhatsApp — that is a better use of five minutes than comparing outdated numbers in a blog post.</p>
 <h2>What to expect from your subscription</h2>
 <p>A The Flix subscription is meant to be ordinary in the best sense: you pay for a streaming package, you set it up with help, and you watch on the devices you already have.</p>
 <ul>

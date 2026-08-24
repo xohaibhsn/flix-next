@@ -114,7 +114,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "Clapperboard",
             title: "Movies & Series",
             description:
-              "A massive on-demand library with the latest releases, classics, and binge-worthy series in HD & 4K.",
+              "Films and series on demand, including recent titles and classics, in HD and 4K where compatible.",
             linkLabel: "Explore",
             linkHref: "/iptv-subscriptions-uk/",
             tone: "purple",
@@ -136,7 +136,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         eyebrow: "",
         heading: "Simple, Transparent Pricing",
         description:
-          "View our current streaming packages below. Names and prices are managed centrally so they stay current.",
+          "Choose the streaming package that best suits your needs.",
         useCentralPlans: true,
         plans: [
           {
@@ -212,7 +212,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
           {
             id: "wc2",
             icon: "Zap",
-            title: "Instant Activation",
+            title: "Fast Setup",
             description:
               "Pay once and start watching in minutes. Message us on WhatsApp for setup and account details.",
           },
@@ -228,7 +228,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             icon: "Lock",
             title: "Secure & Private",
             description:
-              "Encrypted checkout and private connections. We don’t share your data or flood you with ads.",
+              "Account details stay private. Payment instructions are sent on WhatsApp, not published on the website.",
           },
           {
             id: "wc5",
@@ -369,7 +369,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
     case "hours":
       return {
         heading: "Support hours",
-        description: "Hours come from Site Settings so they stay consistent across the site.",
+        description: "Message us on WhatsApp during support hours for setup, payment details and account help.",
       };
   }
 }
@@ -635,7 +635,7 @@ export function defaultFaqs(): FaqItem[] {
     {
       id: "cf2",
       question: "Can I ask about an existing order?",
-      answer: "Yes — include your email in the form so we can match your request.",
+      answer: "Yes. Message us on WhatsApp with your details so we can match your request.",
       category: "Contact",
     },
     {
@@ -682,7 +682,7 @@ export function defaultBlogPosts(): BlogPost[] {
       title: "How to Watch IPTV on Firestick",
       slug: "how-to-watch-iptv-on-firestick",
       excerpt:
-        "A local demo guide covering the usual Firestick apps, playlist steps, and what to check if the stream will not load.",
+        "How to install a player on Firestick, add your details, and what to check if a stream will not load.",
       content:
         "<h2>Install a player</h2><p>Most Firestick viewers install a player, add a playlist or Xtream details, then pin the app to the home row.</p><h3>If a channel fails</h3><p>Check internet speed, try another server line, and confirm the subscription is still active.</p>",
       categoryId: "cat-setup",

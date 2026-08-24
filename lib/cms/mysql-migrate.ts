@@ -14,7 +14,7 @@ import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, SectionType, SiteSettings } from "@/lib/cms/types";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
-import { withKnownTestTaglineReplaced } from "@/lib/cms/settings-cleanup";
+import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
@@ -437,15 +437,70 @@ async function persistPageSectionDiff(
   }
 }
 
-async function cleanupDemoFaqAnswers() {
+async function cleanupDemoFaqCopy() {
   const pool = getDbPool();
-  const [rows] = await pool.query<Array<RowDataPacket & { id: string; answer: string }>>(
-    "SELECT id, answer FROM faqs",
+  const [rows] = await pool.query<Array<RowDataPacket & { id: string; question: string; answer: string }>>(
+    "SELECT id, question, answer FROM faqs",
   );
   for (const row of rows) {
-    const next = rewriteDemoCopy(String(row.answer || ""));
-    if (next === row.answer) continue;
-    await pool.execute("UPDATE faqs SET answer = ? WHERE id = ?", [next, row.id]);
+    const question = rewriteDemoCopy(String(row.question || ""));
+    const answer = rewriteDemoCopy(String(row.answer || ""));
+    if (question === row.question && answer === row.answer) continue;
+    await pool.execute("UPDATE faqs SET question = ?, answer = ? WHERE id = ?", [question, answer, row.id]);
+  }
+}
+
+async function cleanupDemoPlanFeatures() {
+  const pool = getDbPool();
+  const [rows] = await pool.query<Array<RowDataPacket & { id: string; features: unknown }>>(
+    "SELECT id, features FROM pricing_plans",
+  );
+  for (const row of rows) {
+    const features = parseJsonColumn<string[]>(row.features, []);
+    const next = features.map((feature) => rewriteDemoCopy(String(feature)));
+    if (JSON.stringify(next) === JSON.stringify(features)) continue;
+    await pool.execute("UPDATE pricing_plans SET features = ? WHERE id = ?", [JSON.stringify(next), row.id]);
+  }
+}
+
+async function cleanupDemoBlogCopy() {
+  const pool = getDbPool();
+  const [rows] = await pool.query<
+    Array<
+      RowDataPacket & {
+        id: string;
+        excerpt: string;
+        content: string;
+        seo_title: string;
+        seo_description: string;
+        og_title: string;
+        og_description: string;
+      }
+    >
+  >("SELECT id, excerpt, content, seo_title, seo_description, og_title, og_description FROM blog_posts");
+  for (const row of rows) {
+    const excerpt = rewriteDemoCopy(String(row.excerpt || ""));
+    const content = rewriteDemoCopy(String(row.content || ""));
+    const seoTitle = rewriteDemoCopy(String(row.seo_title || ""));
+    const seoDescription = rewriteDemoCopy(String(row.seo_description || ""));
+    const ogTitle = rewriteDemoCopy(String(row.og_title || ""));
+    const ogDescription = rewriteDemoCopy(String(row.og_description || ""));
+    if (
+      excerpt === row.excerpt &&
+      content === row.content &&
+      seoTitle === row.seo_title &&
+      seoDescription === row.seo_description &&
+      ogTitle === row.og_title &&
+      ogDescription === row.og_description
+    ) {
+      continue;
+    }
+    await pool.execute(
+      `UPDATE blog_posts
+       SET excerpt = ?, content = ?, seo_title = ?, seo_description = ?, og_title = ?, og_description = ?
+       WHERE id = ?`,
+      [excerpt, content, seoTitle, seoDescription, ogTitle, ogDescription, row.id],
+    );
   }
 }
 
@@ -497,7 +552,9 @@ export async function seedSeoLongformIfNeeded() {
     if (!longform.changed && !cleaned.changed) continue;
     await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
   }
-  await cleanupDemoFaqAnswers();
+  await cleanupDemoFaqCopy();
+  await cleanupDemoPlanFeatures();
+  await cleanupDemoBlogCopy();
 }
 
 export async function cleanupKnownTestTaglineIfNeeded() {
@@ -508,7 +565,7 @@ export async function cleanupKnownTestTaglineIfNeeded() {
   );
   if (!rows[0]) return;
   const current = sanitizeSettings(parseJsonColumn<SiteSettings>(rows[0].setting_value, defaultSettings()));
-  const next = withKnownTestTaglineReplaced(current);
+  const next = applyPublicCopyCleanupToSettings(current);
   if (!next.changed) return;
   await pool.execute(
     `INSERT INTO site_settings (setting_key, setting_value)

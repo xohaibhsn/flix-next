@@ -5,7 +5,7 @@ import {
   defaultFaqs,
   defaultPricingPlans,
 } from "@/lib/cms/defaults";
-import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
+import { applyPublicCopyCleanupToFaq, applyPublicCopyCleanupToPlan, applyPublicCopyCleanupToPost } from "@/lib/cms/public-copy-cleanup";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/lib/cms/managed-redirects";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import {
@@ -57,7 +57,15 @@ async function saveList<T>(file: string, items: T[]) {
 export class JsonCatalogRepository implements CatalogRepository {
   async listPlans() {
     const items = await readJsonFile<PricingPlan[]>(PLANS_FILE, defaultPricingPlans());
-    return (Array.isArray(items) ? items : defaultPricingPlans()).map(sanitizePricingPlan);
+    const source = Array.isArray(items) ? items : defaultPricingPlans();
+    let changed = false;
+    const next = source.map((item) => {
+      const result = applyPublicCopyCleanupToPlan(item);
+      if (result.changed) changed = true;
+      return sanitizePricingPlan(result.plan);
+    });
+    if (changed) await saveList(PLANS_FILE, next);
+    return next;
   }
   async savePlan(plan: PricingPlan) {
     const safe = sanitizePricingPlan(plan);
@@ -80,9 +88,9 @@ export class JsonCatalogRepository implements CatalogRepository {
     const source = Array.isArray(items) ? items : defaultFaqs();
     let changed = false;
     const next = source.map((item) => {
-      const answer = rewriteDemoCopy(item.answer);
-      if (answer !== item.answer) changed = true;
-      return sanitizeFaq({ ...item, answer });
+      const result = applyPublicCopyCleanupToFaq(item);
+      if (result.changed) changed = true;
+      return sanitizeFaq(result.item);
     });
     if (changed) await saveList(FAQS_FILE, next);
     return next;
@@ -125,7 +133,15 @@ export class JsonCatalogRepository implements CatalogRepository {
   }
   async listPosts() {
     const items = await readJsonFile<BlogPost[]>(POSTS_FILE, defaultBlogPosts());
-    return (Array.isArray(items) ? items : defaultBlogPosts()).map(sanitizePost);
+    const source = Array.isArray(items) ? items : defaultBlogPosts();
+    let changed = false;
+    const next = source.map((item) => {
+      const result = applyPublicCopyCleanupToPost(item);
+      if (result.changed) changed = true;
+      return sanitizePost(result.post);
+    });
+    if (changed) await saveList(POSTS_FILE, next);
+    return next;
   }
   async getPostBySlug(slug: string) {
     const items = await this.listPosts();

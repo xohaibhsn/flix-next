@@ -2,7 +2,7 @@ import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/
 import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
 import { applyPublicCopyCleanupToPages } from "@/lib/cms/public-copy-cleanup";
-import { withKnownTestTaglineReplaced } from "@/lib/cms/settings-cleanup";
+import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { applySeoLongformToPages } from "@/lib/cms/seo-longform";
 import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
@@ -71,7 +71,7 @@ export class LocalJsonRepository implements CmsRepository {
   async getSettings() {
     const settings = await readJsonFile<SiteSettings>(SETTINGS_FILE, defaultSettings());
     const safe = sanitizeSettings(settings);
-    const cleaned = withKnownTestTaglineReplaced(safe);
+    const cleaned = applyPublicCopyCleanupToSettings(safe);
     if (cleaned.changed) {
       await writeJsonFile(SETTINGS_FILE, cleaned.settings);
     }
@@ -79,7 +79,7 @@ export class LocalJsonRepository implements CmsRepository {
   }
 
   async saveSettings(settings: SiteSettings) {
-    const safe = withKnownTestTaglineReplaced(sanitizeSettings(settings)).settings;
+    const safe = applyPublicCopyCleanupToSettings(sanitizeSettings(settings)).settings;
     await writeJsonFile(SETTINGS_FILE, safe);
     return safe;
   }
