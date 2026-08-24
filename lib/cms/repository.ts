@@ -1,7 +1,9 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
+import { MysqlCmsRepository, MysqlWithBuildFallback } from "@/lib/cms/mysql-repository";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
+import { isDatabaseConfigured } from "@/lib/db/config";
 
 const PAGES_FILE = "pages.json";
 const SETTINGS_FILE = "site-settings.json";
@@ -82,4 +84,8 @@ export class LocalJsonRepository implements CmsRepository {
   }
 }
 
-export const cms: CmsRepository = new LocalJsonRepository();
+const jsonCms = new LocalJsonRepository();
+
+export const cms: CmsRepository = isDatabaseConfigured()
+  ? new MysqlWithBuildFallback(new MysqlCmsRepository(), jsonCms)
+  : jsonCms;
