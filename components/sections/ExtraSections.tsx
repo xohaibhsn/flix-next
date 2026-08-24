@@ -37,8 +37,22 @@ const RICH_WIDTH = {
   wide: "",
 } as const;
 
+const RICH_SCROLL_HEIGHT = {
+  compact: "rich-scroll rich-scroll-compact",
+  standard: "rich-scroll rich-scroll-standard",
+  tall: "rich-scroll rich-scroll-tall",
+} as const;
+
 export function RichContentBlock({ data }: { data: RichContentData }) {
   const width = RICH_WIDTH[data.width] || RICH_WIDTH.narrow;
+  const html = sanitizeHtml(data.html);
+  const body = (
+    <div
+      className="prose-cms text-[15px] leading-relaxed text-ink/80"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
+
   return (
     <section className="bg-white py-16">
       <Container className={width}>
@@ -48,10 +62,16 @@ export function RichContentBlock({ data }: { data: RichContentData }) {
         {data.heading ? (
           <h2 className={`text-3xl font-extrabold text-ink ${data.eyebrow ? "mt-3" : ""}`}>{data.heading}</h2>
         ) : null}
-        <div
-          className={`prose-cms text-[15px] leading-relaxed text-ink/80 ${data.heading || data.eyebrow ? "mt-6" : ""}`}
-          dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html) }}
-        />
+        {data.scrollable ? (
+          <div
+            className={`rounded-xl border border-line bg-white p-5 shadow-sm sm:p-7 ${data.heading || data.eyebrow ? "mt-6" : ""} ${RICH_SCROLL_HEIGHT[data.scrollHeight] || RICH_SCROLL_HEIGHT.standard}`}
+            tabIndex={0}
+          >
+            {body}
+          </div>
+        ) : (
+          <div className={data.heading || data.eyebrow ? "mt-6" : ""}>{body}</div>
+        )}
         {data.buttonLabel && data.buttonHref ? (
           <ButtonLink href={data.buttonHref} className="mt-8">
             {data.buttonLabel}

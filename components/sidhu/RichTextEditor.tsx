@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
 import { TextStyle } from "@tiptap/extension-text-style";
@@ -9,7 +9,39 @@ import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
-import { useEffect } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+
+function keepEditorSelection(event: MouseEvent<HTMLButtonElement>) {
+  event.preventDefault();
+}
+
+function ToolButton({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active ? true : undefined}
+      className={`rounded border px-2 py-1 text-xs ${
+        active ? "border-brand bg-brand text-white" : "border-line bg-white"
+      }`}
+      onMouseDown={keepEditorSelection}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  );
+}
+
+function run(editor: Editor, command: (chain: ReturnType<Editor["chain"]>) => boolean) {
+  command(editor.chain().focus());
+}
 
 export function RichTextEditor({
   value,
@@ -22,6 +54,13 @@ export function RichTextEditor({
   onRequestImage?: () => void;
   placeholder?: string;
 }) {
+  const onChangeRef = useRef(onChange);
+  const [, setToolbar] = useState(0);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -34,19 +73,22 @@ export function RichTextEditor({
       Placeholder.configure({ placeholder }),
       CharacterCount,
     ],
-    content: value,
+    content: value || "<p></p>",
     editorProps: {
       attributes: {
         class: "prose-cms min-h-64 rounded-md border border-line px-3 py-2 text-sm focus:outline-none",
       },
     },
-    onUpdate: ({ editor: current }) => onChange(current.getHTML()),
+    onUpdate: ({ editor: current }) => onChangeRef.current(current.getHTML()),
+    onSelectionUpdate: () => setToolbar((tick) => tick + 1),
   });
 
   useEffect(() => {
     if (!editor) return;
-    const current = editor.getHTML();
-    if (value && value !== current) editor.commands.setContent(value, { emitUpdate: false });
+    const incoming = value || "<p></p>";
+    if (incoming === editor.getHTML()) return;
+    if (editor.isFocused) return;
+    editor.commands.setContent(incoming, { emitUpdate: false });
   }, [editor, value]);
 
   if (!editor) return <p className="text-sm text-muted">Loading editor…</p>;
@@ -57,57 +99,36 @@ export function RichTextEditor({
     const url = window.prompt("Link URL", previous || "https://");
     if (url === null) return;
     if (!url) {
-      current.chain().focus().unsetLink().run();
+      run(current, (chain) => chain.unsetLink().run());
       return;
     }
-    current.chain().focus().setLink({ href: url }).run();
+    run(current, (chain) => chain.setLink({ href: url }).run());
   }
-
-  const tools: Array<{ label: string; run: () => void }> = [
-    { label: "P", run: () => current.chain().focus().setParagraph().run() },
-    { label: "H2", run: () => current.chain().focus().toggleHeading({ level: 2 }).run() },
-    { label: "H3", run: () => current.chain().focus().toggleHeading({ level: 3 }).run() },
-    { label: "H4", run: () => current.chain().focus().toggleHeading({ level: 4 }).run() },
-    { label: "B", run: () => current.chain().focus().toggleBold().run() },
-    { label: "I", run: () => current.chain().focus().toggleItalic().run() },
-    { label: "U", run: () => current.chain().focus().toggleUnderline().run() },
-    { label: "S", run: () => current.chain().focus().toggleStrike().run() },
-    { label: "•", run: () => current.chain().focus().toggleBulletList().run() },
-    { label: "1.", run: () => current.chain().focus().toggleOrderedList().run() },
-    { label: "“", run: () => current.chain().focus().toggleBlockquote().run() },
-    { label: "—", run: () => current.chain().focus().setHorizontalRule().run() },
-    { label: "Left", run: () => current.chain().focus().setTextAlign("left").run() },
-    { label: "Center", run: () => current.chain().focus().setTextAlign("center").run() },
-    { label: "Right", run: () => current.chain().focus().setTextAlign("right").run() },
-  ];
 
   return (
     <div>
       <div className="mb-2 flex flex-wrap gap-1">
-        {tools.map((tool) => (
-          <button
-            key={tool.label}
-            type="button"
-            className="rounded border border-line px-2 py-1 text-xs"
-            onClick={tool.run}
-          >
-            {tool.label}
-          </button>
-        ))}
-        <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={setLink}>
-          Link
-        </button>
-        <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={() => onRequestImage?.()}>
-          Image
-        </button>
-        <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={() => current.chain().focus().undo().run()}>
-          Undo
-        </button>
-        <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={() => current.chain().focus().redo().run()}>
-          Redo
-        </button>
+        <ToolButton label="P" active={current.isActive("paragraph")} onClick={() => run(current, (chain) => chain.setParagraph().run())} />
+        <ToolButton label="H2" active={current.isActive("heading", { level: 2 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 2 }).run())} />
+        <ToolButton label="H3" active={current.isActive("heading", { level: 3 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 3 }).run())} />
+        <ToolButton label="H4" active={current.isActive("heading", { level: 4 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 4 }).run())} />
+        <ToolButton label="B" active={current.isActive("bold")} onClick={() => run(current, (chain) => chain.toggleBold().run())} />
+        <ToolButton label="I" active={current.isActive("italic")} onClick={() => run(current, (chain) => chain.toggleItalic().run())} />
+        <ToolButton label="U" active={current.isActive("underline")} onClick={() => run(current, (chain) => chain.toggleUnderline().run())} />
+        <ToolButton label="S" active={current.isActive("strike")} onClick={() => run(current, (chain) => chain.toggleStrike().run())} />
+        <ToolButton label="•" active={current.isActive("bulletList")} onClick={() => run(current, (chain) => chain.toggleBulletList().run())} />
+        <ToolButton label="1." active={current.isActive("orderedList")} onClick={() => run(current, (chain) => chain.toggleOrderedList().run())} />
+        <ToolButton label="“" active={current.isActive("blockquote")} onClick={() => run(current, (chain) => chain.toggleBlockquote().run())} />
+        <ToolButton label="—" onClick={() => run(current, (chain) => chain.setHorizontalRule().run())} />
+        <ToolButton label="Left" active={current.isActive({ textAlign: "left" })} onClick={() => run(current, (chain) => chain.setTextAlign("left").run())} />
+        <ToolButton label="Center" active={current.isActive({ textAlign: "center" })} onClick={() => run(current, (chain) => chain.setTextAlign("center").run())} />
+        <ToolButton label="Right" active={current.isActive({ textAlign: "right" })} onClick={() => run(current, (chain) => chain.setTextAlign("right").run())} />
+        <ToolButton label="Link" active={current.isActive("link")} onClick={setLink} />
+        <ToolButton label="Image" onClick={() => onRequestImage?.()} />
+        <ToolButton label="Undo" onClick={() => run(current, (chain) => chain.undo().run())} />
+        <ToolButton label="Redo" onClick={() => run(current, (chain) => chain.redo().run())} />
       </div>
-      <EditorContent editor={editor} />
+      <EditorContent editor={current} />
     </div>
   );
 }

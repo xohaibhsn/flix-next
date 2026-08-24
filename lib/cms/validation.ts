@@ -14,6 +14,7 @@ import type {
   PricingPlan,
   RedirectRule,
   RichContentData,
+  RichContentScrollHeight,
   RichContentWidth,
   RichTextData,
   SectionType,
@@ -233,6 +234,8 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
     const current = data as RichContentData;
     const width: RichContentWidth =
       current.width === "wide" || current.width === "normal" ? current.width : "narrow";
+    const scrollHeight: RichContentScrollHeight =
+      current.scrollHeight === "compact" || current.scrollHeight === "tall" ? current.scrollHeight : "standard";
     return {
       eyebrow: sanitizeText(current.eyebrow, 80),
       heading: sanitizeText(current.heading, 160),
@@ -240,6 +243,8 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       buttonLabel: sanitizeText(current.buttonLabel, 40),
       buttonHref: current.buttonHref ? sanitizeHref(current.buttonHref) : "",
       width,
+      scrollable: Boolean(current.scrollable),
+      scrollHeight,
     };
   }
   if (type === "cta") {

@@ -351,6 +351,8 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         buttonLabel: "",
         buttonHref: "",
         width: "narrow",
+        scrollable: false,
+        scrollHeight: "standard",
       };
     case "info-cards":
       return {
@@ -419,6 +421,7 @@ export function createHomeSections(): CmsSection[] {
     "devices",
     "trust-stats",
     "why-choose",
+    "rich-content",
     "faq",
     "cta",
   ];
@@ -455,7 +458,19 @@ export function createSubscriptionSections(): CmsSection[] {
   };
   const pricing = createSection("pricing", 3);
   pricing.id = "sec-sub-pricing";
-  const benefits = createSection("info-cards", 4);
+  const longform = createSection("rich-content", 4);
+  longform.id = "sec-sub-longform";
+  longform.data = {
+    eyebrow: "Guide",
+    heading: "What you get with a The Flix IPTV subscription",
+    html: "<p>Use this block for a longer SEO description. Enable Scrollable Content if the copy should stay in a contained panel.</p>",
+    buttonLabel: "",
+    buttonHref: "",
+    width: "narrow",
+    scrollable: true,
+    scrollHeight: "standard",
+  };
+  const benefits = createSection("info-cards", 5);
   benefits.id = "sec-sub-benefits";
   benefits.label = "Benefits";
   benefits.data = {
@@ -469,11 +484,11 @@ export function createSubscriptionSections(): CmsSection[] {
       { id: "ben-4", icon: "Headphones", title: "Support when you need it", description: "WhatsApp and email help for playlist setup, device questions, and plan changes." },
     ],
   };
-  const how = createSection("how-it-works", 5);
+  const how = createSection("how-it-works", 6);
   how.id = "sec-sub-how";
-  const devices = createSection("devices", 6);
+  const devices = createSection("devices", 7);
   devices.id = "sec-sub-devices";
-  const info = createSection("info-cards", 7);
+  const info = createSection("info-cards", 8);
   info.id = "sec-sub-info";
   info.label = "Good to know";
   info.data = {
@@ -486,10 +501,10 @@ export function createSubscriptionSections(): CmsSection[] {
       { id: "info-3", icon: "ShieldCheck", title: "What this page is not", description: "There is no checkout or reseller portal on this build. Plan buttons go to Contact." },
     ],
   };
-  const faq = createSection("faq", 8);
+  const faq = createSection("faq", 9);
   faq.id = "sec-sub-faq";
   (faq.data as { category: string }).category = "Subscription";
-  const cta = createSection("cta", 9);
+  const cta = createSection("cta", 10);
   cta.id = "sec-sub-cta";
   cta.data = {
     heading: "Ready to choose a plan?",
@@ -497,7 +512,7 @@ export function createSubscriptionSections(): CmsSection[] {
     buttonLabel: "Talk to support",
     buttonHref: "/contact/",
   };
-  return [hero, intro, pricing, benefits, how, devices, info, faq, cta];
+  return [hero, intro, pricing, longform, benefits, how, devices, info, faq, cta];
 }
 
 export function createContactSections(): CmsSection[] {

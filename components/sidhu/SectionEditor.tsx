@@ -996,6 +996,33 @@ function RichContentFields({
           <option value="wide">Wide</option>
         </select>
       </Field>
+      <label className="block text-sm">
+        <input
+          type="checkbox"
+          checked={Boolean(data.scrollable)}
+          onChange={(event) => onChange({ ...data, scrollable: event.target.checked })}
+        />{" "}
+        Scrollable Content
+      </label>
+      {data.scrollable ? (
+        <Field label="Scroll height">
+          <select
+            className="w-full rounded-md border border-line px-3 py-2 text-sm"
+            value={data.scrollHeight || "standard"}
+            onChange={(event) =>
+              onChange({
+                ...data,
+                scrollHeight:
+                  event.target.value === "compact" || event.target.value === "tall" ? event.target.value : "standard",
+              })
+            }
+          >
+            <option value="compact">Compact</option>
+            <option value="standard">Standard</option>
+            <option value="tall">Tall</option>
+          </select>
+        </Field>
+      ) : null}
       <Field label="Body content">
         <RichContentEditor data={data} assets={assets} onChange={onChange} />
       </Field>

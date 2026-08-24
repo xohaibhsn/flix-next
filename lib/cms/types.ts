@@ -215,6 +215,7 @@ export type RichTextData = {
 };
 
 export type RichContentWidth = "normal" | "narrow" | "wide";
+export type RichContentScrollHeight = "compact" | "standard" | "tall";
 
 export type RichContentData = {
   eyebrow: string;
@@ -223,6 +224,8 @@ export type RichContentData = {
   buttonLabel: string;
   buttonHref: string;
   width: RichContentWidth;
+  scrollable: boolean;
+  scrollHeight: RichContentScrollHeight;
 };
 
 export type InfoCardsData = {
