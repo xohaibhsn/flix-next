@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { cms } from "@/lib/cms/repository";
 import { createHomeSections } from "@/lib/cms/defaults";
 import { SectionRenderer } from "@/components/cms/SectionRenderer";
+import { publicPageUrl } from "@/lib/site-url";
 
 export async function HomePage() {
   await connection();
@@ -18,6 +19,7 @@ export async function HomePage() {
       settings={settings}
       plans={plans.filter((plan) => plan.active)}
       faqs={faqs.filter((item) => item.visible)}
+      pageUrl={publicPageUrl("/")}
     />
   );
 }

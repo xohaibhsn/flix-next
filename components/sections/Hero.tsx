@@ -3,11 +3,16 @@ import { DeviceShowcase } from "@/components/sections/DeviceShowcase";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { Container } from "@/components/ui/Container";
 import { getIcon } from "@/lib/cms/icons";
-import type { HeroData } from "@/lib/cms/types";
+import type { HeroData, SiteSettings } from "@/lib/cms/types";
 import { createDefaultSectionData } from "@/lib/cms/defaults";
+import { publicWhatsAppSalesUrl } from "@/lib/cms/public-contact";
+import { resolveBrowseHref, resolveSalesHref } from "@/lib/cms/whatsapp-messages";
 
-export function Hero({ data }: { data?: HeroData }) {
+export function Hero({ data, settings }: { data?: HeroData; settings?: SiteSettings }) {
   const content = data ?? (createDefaultSectionData("hero") as HeroData);
+  const salesUrl = settings ? publicWhatsAppSalesUrl(settings) : "";
+  const primaryHref = resolveSalesHref(content.primaryLabel, content.primaryHref, salesUrl);
+  const secondaryHref = resolveBrowseHref(content.secondaryLabel, content.secondaryHref);
 
   return (
     <section className="hero-grid relative overflow-hidden pt-[76px]">
@@ -27,11 +32,11 @@ export function Hero({ data }: { data?: HeroData }) {
             {content.description}
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <ButtonLink href={content.primaryHref}>
+            <ButtonLink href={primaryHref}>
               {content.primaryLabel}
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </ButtonLink>
-            <ButtonLink href={content.secondaryHref} variant="ghost">
+            <ButtonLink href={secondaryHref} variant="ghost">
               {content.secondaryLabel}
             </ButtonLink>
           </div>

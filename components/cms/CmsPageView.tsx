@@ -3,6 +3,7 @@ import { SectionRenderer } from "@/components/cms/SectionRenderer";
 import { cms } from "@/lib/cms/repository";
 import { createContactSections, createHomeSections, createSubscriptionSections } from "@/lib/cms/defaults";
 import type { CmsSection } from "@/lib/cms/types";
+import { publicPageUrl } from "@/lib/site-url";
 
 function fallbackSections(slug: string): CmsSection[] {
   if (slug === "/iptv-subscriptions-uk/") return createSubscriptionSections();
@@ -25,6 +26,7 @@ export async function CmsPageView({ slug }: { slug: string }) {
       settings={settings}
       plans={plans.filter((plan) => plan.active)}
       faqs={faqs.filter((item) => item.visible)}
+      pageUrl={publicPageUrl(slug)}
     />
   );
 }

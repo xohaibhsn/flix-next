@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { externalAnchorProps, isExternalHref } from "@/lib/cms/contact";
 
 const variants = {
   primary:
@@ -15,6 +16,7 @@ type ButtonLinkProps = {
   children: ReactNode;
   variant?: keyof typeof variants;
   className?: string;
+  "aria-label"?: string;
 };
 
 export function ButtonLink({
@@ -22,12 +24,18 @@ export function ButtonLink({
   children,
   variant = "primary",
   className = "",
+  "aria-label": ariaLabel,
 }: ButtonLinkProps) {
+  const classNames = `inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition ${variants[variant]} ${className}`;
+  if (isExternalHref(href)) {
+    return (
+      <a href={href} className={classNames} aria-label={ariaLabel} {...externalAnchorProps(href)}>
+        {children}
+      </a>
+    );
+  }
   return (
-    <Link
-      href={href}
-      className={`inline-flex items-center justify-center gap-2 rounded-md px-6 py-3 text-sm font-semibold transition ${variants[variant]} ${className}`}
-    >
+    <Link href={href} className={classNames} aria-label={ariaLabel}>
       {children}
     </Link>
   );

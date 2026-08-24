@@ -620,7 +620,10 @@ function PricingFields({ data, onChange }: { data: PricingData; onChange: (data:
                 }
               />
             </Field>
-            <Field label="Button URL">
+            <Field
+              label="Button URL"
+              hint="Ignored on the public site while WhatsApp is enabled. Choose Plan uses the central plan name, price, and duration."
+            >
               <TextInput
                 value={plan.buttonHref}
                 onChange={(event) =>

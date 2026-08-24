@@ -7,8 +7,9 @@ import {
   publicPhoneHref,
   publicSocialLinks,
   publicTelegramUrl,
-  publicWhatsAppUrl,
+  publicWhatsAppSalesUrl,
 } from "@/lib/cms/public-contact";
+import { externalAnchorProps } from "@/lib/cms/contact";
 import type { SiteSettings } from "@/lib/cms/types";
 
 export function Footer({
@@ -18,7 +19,7 @@ export function Footer({
   branding?: LogoBranding;
   settings: SiteSettings;
 }) {
-  const wa = publicWhatsAppUrl(settings);
+  const wa = publicWhatsAppSalesUrl(settings);
   const telegram = publicTelegramUrl(settings);
   const phone = publicPhone(settings);
   const email = publicEmail(settings);
@@ -75,14 +76,14 @@ export function Footer({
             ))}
             {wa ? (
               <li>
-                <a href={wa} className="hover:text-white">
+                <a href={wa} className="hover:text-white" {...externalAnchorProps(wa)}>
                   WhatsApp Help
                 </a>
               </li>
             ) : null}
             {telegram ? (
               <li>
-                <a href={telegram} className="inline-flex items-center gap-1 hover:text-white">
+                <a href={telegram} className="inline-flex items-center gap-1 hover:text-white" {...externalAnchorProps(telegram)}>
                   <Send className="h-3.5 w-3.5" aria-hidden="true" />
                   Telegram
                 </a>
@@ -119,7 +120,8 @@ export function Footer({
           {wa ? (
             <a
               href={wa}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
+              className="mt-5 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
+              {...externalAnchorProps(wa)}
             >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
               Chat on WhatsApp

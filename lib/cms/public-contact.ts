@@ -1,4 +1,5 @@
-import { isPlaceholderPhone, telUrl, whatsappUrl } from "@/lib/cms/contact";
+import { buildWhatsAppUrl, isPlaceholderPhone, telUrl } from "@/lib/cms/contact";
+import { planWhatsAppMessage, WHATSAPP_SALES_MESSAGE, WHATSAPP_VISIT_MESSAGE } from "@/lib/cms/whatsapp-messages";
 import type { SiteSettings, SocialPlatform } from "@/lib/cms/types";
 
 export type PublicSocial = {
@@ -33,9 +34,31 @@ export function publicPhoneHref(settings: SiteSettings) {
   return phone ? telUrl(phone) : "";
 }
 
-export function publicWhatsAppUrl(settings: SiteSettings) {
+export function publicWhatsAppUrl(settings: SiteSettings, message?: string) {
   if (!settings.whatsappEnabled) return "";
-  return whatsappUrl(settings.whatsapp, settings.whatsappMessage);
+  const text = message === undefined ? settings.whatsappMessage : message;
+  return buildWhatsAppUrl(settings.whatsapp, text);
+}
+
+export function publicWhatsAppProfileUrl(settings: SiteSettings) {
+  if (!settings.whatsappEnabled) return "";
+  return buildWhatsAppUrl(settings.whatsapp);
+}
+
+export function publicWhatsAppSalesUrl(settings: SiteSettings) {
+  return publicWhatsAppUrl(settings, WHATSAPP_SALES_MESSAGE);
+}
+
+export function publicWhatsAppVisitUrl(settings: SiteSettings) {
+  return publicWhatsAppUrl(settings, WHATSAPP_VISIT_MESSAGE);
+}
+
+export function publicWhatsAppPlanUrl(
+  settings: SiteSettings,
+  plan: { name: string; price: string; duration: string },
+  pageUrl?: string,
+) {
+  return publicWhatsAppUrl(settings, planWhatsAppMessage(plan, pageUrl));
 }
 
 export function publicTelegramUrl(settings: SiteSettings) {
@@ -59,7 +82,7 @@ export function publicSocialLinks(settings: SiteSettings): PublicSocial[] {
 
 export function publicSameAs(settings: SiteSettings) {
   const urls = publicSocialLinks(settings).map((item) => item.href);
-  const wa = publicWhatsAppUrl(settings);
+  const wa = publicWhatsAppProfileUrl(settings);
   if (wa) urls.push(wa);
   return [...new Set(urls)];
 }

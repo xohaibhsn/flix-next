@@ -12,3 +12,12 @@ export function absoluteUrl(path: string) {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${normalized}`;
 }
+
+export function publicPagePath(slug: string) {
+  if (slug === "/") return "/welcome/";
+  return slug.endsWith("/") ? slug : `${slug}/`;
+}
+
+export function publicPageUrl(slug: string) {
+  return absoluteUrl(publicPagePath(slug));
+}

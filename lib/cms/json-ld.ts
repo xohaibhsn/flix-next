@@ -1,6 +1,6 @@
 import { getSiteOrigin } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
-import { publicEmail, publicPhone, publicSameAs, publicWhatsAppUrl } from "@/lib/cms/public-contact";
+import { publicEmail, publicPhone, publicSameAs, publicWhatsAppProfileUrl } from "@/lib/cms/public-contact";
 
 export function organizationJsonLd(settings: SiteSettings) {
   const origin = getSiteOrigin();
@@ -71,5 +71,5 @@ export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
 }
 
 export function whatsappSameAs(settings: SiteSettings) {
-  return publicWhatsAppUrl(settings);
+  return publicWhatsAppProfileUrl(settings);
 }

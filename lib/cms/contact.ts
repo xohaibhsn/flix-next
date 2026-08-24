@@ -7,12 +7,25 @@ export function isPlaceholderPhone(value: string) {
   return !digits || digits === "1234567890" || digits === "0000000000";
 }
 
-export function whatsappUrl(number: string, message = "") {
+export function buildWhatsAppUrl(number: string, message = "") {
   const digits = digitsOnly(number);
   if (!digits || isPlaceholderPhone(digits)) return "";
   const base = `https://wa.me/${digits}`;
   const text = message.trim();
   return text ? `${base}?text=${encodeURIComponent(text)}` : base;
+}
+
+/** @deprecated Use buildWhatsAppUrl */
+export const whatsappUrl = buildWhatsAppUrl;
+
+export function isExternalHref(href: string) {
+  return /^(https?:|mailto:|tel:)/i.test(href.trim());
+}
+
+export function externalAnchorProps(href: string) {
+  if (!isExternalHref(href)) return {};
+  if (/^(mailto:|tel:)/i.test(href.trim())) return {};
+  return { target: "_blank" as const, rel: "noopener noreferrer" };
 }
 
 export function telUrl(phone: string) {

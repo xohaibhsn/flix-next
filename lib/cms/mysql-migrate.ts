@@ -451,7 +451,7 @@ async function cleanupDemoFaqAnswers() {
 
 export async function seedSeoLongformIfNeeded() {
   const pool = getDbPool();
-  for (const slug of ["/", "/iptv-subscriptions-uk/"]) {
+  for (const slug of ["/", "/iptv-subscriptions-uk/", "/contact/"]) {
     const [pages] = await pool.query<Array<RowDataPacket & { id: string; name: string; slug: string; status: string; cms_enabled: number }>>(
       "SELECT id, name, slug, status, cms_enabled FROM pages WHERE slug = ? LIMIT 1",
       [slug],

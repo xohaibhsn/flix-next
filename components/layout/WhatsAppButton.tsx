@@ -5,7 +5,7 @@ export function WhatsAppButton({ href }: { href: string }) {
     <a
       href={href}
       target="_blank"
-      rel="noreferrer"
+      rel="noopener noreferrer"
       className="wa-pulse fixed right-5 bottom-5 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#1ebe5d]"
       aria-label="Chat on WhatsApp"
     >

@@ -15,12 +15,16 @@ export function HowItWorks({ data }: { data?: HowItWorksData }) {
           title={content.heading}
           description={content.description || undefined}
         />
-        <div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-6">
+        <div
+          className={`mt-14 grid gap-10 md:gap-6 ${
+            content.steps.length >= 4 ? "md:grid-cols-2 xl:grid-cols-4" : "md:grid-cols-3"
+          }`}
+        >
           {content.steps.map((step, i) => {
             const Icon = getIcon(step.icon);
             return (
               <div key={step.id} className="relative text-center">
-                {i < content.steps.length - 1 ? (
+                {content.steps.length <= 3 && i < content.steps.length - 1 ? (
                   <div className="pointer-events-none absolute top-7 left-[58%] hidden h-px w-[84%] border-t-2 border-dashed border-brand/30 md:block" />
                 ) : null}
                 <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-brand text-xl font-extrabold text-white shadow-lg shadow-brand/30">

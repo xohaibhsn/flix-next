@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Logo, type LogoBranding } from "@/components/layout/Logo";
+import { externalAnchorProps, isExternalHref } from "@/lib/cms/contact";
 import type { NavLink } from "@/lib/cms/types";
 
 export function Header({
@@ -40,6 +41,11 @@ export function Header({
   }, [open]);
 
   const solid = !overlay || scrolled || open;
+  const ctaClassDesktop =
+    "hidden rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-hover lg:inline-flex";
+  const ctaClassMobile =
+    "mt-3 flex items-center justify-center rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white";
+  const ctaExternal = isExternalHref(ctaHref);
 
   return (
     <header
@@ -69,12 +75,15 @@ export function Header({
           })}
         </nav>
         {ctaLabel && ctaHref ? (
-          <Link
-            href={ctaHref}
-            className="hidden rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-hover lg:inline-flex"
-          >
-            {ctaLabel}
-          </Link>
+          ctaExternal ? (
+            <a href={ctaHref} className={ctaClassDesktop} {...externalAnchorProps(ctaHref)}>
+              {ctaLabel}
+            </a>
+          ) : (
+            <Link href={ctaHref} className={ctaClassDesktop}>
+              {ctaLabel}
+            </Link>
+          )
         ) : null}
         <button
           type="button"
@@ -102,13 +111,20 @@ export function Header({
             ))}
           </nav>
           {ctaLabel && ctaHref ? (
-            <Link
-              href={ctaHref}
-              onClick={() => setOpen(false)}
-              className="mt-3 flex items-center justify-center rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white"
-            >
-              {ctaLabel}
-            </Link>
+            ctaExternal ? (
+              <a
+                href={ctaHref}
+                onClick={() => setOpen(false)}
+                className={ctaClassMobile}
+                {...externalAnchorProps(ctaHref)}
+              >
+                {ctaLabel}
+              </a>
+            ) : (
+              <Link href={ctaHref} onClick={() => setOpen(false)} className={ctaClassMobile}>
+                {ctaLabel}
+              </Link>
+            )
           ) : null}
         </div>
       ) : null}

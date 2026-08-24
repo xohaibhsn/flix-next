@@ -1,4 +1,5 @@
 import type { CmsPage, CmsSection, HowItWorksData } from "@/lib/cms/types";
+import { isLegacyHowItWorks, ORDER_PROCESS_HOW_IT_WORKS } from "@/lib/cms/order-process";
 
 const EXACT_REPLACEMENTS: Array<[string, string]> = [
   [
@@ -125,6 +126,38 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
     "Packages, devices, and FAQs on this page are editable in Sidhu.",
     "Packages, devices, and FAQs on this page can be reviewed before you message us on WhatsApp.",
   ],
+  [
+    "WhatsApp, email, and a contact form. Phone, email, and chat links come from Site Settings.",
+    "For subscriptions, payment details, setup and support, contact us directly on WhatsApp.",
+  ],
+  [
+    "Reach us using the details managed in Site Settings.",
+    "For subscriptions, payment details, setup and support, message our team directly on WhatsApp.",
+  ],
+  [
+    "Tell us what you need help with. We store messages in Sidhu until email sending is connected.",
+    "For general questions you can use this form. For subscriptions, payment details and setup, WhatsApp is the fastest way to reach us.",
+  ],
+  [
+    "Prefer WhatsApp or Telegram?",
+    "Chat with us on WhatsApp",
+  ],
+  [
+    "Most setup questions are faster in chat.",
+    "For subscriptions, payment details, setup and support, message our team directly on WhatsApp.",
+  ],
+  [
+    "Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page can be reviewed before you get in touch.",
+    "Choose a plan, then tap Choose Plan to message us on WhatsApp. Our team will send payment details manually, then set you up after payment is confirmed.",
+  ],
+  [
+    "Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page can be reviewed before you message us on WhatsApp.",
+    "Choose a plan, then tap Choose Plan to message us on WhatsApp. Our team will send payment details manually, then set you up after payment is confirmed.",
+  ],
+  [
+    "View streaming packages",
+    "Get Started",
+  ],
 ];
 
 export function rewriteDemoCopy(value: string) {
@@ -176,14 +209,28 @@ function retargetHowItWorksIcons(section: CmsSection): CmsSection {
   return { ...section, data: { ...data, steps } };
 }
 
+function applyOrderProcessHowItWorks(section: CmsSection): CmsSection {
+  if (section.type !== "how-it-works") return section;
+  const data = section.data as HowItWorksData;
+  if (!isLegacyHowItWorks(data)) return section;
+  return {
+    ...section,
+    data: {
+      ...ORDER_PROCESS_HOW_IT_WORKS,
+      steps: ORDER_PROCESS_HOW_IT_WORKS.steps.map((step) => ({ ...step })),
+    },
+  };
+}
+
 export function applyPublicCopyCleanupToPage(page: CmsPage): { page: CmsPage; changed: boolean } {
   let changed = false;
   const sections = page.sections.map((section) => {
     const rewritten = rewriteUnknown(section);
     const nextSection = (rewritten.changed ? rewritten.value : section) as CmsSection;
     const withIcons = retargetHowItWorksIcons(nextSection);
-    if (rewritten.changed || withIcons !== nextSection) changed = true;
-    return withIcons;
+    const withOrder = applyOrderProcessHowItWorks(withIcons);
+    if (rewritten.changed || withIcons !== nextSection || withOrder !== withIcons) changed = true;
+    return withOrder;
   });
   return { page: changed ? { ...page, sections } : page, changed };
 }

@@ -138,7 +138,10 @@ export function PricingManager({ initialPlans }: { initialPlans: PricingPlan[] }
             <Field label="Button label">
               <TextInput value={editing.buttonLabel} onChange={(event) => setEditing({ ...editing, buttonLabel: event.target.value })} />
             </Field>
-            <Field label="Button URL">
+            <Field
+              label="Button URL"
+              hint="Ignored on the public site while WhatsApp is enabled. Choose Plan opens WhatsApp with this plan's name, price, and duration."
+            >
               <TextInput value={editing.buttonHref} onChange={(event) => setEditing({ ...editing, buttonHref: event.target.value })} />
             </Field>
           </div>

@@ -53,11 +53,12 @@ function renderSection(
   settings: SiteSettings,
   plans: PricingPlan[],
   faqs: FaqItem[],
+  pageUrl?: string,
 ) {
   const data = mergeSectionData(section.type, section.data);
   switch (section.type) {
     case "hero":
-      return <Hero data={data as HeroData} />;
+      return <Hero data={data as HeroData} settings={settings} />;
     case "highlights":
       return <StatsStrip data={data as HighlightsData} />;
     case "how-it-works":
@@ -65,7 +66,7 @@ function renderSection(
     case "services":
       return <Services data={data as ServicesData} />;
     case "pricing":
-      return <Pricing data={resolvePricingData(data as PricingData, plans)} />;
+      return <Pricing data={resolvePricingData(data as PricingData, plans)} settings={settings} pageUrl={pageUrl} />;
     case "devices":
       return <Devices data={data as DevicesData} />;
     case "trust-stats":
@@ -77,7 +78,7 @@ function renderSection(
       return <FAQ data={resolved} />;
     }
     case "cta":
-      return <CTA data={data as CtaData} />;
+      return <CTA data={data as CtaData} settings={settings} />;
     case "page-hero":
       return <InnerPageHero data={data as PageHeroData} />;
     case "rich-text":
@@ -104,11 +105,13 @@ export function SectionRenderer({
   settings,
   plans = [],
   faqs = [],
+  pageUrl,
 }: {
   sections: CmsSection[];
   settings: SiteSettings;
   plans?: PricingPlan[];
   faqs?: FaqItem[];
+  pageUrl?: string;
 }) {
   return (
     <>
@@ -134,7 +137,7 @@ export function SectionRenderer({
         .sort((a, b) => a.order - b.order)
         .map((section) => (
           <SectionErrorBoundary key={section.id} label={`“${section.label}” could not be displayed.`}>
-            {renderSection(section, settings, plans, faqs)}
+            {renderSection(section, settings, plans, faqs, pageUrl)}
           </SectionErrorBoundary>
         ))}
     </>

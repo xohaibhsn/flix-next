@@ -6,7 +6,8 @@ import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
-import { publicWhatsAppUrl } from "@/lib/cms/public-contact";
+import { publicWhatsAppSalesUrl, publicWhatsAppVisitUrl } from "@/lib/cms/public-contact";
+import { isSalesCtaLabel } from "@/lib/cms/whatsapp-messages";
 import type { LogoBranding } from "@/components/layout/Logo";
 
 export async function SiteShell({
@@ -23,6 +24,10 @@ export async function SiteShell({
     alt: settings.branding.logoAlt || settings.siteName,
   };
 
+  const salesWhatsApp = publicWhatsAppSalesUrl(settings);
+  const headerCtaHref =
+    salesWhatsApp && isSalesCtaLabel(settings.headerCtaLabel) ? salesWhatsApp : settings.headerCtaHref;
+
   return (
     <>
       <JsonLd data={organizationJsonLd(settings)} />
@@ -32,11 +37,11 @@ export async function SiteShell({
         branding={branding}
         nav={settings.headerNav}
         ctaLabel={settings.headerCtaLabel}
-        ctaHref={settings.headerCtaHref}
+        ctaHref={headerCtaHref}
       />
       <main className="flex-1">{children}</main>
       <Footer branding={branding} settings={settings} />
-      <WhatsAppButton href={publicWhatsAppUrl(settings)} />
+      <WhatsAppButton href={publicWhatsAppVisitUrl(settings)} />
     </>
   );
 }

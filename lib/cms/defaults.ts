@@ -13,6 +13,7 @@ import type {
 } from "@/lib/cms/types";
 import { createId } from "@/lib/cms/ids";
 import { HOME_SEO_LONGFORM, SEO_LONGFORM_HOME_ID, SUBSCRIPTION_SEO_LONGFORM } from "@/lib/cms/seo-longform";
+import { ORDER_PROCESS_HOW_IT_WORKS } from "@/lib/cms/order-process";
 
 const PLAN_FEATURES = [
   "Live TV on compatible devices",
@@ -88,36 +89,8 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
       };
     case "how-it-works":
       return {
-        eyebrow: "",
-        heading: "Get Started in 3 Simple Steps",
-        description:
-          "Choose a plan, message us on WhatsApp, and start watching on the device you already own.",
-        steps: [
-          {
-            id: "hiw1",
-            number: "1",
-            icon: "ShoppingCart",
-            title: "Choose a Plan",
-            description:
-              "Pick the streaming package that fits your household. Names and prices are listed on the subscription page.",
-          },
-          {
-            id: "hiw2",
-            number: "2",
-            icon: "MessageCircle",
-            title: "Message us on WhatsApp",
-            description:
-              "After you choose a plan, message us on WhatsApp for setup and account details.",
-          },
-          {
-            id: "hiw3",
-            number: "3",
-            icon: "Play",
-            title: "Start Watching",
-            description:
-              "Open the apps on your Firestick, Smart TV, phone or laptop and start watching.",
-          },
-        ],
+        ...ORDER_PROCESS_HOW_IT_WORKS,
+        steps: ORDER_PROCESS_HOW_IT_WORKS.steps.map((step) => ({ ...step })),
       };
     case "services":
       return {
@@ -328,8 +301,8 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         heading: "Ready to start watching?",
         description:
           "Choose a streaming package, then message us on WhatsApp for setup on Firestick, Smart TV, or the device you already own.",
-        buttonLabel: "View streaming packages",
-        buttonHref: "/iptv-subscriptions-uk/",
+        buttonLabel: "Get Started",
+        buttonHref: "/contact/",
       };
     case "page-hero":
       return {
@@ -372,12 +345,12 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
     case "contact-info":
       return {
         heading: "Contact details",
-        description: "Reach us using the details managed in Site Settings.",
+        description: "For subscriptions, payment details, setup and support, message our team directly on WhatsApp.",
       };
     case "contact-form":
       return {
         heading: "Send a message",
-        description: "Tell us what you need help with. We store messages in Sidhu until email sending is connected.",
+        description: "For general questions you can use this form. For subscriptions, payment details and setup, WhatsApp is the fastest way to reach us.",
         nameLabel: "Name",
         emailLabel: "Email",
         phoneLabel: "Phone (optional)",
@@ -388,9 +361,9 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
       };
     case "messaging-cta":
       return {
-        heading: "Prefer WhatsApp or Telegram?",
-        description: "Most setup questions are faster in chat.",
-        whatsappLabel: "Open WhatsApp",
+        heading: "Chat with us on WhatsApp",
+        description: "For subscriptions, payment details, setup and support, message our team directly on WhatsApp.",
+        whatsappLabel: "Chat on WhatsApp",
         telegramLabel: "Open Telegram",
       };
     case "hours":
@@ -455,7 +428,7 @@ export function createSubscriptionSections(): CmsSection[] {
   intro.label = "Intro";
   intro.data = {
     heading: "",
-    html: "<p>Choose a plan, then message us on WhatsApp for setup. Packages, devices, and FAQs on this page can be reviewed before you get in touch.</p>",
+    html: "<p>Choose a plan, then tap Choose Plan to message us on WhatsApp. Our team will send payment details manually, then set you up after payment is confirmed.</p>",
   };
   const pricing = createSection("pricing", 3);
   pricing.id = "sec-sub-pricing";
@@ -514,7 +487,7 @@ export function createContactSections(): CmsSection[] {
     eyebrow: "Support",
     heading: "Contact",
     highlight: "The Flix",
-    description: "WhatsApp, email, and a contact form. Phone, email, and chat links come from Site Settings.",
+    description: "For subscriptions, payment details, setup and support, contact us directly on WhatsApp.",
   };
   const info = createSection("contact-info", 2);
   info.id = "sec-contact-info";
@@ -616,7 +589,7 @@ export function defaultSettings(): SiteSettings {
         "IPTV plans, devices, and FAQs for THE FLIX IPTV.",
         "/iptv-subscriptions-uk/",
       ),
-      contact: defaultPageSeo("Contact", "Contact THE FLIX IPTV support by WhatsApp, email, or form.", "/contact/"),
+      contact: defaultPageSeo("Contact", "Contact THE FLIX IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
       blog: defaultPageSeo("Blog", "Guides and updates from THE FLIX IPTV.", "/blog/"),
     },
   };

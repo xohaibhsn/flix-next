@@ -2,7 +2,9 @@ import { Clock3, Mail, MessageCircle, Phone, Send } from "lucide-react";
 import { sanitizeHtml } from "@/lib/cms/html";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { publicEmail, publicPhone, publicPhoneHref, publicTelegramUrl, publicWhatsAppUrl } from "@/lib/cms/public-contact";
+import { publicEmail, publicPhone, publicPhoneHref, publicTelegramUrl, publicWhatsAppSalesUrl } from "@/lib/cms/public-contact";
+import { isSalesCtaLabel } from "@/lib/cms/whatsapp-messages";
+import { externalAnchorProps } from "@/lib/cms/contact";
 import type {
   ContactFormData,
   ContactInfoData,
@@ -52,8 +54,11 @@ export function RichContentBlock({
 }) {
   const width = RICH_WIDTH[data.width] || RICH_WIDTH.narrow;
   const html = sanitizeHtml(data.html);
-  const whatsappHref = settings ? publicWhatsAppUrl(settings) : "";
-  const ctaHref = data.ctaSource === "whatsapp" ? whatsappHref : data.buttonHref;
+  const whatsappHref = settings ? publicWhatsAppSalesUrl(settings) : "";
+  const ctaHref =
+    data.ctaSource === "whatsapp" || (whatsappHref && isSalesCtaLabel(data.buttonLabel))
+      ? whatsappHref
+      : data.buttonHref;
   const showCta = Boolean(data.buttonLabel && ctaHref);
   const body = (
     <div
@@ -118,30 +123,63 @@ export function InfoCards({ data }: { data: InfoCardsData }) {
 }
 
 export function ContactInfoCards({ data, settings }: { data: ContactInfoData; settings: SiteSettings }) {
-  const wa = publicWhatsAppUrl(settings);
+  const wa = publicWhatsAppSalesUrl(settings);
   const email = publicEmail(settings);
   const phone = publicPhone(settings);
   const phoneHref = publicPhoneHref(settings);
   const cards = [
-    email ? { icon: Mail, title: "Email", value: email, href: `mailto:${email}` } : null,
+    wa ? { icon: MessageCircle, title: "WhatsApp", value: settings.whatsappDisplay || "Chat on WhatsApp", href: wa, primary: true } : null,
+    email ? { icon: Mail, title: "Email", value: email, href: `mailto:${email}`, primary: false } : null,
     phone && phoneHref
-      ? { icon: Phone, title: "Phone", value: settings.whatsappDisplay || phone, href: phoneHref }
+      ? { icon: Phone, title: "Phone", value: settings.whatsappDisplay || phone, href: phoneHref, primary: false }
       : null,
-    wa ? { icon: MessageCircle, title: "WhatsApp", value: settings.whatsappDisplay || "Chat on WhatsApp", href: wa } : null,
-    settings.hours ? { icon: Clock3, title: "Hours", value: settings.hours, href: undefined } : null,
-  ].filter(Boolean) as Array<{ icon: typeof Mail; title: string; value: string; href?: string }>;
+    settings.hours ? { icon: Clock3, title: "Hours", value: settings.hours, href: undefined, primary: false } : null,
+  ].filter(Boolean) as Array<{
+    icon: typeof Mail;
+    title: string;
+    value: string;
+    href?: string;
+    primary: boolean;
+  }>;
 
   return (
     <section className="bg-white py-16">
       <Container>
         <SectionHeading title={data.heading} description={data.description || undefined} />
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {wa ? (
+          <div className="mt-8 flex flex-col gap-4 rounded-2xl border border-[#25D366]/25 bg-[#25D366]/10 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+            <div className="max-w-xl">
+              <h3 className="text-lg font-bold text-ink">Chat on WhatsApp</h3>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                For subscriptions, payment details, setup and support, message our team directly on WhatsApp.
+              </p>
+            </div>
+            <a
+              href={wa}
+              className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-md bg-[#25D366] px-5 py-3 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
+              {...externalAnchorProps(wa)}
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              Chat on WhatsApp
+            </a>
+          </div>
+        ) : null}
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {cards.map((card) => (
-            <article key={card.title} className="rounded-xl border border-line bg-paper p-5">
-              <card.icon className="h-5 w-5 text-brand" aria-hidden="true" />
+            <article
+              key={card.title}
+              className={`rounded-xl border p-5 ${
+                card.primary ? "border-[#25D366]/40 bg-[#25D366]/5" : "border-line bg-paper"
+              }`}
+            >
+              <card.icon className={`h-5 w-5 ${card.primary ? "text-[#25D366]" : "text-brand"}`} aria-hidden="true" />
               <h2 className="mt-3 font-bold text-ink">{card.title}</h2>
               {card.href ? (
-                <a href={card.href} className="mt-1 block text-sm text-muted hover:text-brand">
+                <a
+                  href={card.href}
+                  className="mt-1 block text-sm text-muted hover:text-brand"
+                  {...externalAnchorProps(card.href)}
+                >
                   {card.value}
                 </a>
               ) : (
@@ -170,7 +208,7 @@ export function ContactFormBlock({ data }: { data: ContactFormData }) {
 }
 
 export function MessagingCta({ data, settings }: { data: MessagingCtaData; settings: SiteSettings }) {
-  const wa = publicWhatsAppUrl(settings);
+  const wa = publicWhatsAppSalesUrl(settings);
   const telegram = publicTelegramUrl(settings);
   return (
     <section className="bg-ink py-16 text-white">
@@ -179,13 +217,21 @@ export function MessagingCta({ data, settings }: { data: MessagingCtaData; setti
         <p className="mt-3 text-sm text-white/70">{data.description}</p>
         <div className="mt-8 flex flex-wrap justify-center gap-3">
           {wa ? (
-            <a href={wa} className="inline-flex items-center gap-2 rounded-md bg-[#25D366] px-5 py-3 text-sm font-semibold text-white">
+            <a
+              href={wa}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[#25D366] px-5 py-3 text-sm font-semibold text-white"
+              {...externalAnchorProps(wa)}
+            >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
               {data.whatsappLabel}
             </a>
           ) : null}
           {telegram ? (
-            <a href={telegram} className="inline-flex items-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold">
+            <a
+              href={telegram}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-white/20 px-5 py-3 text-sm font-semibold"
+              {...externalAnchorProps(telegram)}
+            >
               <Send className="h-4 w-4" aria-hidden="true" />
               {data.telegramLabel}
             </a>
