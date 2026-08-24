@@ -13,7 +13,10 @@ export default async function SidhuSettingsPage() {
   ]);
 
   return (
-    <AdminShell title="Site Settings" subtitle="Branding controls for logo, favicon, and the default Open Graph image.">
+    <AdminShell
+      title="Site Settings"
+      subtitle="Global site name, tagline, logo, favicon, and default Open Graph image. The Home Hero heading is edited under Pages → Home."
+    >
       <SiteSettingsForm
         settings={settings}
         configured={cloud.configured}

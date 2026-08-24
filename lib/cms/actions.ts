@@ -1,31 +1,17 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
+import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import type { CmsPage, SiteSettings } from "@/lib/cms/types";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
-
-function revalidatePublic() {
-  revalidatePath("/", "layout");
-  revalidatePath("/");
-  revalidatePath("/welcome");
-  revalidatePath("/contact");
-  revalidatePath("/blog");
-  revalidatePath("/iptv-subscriptions-uk");
-  revalidatePath("/sidhu");
-  revalidatePath("/sidhu/pages");
-  revalidatePath("/sidhu/pages/home");
-  revalidatePath("/sidhu/media");
-  revalidatePath("/sidhu/settings");
-}
 
 export async function savePageAction(page: CmsPage) {
   const unauthorized = await requireAdminAction();
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePage(page);
-    revalidatePublic();
+    revalidateSidhuCms();
     return { ok: true as const, page: saved };
   } catch (error) {
     return {
@@ -40,7 +26,7 @@ export async function saveSettingsAction(settings: SiteSettings) {
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveSettings(settings);
-    revalidatePublic();
+    revalidateSidhuCms();
     return { ok: true as const, settings: saved };
   } catch (error) {
     return {

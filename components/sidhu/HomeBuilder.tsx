@@ -48,7 +48,7 @@ export function HomeBuilder({ page: initialPage }: { page: CmsPage }) {
     if (result.ok) {
       setPage(result.page);
       setSaved(result.page);
-      setMessage({ tone: "ok", text: "Home page saved. Refresh / to see the live site." });
+      setMessage({ tone: "ok", text: "Home page saved. Refresh /welcome/ to see the live Hero and sections." });
     } else {
       setMessage({ tone: "error", text: result.error });
     }

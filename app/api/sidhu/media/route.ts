@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
 import { requireAdminApi } from "@/lib/auth/guards";
+import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
 import { cms } from "@/lib/cms/repository";
 import {
@@ -20,9 +20,7 @@ function jsonError(message: string, status = 400) {
 }
 
 function revalidateMedia() {
-  revalidatePath("/", "layout");
-  revalidatePath("/sidhu/media");
-  revalidatePath("/sidhu/settings");
+  revalidateSidhuCms();
 }
 
 export async function GET() {

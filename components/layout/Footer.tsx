@@ -3,15 +3,23 @@ import { Mail, MapPin, Phone } from "lucide-react";
 import { Logo, type LogoBranding } from "@/components/layout/Logo";
 import { siteConfig, whatsappLink } from "@/lib/site-config";
 
-export function Footer({ branding }: { branding?: LogoBranding }) {
+export function Footer({
+  branding,
+  siteName,
+  tagline,
+}: {
+  branding?: LogoBranding;
+  siteName?: string;
+  tagline?: string;
+}) {
   return (
     <footer className="bg-[#08090d] text-white">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
           <Logo imageUrl={branding?.imageUrl} alt={branding?.alt} />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
-            Premium IPTV with live channels, movies, and series on every device.
-            Reliable streams. Honest pricing.
+            {tagline ||
+              "Premium IPTV with live channels, movies, and series on every device. Reliable streams. Honest pricing."}
           </p>
           <div className="mt-5 flex gap-3">
             {siteConfig.socials.map((s) => (
@@ -86,7 +94,7 @@ export function Footer({ branding }: { branding?: LogoBranding }) {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-5 text-xs text-white/45 sm:flex-row lg:px-8">
           <p>
-            © {new Date().getFullYear()} {siteConfig.name}. All rights reserved.
+            © {new Date().getFullYear()} {siteName || siteConfig.name}. All rights reserved.
           </p>
           <div className="flex items-center gap-2">
             {siteConfig.payments.map((p) => (

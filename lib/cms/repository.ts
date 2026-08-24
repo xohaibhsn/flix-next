@@ -85,7 +85,12 @@ export class LocalJsonRepository implements CmsRepository {
 }
 
 const jsonCms = new LocalJsonRepository();
+const useMysql = isDatabaseConfigured();
 
-export const cms: CmsRepository = isDatabaseConfigured()
+if (process.env.NEXT_PHASE !== "phase-production-build") {
+  console.info(`[cms] persistence adapter: ${useMysql ? "mysql" : "json"}`);
+}
+
+export const cms: CmsRepository = useMysql
   ? new MysqlWithBuildFallback(new MysqlCmsRepository(), jsonCms)
   : jsonCms;

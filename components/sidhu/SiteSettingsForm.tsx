@@ -67,7 +67,10 @@ export function SiteSettingsForm({
     setSaving(false);
     if (result.ok) {
       setSettings(result.settings);
-      setMessage({ tone: "ok", text: "Site settings saved. Refresh the public site to see branding." });
+      setMessage({
+        tone: "ok",
+        text: "Site settings saved. Refresh the public site to see the tab title, description, and footer.",
+      });
     } else {
       setMessage({ tone: "error", text: result.error });
     }
@@ -88,14 +91,22 @@ export function SiteSettingsForm({
 
       <section className="rounded-xl border border-line bg-white p-5">
         <h2 className="font-semibold">Site identity</h2>
+        <p className="mt-1 text-xs text-muted">
+          These global fields update the browser tab title, default site description, footer, and
+          logo alt text. They do not change the Home Hero heading — edit that under Pages → Home →
+          Hero.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <Field label="Site name">
+          <Field label="Site name" hint="Used in the tab title, Open Graph site name, footer copyright, and logo alt.">
             <TextInput
               value={settings.siteName}
               onChange={(event) => setSettings({ ...settings, siteName: event.target.value })}
             />
           </Field>
-          <Field label="Tagline">
+          <Field
+            label="Tagline"
+            hint="Used as the default site description, Open Graph description, and footer intro. Not the Home Hero heading."
+          >
             <TextInput
               value={settings.tagline}
               onChange={(event) => setSettings({ ...settings, tagline: event.target.value })}

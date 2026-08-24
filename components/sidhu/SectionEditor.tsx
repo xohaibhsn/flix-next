@@ -173,10 +173,13 @@ function HeroFields({ data, onChange }: { data: HeroData; onChange: (data: HeroD
       <Field label="Badge text">
         <TextInput value={data.badge} onChange={(event) => onChange({ ...data, badge: event.target.value })} />
       </Field>
-      <Field label="Heading">
+      <Field
+        label="Heading"
+        hint="This is the Home Hero H1 on /welcome/. It is not the Site Settings tagline."
+      >
         <TextInput value={data.heading} onChange={(event) => onChange({ ...data, heading: event.target.value })} />
       </Field>
-      <Field label="Highlighted heading text">
+      <Field label="Highlighted heading text" hint="Second line of the Hero H1, shown in brand color.">
         <TextInput value={data.highlight} onChange={(event) => onChange({ ...data, highlight: event.target.value })} />
       </Field>
       <Field label="Description">
