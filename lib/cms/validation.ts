@@ -4,20 +4,31 @@ import type {
   CmsPage,
   CmsSection,
   ContactMessage,
+  CtaData,
+  FaqData,
   FaqItem,
   MediaRef,
   NavLink,
   PageSeo,
+  PricingData,
   PricingPlan,
   RedirectRule,
+  RichTextData,
   SectionType,
+  ServicesData,
   SiteSettings,
   SocialLinks,
+  SocialPlatform,
 } from "@/lib/cms/types";
 import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import { sanitizeHtml } from "@/lib/cms/html";
 import { sanitizeHttpUrl, normalizePath } from "@/lib/cms/contact";
+import {
+  isReservedRedirectSource,
+  isSelfRedirect,
+  sanitizeRedirectDestination,
+} from "@/lib/cms/redirects";
 import { slugify } from "@/lib/cms/slug";
 
 const SECTION_TYPES: SectionType[] = [
@@ -52,6 +63,17 @@ export function sanitizeText(value: unknown, max = 4000) {
 export function sanitizeHref(value: unknown) {
   const href = sanitizeText(value, 500).trim();
   if (!href) return "/";
+  const lower = href.toLowerCase();
+  if (
+    lower.startsWith("javascript:") ||
+    lower.startsWith("data:") ||
+    lower.startsWith("vbscript:") ||
+    href.startsWith("//") ||
+    href.startsWith("/\\") ||
+    href.includes("\\")
+  ) {
+    return "/";
+  }
   if (
     href.startsWith("/") ||
     href.startsWith("#") ||
@@ -97,7 +119,7 @@ export function sanitizePage(input: CmsPage): CmsPage {
       label: sanitizeText(section.label, 80) || section.type,
       order: typeof section.order === "number" ? section.order : index + 1,
       visible: Boolean(section.visible),
-      data: mergeSectionData(section.type, section.data),
+      data: sanitizeSectionData(section.type, mergeSectionData(section.type, section.data)),
     }))
     .sort((a, b) => a.order - b.order)
     .map((section, index) => ({ ...section, order: index + 1 }));
@@ -115,17 +137,20 @@ export function sanitizePage(input: CmsPage): CmsPage {
 export function sanitizeSettings(input: SiteSettings): SiteSettings {
   const fallback = defaultSettings();
   const source = input && typeof input === "object" ? input : fallback;
-  return {
+  const whatsapp = sanitizeText(source.whatsapp, 40).replace(/[^\d]/g, "");
+  const next: SiteSettings = {
     siteName: sanitizeText(source.siteName, 80) || "THE FLIX IPTV",
     tagline: sanitizeText(source.tagline, 160),
     email: sanitizeText(source.email, 120),
     phone: sanitizeText(source.phone, 60),
-    whatsapp: sanitizeText(source.whatsapp, 40).replace(/[^\d]/g, ""),
+    whatsapp,
     whatsappDisplay: sanitizeText(source.whatsappDisplay, 60),
     whatsappMessage: sanitizeText(source.whatsappMessage, 300),
+    whatsappEnabled: coerceEnabled(source.whatsappEnabled, Boolean(whatsapp)),
     hours: sanitizeText(source.hours, 120),
     location: sanitizeText(source.location, 160),
-    telegramUrl: sanitizeHttpUrl(sanitizeText(source.telegramUrl, 300)),
+    telegramUrl: "",
+    telegramEnabled: false,
     socials: sanitizeSocials(source.socials),
     headerNav: sanitizeNavList(source.headerNav, fallback.headerNav),
     headerCtaLabel: sanitizeText(source.headerCtaLabel, 40) || "Get Started",
@@ -150,17 +175,101 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
       blog: sanitizePageSeo(source.pageSeo?.blog, fallback.pageSeo.blog),
     },
   };
+
+  const telegramUrl =
+    sanitizeHttpUrl(sanitizeText(source.telegramUrl, 300)) || next.socials.telegram.url;
+  next.telegramUrl = telegramUrl;
+  next.telegramEnabled = coerceEnabled(source.telegramEnabled, Boolean(telegramUrl));
+  next.socials = {
+    ...next.socials,
+    telegram: { url: telegramUrl, visible: next.telegramEnabled },
+  };
+  return next;
+}
+
+function coerceEnabled(flag: unknown, hasValue: boolean) {
+  if (typeof flag === "boolean") return flag;
+  return hasValue;
+}
+
+function sanitizeSocialPlatform(value: unknown): SocialPlatform {
+  if (typeof value === "string") {
+    const url = sanitizeHttpUrl(sanitizeText(value, 300));
+    return { url, visible: Boolean(url) };
+  }
+  if (value && typeof value === "object") {
+    const input = value as { url?: unknown; href?: unknown; visible?: unknown };
+    const url = sanitizeHttpUrl(sanitizeText((input.url ?? input.href) as string, 300));
+    const visible = typeof input.visible === "boolean" ? input.visible : Boolean(url);
+    return { url, visible };
+  }
+  return { url: "", visible: false };
 }
 
 function sanitizeSocials(value: unknown): SocialLinks {
-  const input = value && typeof value === "object" ? (value as SocialLinks) : defaultSettings().socials;
+  const input = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
   return {
-    facebook: sanitizeHttpUrl(sanitizeText(input.facebook, 300)),
-    instagram: sanitizeHttpUrl(sanitizeText(input.instagram, 300)),
-    twitter: sanitizeHttpUrl(sanitizeText(input.twitter, 300)),
-    youtube: sanitizeHttpUrl(sanitizeText(input.youtube, 300)),
-    telegram: sanitizeHttpUrl(sanitizeText(input.telegram, 300)),
+    facebook: sanitizeSocialPlatform(input.facebook),
+    instagram: sanitizeSocialPlatform(input.instagram),
+    twitter: sanitizeSocialPlatform(input.twitter),
+    youtube: sanitizeSocialPlatform(input.youtube),
+    telegram: sanitizeSocialPlatform(input.telegram),
   };
+}
+
+function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSection["data"] {
+  if (type === "rich-text") {
+    const current = data as RichTextData;
+    return {
+      heading: sanitizeText(current.heading, 160),
+      html: sanitizeHtml(current.html),
+    };
+  }
+  if (type === "cta") {
+    const current = data as CtaData;
+    return {
+      ...current,
+      heading: sanitizeText(current.heading, 160),
+      description: sanitizeText(current.description, 400),
+      buttonLabel: sanitizeText(current.buttonLabel, 40),
+      buttonHref: sanitizeHref(current.buttonHref),
+    };
+  }
+  if (type === "services") {
+    const current = data as ServicesData;
+    return {
+      ...current,
+      cards: current.cards.map((card) => ({
+        ...card,
+        title: sanitizeText(card.title, 80),
+        description: sanitizeText(card.description, 400),
+        linkLabel: sanitizeText(card.linkLabel, 40),
+        linkHref: sanitizeHref(card.linkHref),
+      })),
+    };
+  }
+  if (type === "pricing") {
+    const current = data as PricingData;
+    return {
+      ...current,
+      plans: current.plans.map((plan) => ({
+        ...plan,
+        buttonHref: sanitizeHref(plan.buttonHref),
+      })),
+    };
+  }
+  if (type === "faq") {
+    const current = data as FaqData;
+    return {
+      ...current,
+      items: current.items.map((item) => ({
+        ...item,
+        question: sanitizeText(item.question, 200),
+        answer: sanitizeText(item.answer, 2000),
+      })),
+    };
+  }
+  return data;
 }
 
 function sanitizeNavList(value: unknown, fallback: NavLink[]): NavLink[] {
@@ -275,9 +384,20 @@ export function sanitizePost(input: BlogPost): BlogPost {
 export function sanitizeRedirect(input: RedirectRule): RedirectRule {
   const now = new Date().toISOString();
   const sourcePath = normalizePath(sanitizeText(input.sourcePath, 200));
-  const destinationPath = sanitizeHref(input.destinationPath);
+  const destinationPath = sanitizeRedirectDestination(input.destinationPath);
   const statusCode =
     input.statusCode === 302 || input.statusCode === 307 || input.statusCode === 308 ? input.statusCode : 301;
+  if (isReservedRedirectSource(sourcePath) || isSelfRedirect(sourcePath, destinationPath)) {
+    return {
+      id: sanitizeText(input.id, 80),
+      sourcePath,
+      destinationPath: "/",
+      statusCode,
+      active: false,
+      createdAt: sanitizeText(input.createdAt, 40) || now,
+      updatedAt: now,
+    };
+  }
   return {
     id: sanitizeText(input.id, 80),
     sourcePath,

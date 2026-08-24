@@ -16,7 +16,7 @@ export default async function SidhuMediaPage() {
   const usedIds = referencedMediaIds(settings, posts);
 
   return (
-    <AdminShell title="Media" subtitle="Upload, preview, copy URL, and delete Cloudinary images. SVG is not accepted in this phase.">
+    <AdminShell title="Media" subtitle="Upload Image is the primary action. JPG, PNG, and WEBP only. In-use images cannot be deleted until they are unassigned.">
       <MediaLibrary
         configured={cloud.configured}
         initialAssets={assets.map((asset) => ({ ...asset, inUse: usedIds.has(asset.id) }))}

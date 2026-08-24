@@ -1,24 +1,12 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { MediaAsset } from "@/lib/cms/types";
+import { deleteSidhuImage, fetchSidhuMedia, uploadSidhuImage } from "@/lib/cms/media-client";
+import { MEDIA_UPLOAD, formatFileSize } from "@/lib/media-specs";
 import { Banner } from "@/components/sidhu/fields";
 
 type LibraryAsset = MediaAsset & { inUse?: boolean };
-
-async function fetchLibrary() {
-  const response = await fetch("/api/sidhu/media", { cache: "no-store", credentials: "same-origin" });
-  const json = (await response.json()) as {
-    ok: boolean;
-    configured?: boolean;
-    assets?: LibraryAsset[];
-    error?: string;
-  };
-  if (!response.ok || !json.ok) {
-    throw new Error(json.error || "Could not load the media library.");
-  }
-  return { configured: Boolean(json.configured), assets: json.assets ?? [] };
-}
 
 export function MediaLibrary({
   initialAssets,
@@ -30,92 +18,128 @@ export function MediaLibrary({
   const [assets, setAssets] = useState<LibraryAsset[]>(initialAssets);
   const [configured, setConfigured] = useState(initialConfigured);
   const [busy, setBusy] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
+  const [alt, setAlt] = useState("");
+  const [folder, setFolder] = useState("theflix/site");
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
 
   const reload = useCallback(async () => {
-    const result = await fetchLibrary();
+    const result = await fetchSidhuMedia();
     setConfigured(result.configured);
     setAssets(result.assets);
   }, []);
 
-  async function upload(file: File, folder: string) {
-    setBusy(true);
-    setMessage(null);
-    const body = new FormData();
-    body.append("file", file);
-    body.append("folder", folder);
-    const response = await fetch("/api/sidhu/media", { method: "POST", body, credentials: "same-origin" });
-    const json = (await response.json()) as { ok: boolean; error?: string };
-    setBusy(false);
-    if (!response.ok || !json.ok) {
-      setMessage({ tone: "error", text: json.error || "Upload failed." });
+  const localPreview = useMemo(() => preview, [preview]);
+
+  function chooseFile(next: File | null) {
+    if (preview) URL.revokeObjectURL(preview);
+    setFile(next);
+    setPreview(next ? URL.createObjectURL(next) : "");
+  }
+
+  async function upload() {
+    if (!file) {
+      setMessage({ tone: "error", text: "Choose an image first, then click Upload Image." });
       return;
     }
-    setMessage({ tone: "ok", text: "Image uploaded to Cloudinary and saved in the library." });
-    await reload();
+    setBusy(true);
+    setMessage(null);
+    try {
+      await uploadSidhuImage(file, folder, alt);
+      chooseFile(null);
+      setAlt("");
+      setMessage({ tone: "ok", text: "Image uploaded to Cloudinary and saved in the library." });
+      await reload();
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Upload failed." });
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function remove(asset: LibraryAsset) {
     if (asset.inUse) {
       setMessage({
         tone: "error",
-        text: "This image is used in Site Settings. Remove it from Logo, Favicon, or OG Image first.",
+        text: "This image is used on the site. Unassign it from Site Settings, SEO, or a blog post first.",
       });
       return;
     }
-    if (!confirm(`Delete “${asset.originalFilename}” from Cloudinary and the local library?`)) return;
+    if (!confirm(`Delete “${asset.originalFilename}” from Cloudinary and the library?`)) return;
     setBusy(true);
-    const response = await fetch("/api/sidhu/media", {
-      method: "DELETE",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: asset.id }),
-    });
-    const json = (await response.json()) as { ok: boolean; error?: string };
-    setBusy(false);
-    if (!response.ok || !json.ok) {
-      setMessage({ tone: "error", text: json.error || "Delete failed." });
-      return;
+    try {
+      await deleteSidhuImage(asset.id);
+      setMessage({ tone: "ok", text: "Image deleted from Cloudinary and the library." });
+      await reload();
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Delete failed." });
+    } finally {
+      setBusy(false);
     }
-    setMessage({ tone: "ok", text: "Image deleted from Cloudinary and the library." });
-    await reload();
   }
 
   return (
     <div className="space-y-4">
       {!configured ? (
         <Banner tone="info">
-          Cloudinary is not configured. Uploads and deletes stay disabled until CLOUDINARY_API_KEY
-          and CLOUDINARY_API_SECRET are set in environment variables. The API secret must stay
-          server-only.
+          Cloudinary is not configured. Uploads and deletes stay disabled until the Cloudinary API key
+          and secret are set in server environment variables.
         </Banner>
       ) : null}
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <div className="rounded-xl border border-line bg-white p-4">
-        <p className="text-sm font-semibold">Upload image</p>
-        <p className="mt-1 text-xs text-muted">JPG, PNG, or WEBP · max 5MB · SVG is excluded for now.</p>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <select id="folder" className="rounded-md border border-line px-3 py-2 text-sm" defaultValue="theflix/site">
-            <option value="theflix/branding">theflix/branding</option>
-            <option value="theflix/og">theflix/og</option>
-            <option value="theflix/site">theflix/site</option>
-          </select>
-          <label className="inline-flex cursor-pointer items-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {busy ? "Uploading…" : "Upload"}
+        <h2 className="text-sm font-semibold">Upload Image</h2>
+        <p className="mt-1 text-xs text-muted">
+          JPG, JPEG, PNG, or WEBP · max {MEDIA_UPLOAD.maxLabel}. Choose a file to preview it, then click
+          Upload Image. Nothing is sent until you click Upload Image.
+        </p>
+        <div className="mt-3 grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
+          <div className="flex h-36 items-center justify-center overflow-hidden rounded-md border border-dashed border-line bg-paper">
+            {localPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={localPreview} alt="" className="max-h-full max-w-full object-contain" />
+            ) : (
+              <span className="px-2 text-center text-xs text-muted">Preview appears here</span>
+            )}
+          </div>
+          <div className="space-y-3">
             <input
               type="file"
-              className="sr-only"
-              accept="image/jpeg,image/png,image/webp"
+              accept={MEDIA_UPLOAD.accept}
               disabled={!configured || busy}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                const folder = (document.getElementById("folder") as HTMLSelectElement | null)?.value || "theflix/site";
-                if (file) void upload(file, folder);
-                event.target.value = "";
-              }}
+              onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
             />
-          </label>
-          {busy ? <span className="text-xs text-muted">Please wait…</span> : null}
+            <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
+              Optional alt / label
+              <input
+                value={alt}
+                onChange={(event) => setAlt(event.target.value)}
+                className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
+                placeholder="Describe the image"
+              />
+            </label>
+            <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
+              Cloudinary folder
+              <select
+                className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
+                value={folder}
+                onChange={(event) => setFolder(event.target.value)}
+              >
+                <option value="theflix/branding">theflix/branding</option>
+                <option value="theflix/og">theflix/og</option>
+                <option value="theflix/site">theflix/site</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              disabled={!configured || busy || !file}
+              onClick={() => void upload()}
+            >
+              {busy ? "Uploading…" : "Upload Image"}
+            </button>
+          </div>
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -129,10 +153,21 @@ export function MediaLibrary({
               <div className="space-y-2 p-3">
                 <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
                 <p className="text-xs text-muted">
-                  {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format} · {asset.createdAt.slice(0, 10)}
-                  {asset.inUse ? " · used in settings" : ""}
+                  {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format || "unknown"} ·{" "}
+                  {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
+                  {asset.inUse ? " · in use" : ""}
                 </p>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded border border-line px-2 py-1 text-xs"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(asset.secureUrl);
+                      setMessage({ tone: "ok", text: "Selected — URL copied. Assign it from an image field or paste the URL." });
+                    }}
+                  >
+                    Select/Use
+                  </button>
                   <button
                     type="button"
                     className="rounded border border-line px-2 py-1 text-xs"

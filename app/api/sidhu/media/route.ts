@@ -4,17 +4,18 @@ import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
 import { referencedMediaIds } from "@/lib/cms/media-refs";
 import { cms } from "@/lib/cms/repository";
+import { sanitizeText } from "@/lib/cms/validation";
 import {
   destroyCloudinaryImage,
   isCloudinaryConfigured,
   sanitizeFolder,
   uploadImageBuffer,
 } from "@/lib/cloudinary";
+import { publicErrorMessage } from "@/lib/security/errors";
+import { assertSafeImageUpload, isAllowedCloudinaryImage } from "@/lib/security/image-upload";
+import { isSameOriginMutation } from "@/lib/security/origin";
 
 export const runtime = "nodejs";
-
-const MAX_BYTES = 5 * 1024 * 1024;
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -43,25 +44,25 @@ export async function GET() {
 export async function POST(request: Request) {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
+  if (!isSameOriginMutation(request)) {
+    return jsonError("Invalid request origin.", 403);
+  }
   if (!isCloudinaryConfigured()) {
-    return jsonError(
-      "Cloudinary is not configured. Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in the server environment.",
-      503,
-    );
+    return jsonError("Cloudinary is not configured.", 503);
   }
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File)) {
     return jsonError("Choose an image file to upload.");
   }
-  if (!ALLOWED_TYPES.has(file.type)) {
-    return jsonError("Only JPG, PNG, and WEBP images are allowed.");
-  }
-  if (file.size > MAX_BYTES) {
-    return jsonError("Image must be 5MB or smaller.");
+  const buffer = Buffer.from(await file.arrayBuffer());
+  try {
+    assertSafeImageUpload(file, buffer);
+  } catch (error) {
+    return jsonError(error instanceof Error ? error.message : "That image is not allowed.");
   }
   const folder = sanitizeFolder(String(form.get("folder") || "theflix/site"));
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const alt = sanitizeText(form.get("alt"), 160);
   const safeName = file.name.replace(/[^\w.\-]+/g, "-").slice(0, 80) || "upload";
   try {
     const uploaded = await uploadImageBuffer({
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
       filename: safeName,
       folder,
     });
+    if (!isAllowedCloudinaryImage(uploaded)) {
+      return jsonError("Cloudinary returned an unsupported image type.");
+    }
     const asset = await cms.addMedia({
       id: createId("media"),
       publicId: uploaded.publicId,
@@ -81,29 +85,31 @@ export async function POST(request: Request) {
       bytes: uploaded.bytes,
       resourceType: uploaded.resourceType,
       createdAt: new Date().toISOString(),
-      alt: "",
+      alt,
     });
     revalidateMedia();
     return NextResponse.json({ ok: true, asset });
   } catch (error) {
-    return jsonError(
-      error instanceof Error ? error.message : "Cloudinary upload failed.",
-      502,
-    );
+    return jsonError(publicErrorMessage(error, "Cloudinary upload failed."), 502);
   }
 }
 
 export async function DELETE(request: Request) {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
-  if (!isCloudinaryConfigured()) {
-    return jsonError(
-      "Cloudinary is not configured. Set CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET in the server environment.",
-      503,
-    );
+  if (!isSameOriginMutation(request)) {
+    return jsonError("Invalid request origin.", 403);
   }
-  const body = (await request.json()) as { id?: string };
-  const id = body.id?.trim();
+  if (!isCloudinaryConfigured()) {
+    return jsonError("Cloudinary is not configured.", 503);
+  }
+  let body: { id?: string };
+  try {
+    body = (await request.json()) as { id?: string };
+  } catch {
+    return jsonError("Missing media id.");
+  }
+  const id = sanitizeText(body.id, 80);
   if (!id) return jsonError("Missing media id.");
   const asset = await cms.getMediaById(id);
   if (!asset) return jsonError("That media item is not in the library.", 404);
@@ -121,9 +127,6 @@ export async function DELETE(request: Request) {
     revalidateMedia();
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return jsonError(
-      error instanceof Error ? error.message : "Cloudinary delete failed.",
-      502,
-    );
+    return jsonError(publicErrorMessage(error, "Cloudinary delete failed."), 502);
   }
 }

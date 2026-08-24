@@ -1,7 +1,4 @@
-import { whatsappUrl } from "@/lib/cms/contact";
-
-export function WhatsAppButton({ number, message }: { number: string; message?: string }) {
-  const href = whatsappUrl(number, message);
+export function WhatsAppButton({ href }: { href: string }) {
   if (!href) return null;
 
   return (

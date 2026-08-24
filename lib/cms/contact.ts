@@ -38,7 +38,7 @@ export function sanitizeHttpUrl(value: string) {
 
 export function normalizePath(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!trimmed || trimmed.startsWith("//")) return "";
   if (/^https?:\/\//i.test(trimmed)) {
     try {
       const url = new URL(trimmed);

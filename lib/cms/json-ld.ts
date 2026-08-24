@@ -1,19 +1,18 @@
 import { getSiteOrigin } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
-import { whatsappUrl } from "@/lib/cms/contact";
+import { publicEmail, publicPhone, publicSameAs, publicWhatsAppUrl } from "@/lib/cms/public-contact";
 
 export function organizationJsonLd(settings: SiteSettings) {
   const origin = getSiteOrigin();
-  const sameAs = Object.values(settings.socials).filter(Boolean);
-  if (settings.telegramUrl) sameAs.push(settings.telegramUrl);
+  const sameAs = publicSameAs(settings);
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
     name: settings.siteName,
     url: origin,
     description: settings.tagline,
-    email: settings.email || undefined,
-    telephone: settings.phone || undefined,
+    email: publicEmail(settings) || undefined,
+    telephone: publicPhone(settings) || undefined,
     logo: settings.branding.logo?.secureUrl,
     sameAs: sameAs.length ? sameAs : undefined,
   };
@@ -72,5 +71,5 @@ export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
 }
 
 export function whatsappSameAs(settings: SiteSettings) {
-  return whatsappUrl(settings.whatsapp, settings.whatsappMessage);
+  return publicWhatsAppUrl(settings);
 }

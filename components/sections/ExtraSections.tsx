@@ -1,7 +1,8 @@
 import { Clock3, Mail, MessageCircle, Phone, Send } from "lucide-react";
+import { sanitizeHtml } from "@/lib/cms/html";
 import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { isPlaceholderPhone, telUrl, whatsappUrl } from "@/lib/cms/contact";
+import { publicEmail, publicPhone, publicPhoneHref, publicTelegramUrl, publicWhatsAppUrl } from "@/lib/cms/public-contact";
 import type {
   ContactFormData,
   ContactInfoData,
@@ -21,7 +22,7 @@ export function RichTextBlock({ data }: { data: RichTextData }) {
         {data.heading ? <h2 className="text-2xl font-extrabold text-ink">{data.heading}</h2> : null}
         <div
           className="prose-cms mt-4 text-sm leading-relaxed text-muted"
-          dangerouslySetInnerHTML={{ __html: data.html }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html) }}
         />
       </Container>
     </section>
@@ -55,13 +56,14 @@ export function InfoCards({ data }: { data: InfoCardsData }) {
 }
 
 export function ContactInfoCards({ data, settings }: { data: ContactInfoData; settings: SiteSettings }) {
-  const wa = whatsappUrl(settings.whatsapp, settings.whatsappMessage);
+  const wa = publicWhatsAppUrl(settings);
+  const email = publicEmail(settings);
+  const phone = publicPhone(settings);
+  const phoneHref = publicPhoneHref(settings);
   const cards = [
-    settings.email
-      ? { icon: Mail, title: "Email", value: settings.email, href: `mailto:${settings.email}` }
-      : null,
-    settings.phone && !isPlaceholderPhone(settings.phone)
-      ? { icon: Phone, title: "Phone", value: settings.whatsappDisplay || settings.phone, href: telUrl(settings.phone) }
+    email ? { icon: Mail, title: "Email", value: email, href: `mailto:${email}` } : null,
+    phone && phoneHref
+      ? { icon: Phone, title: "Phone", value: settings.whatsappDisplay || phone, href: phoneHref }
       : null,
     wa ? { icon: MessageCircle, title: "WhatsApp", value: settings.whatsappDisplay || "Chat on WhatsApp", href: wa } : null,
     settings.hours ? { icon: Clock3, title: "Hours", value: settings.hours, href: undefined } : null,
@@ -106,8 +108,8 @@ export function ContactFormBlock({ data }: { data: ContactFormData }) {
 }
 
 export function MessagingCta({ data, settings }: { data: MessagingCtaData; settings: SiteSettings }) {
-  const wa = whatsappUrl(settings.whatsapp, settings.whatsappMessage);
-  const telegram = settings.telegramUrl || settings.socials.telegram;
+  const wa = publicWhatsAppUrl(settings);
+  const telegram = publicTelegramUrl(settings);
   return (
     <section className="bg-ink py-16 text-white">
       <Container className="max-w-3xl text-center">

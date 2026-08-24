@@ -1,16 +1,33 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { saveSettingsAction } from "@/lib/cms/actions";
 import { createId } from "@/lib/cms/ids";
 import { whatsappUrl } from "@/lib/cms/contact";
-import type { MediaAsset, MediaRef, NavLink, SiteSettings } from "@/lib/cms/types";
+import { uploadSidhuImage } from "@/lib/cms/media-client";
+import type { MediaAsset, NavLink, SiteSettings, SocialPlatform } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
+import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
+import { MediaPickerModal, toMediaRef } from "@/components/sidhu/MediaPickerModal";
+import { MEDIA_UPLOAD } from "@/lib/media-specs";
 
 type LibraryAsset = MediaAsset & { inUse?: boolean };
 
-function toRef(asset: Pick<MediaAsset, "id" | "publicId" | "secureUrl">): MediaRef {
-  return { id: asset.id, publicId: asset.publicId, secureUrl: asset.secureUrl };
+function ShowToggle({
+  checked,
+  onChange,
+  label = "Show on website",
+}: {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label?: string;
+}) {
+  return (
+    <label className="inline-flex items-center gap-2 text-sm">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      {label}
+    </label>
+  );
 }
 
 export function SiteSettingsForm({
@@ -26,41 +43,18 @@ export function SiteSettingsForm({
 }) {
   const [settings, setSettings] = useState(initial);
   const [assets, setAssets] = useState<LibraryAsset[]>(initialAssets);
-  const [picker, setPicker] = useState<"logo" | "favicon" | "og" | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
 
-  const loadAssets = useCallback(async () => {
-    const response = await fetch("/api/sidhu/media", { cache: "no-store" });
-    const json = (await response.json()) as { ok: boolean; assets?: LibraryAsset[] };
-    if (json.ok) setAssets(json.assets ?? []);
-  }, []);
+  function notice(text: string, tone: "ok" | "error" | "info" = "info") {
+    setMessage({ tone, text });
+  }
 
-  async function uploadAndAssign(slot: "logo" | "favicon" | "og", file: File) {
-    const previous = settings.branding;
-    setMessage(null);
-    const body = new FormData();
-    body.append("file", file);
-    body.append("folder", slot === "og" ? "theflix/og" : "theflix/branding");
-    const response = await fetch("/api/sidhu/media", { method: "POST", body });
-    const json = (await response.json()) as { ok: boolean; asset?: MediaAsset; error?: string };
-    if (!response.ok || !json.ok || !json.asset) {
-      setSettings({ ...settings, branding: previous });
-      setMessage({ tone: "error", text: json.error || "Upload failed. Existing branding was kept." });
-      return;
-    }
-    const ref = toRef(json.asset);
-    setSettings((current) => ({
-      ...current,
-      branding: {
-        ...current.branding,
-        logo: slot === "logo" ? ref : current.branding.logo,
-        favicon: slot === "favicon" ? ref : current.branding.favicon,
-        defaultOgImage: slot === "og" ? ref : current.branding.defaultOgImage,
-      },
-    }));
-    setMessage({ tone: "info", text: "Uploaded. Click Save changes to apply it on the website." });
-    await loadAssets();
+  function setSocial(key: keyof SiteSettings["socials"], patch: Partial<SocialPlatform>) {
+    setSettings({
+      ...settings,
+      socials: { ...settings.socials, [key]: { ...settings.socials[key], ...patch } },
+    });
   }
 
   async function save() {
@@ -69,12 +63,9 @@ export function SiteSettingsForm({
     setSaving(false);
     if (result.ok) {
       setSettings(result.settings);
-      setMessage({
-        tone: "ok",
-        text: "Site settings saved. Refresh the public site to see the tab title, description, and footer.",
-      });
+      notice("Site settings saved. Refresh the public site to see header, footer, and contact changes.", "ok");
     } else {
-      setMessage({ tone: "error", text: result.error });
+      notice(result.error, "error");
     }
   }
 
@@ -82,9 +73,8 @@ export function SiteSettingsForm({
     <div className="space-y-4">
       {!configured ? (
         <Banner tone="info">
-          Cloudinary cloud name in use: {cloudName}. Add CLOUDINARY_API_KEY and
-          CLOUDINARY_API_SECRET in .env.local before uploads will work. Choosing an existing library
-          image still works locally.
+          Cloudinary cloud name in use: {cloudName}. Add the Cloudinary API key and secret in the server
+          environment before uploads will work. Choosing an existing library image still works.
         </Banner>
       ) : (
         <Banner tone="info">Cloudinary cloud: {cloudName}</Banner>
@@ -94,9 +84,8 @@ export function SiteSettingsForm({
       <section className="rounded-xl border border-line bg-white p-5">
         <h2 className="font-semibold">Site identity</h2>
         <p className="mt-1 text-xs text-muted">
-          These global fields update the browser tab title, default site description, footer, and
-          logo alt text. They do not change the Home Hero heading — edit that under Pages → Home →
-          Hero.
+          These global fields update the browser tab title, default site description, footer, and logo alt
+          text. They do not change the Home Hero heading — edit that under Pages → Home → Hero.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Site name" hint="Used in the tab title, Open Graph site name, footer copyright, and logo alt.">
@@ -117,39 +106,53 @@ export function SiteSettingsForm({
         </div>
       </section>
 
-      <AssetCard
+      <ImageField
         title="Website logo"
-        hint="Used in the header and footer. If empty, the wordmark fallback is shown."
+        specId="logo"
         value={settings.branding.logo}
         alt={settings.branding.logoAlt}
         onAlt={(logoAlt) => setSettings({ ...settings, branding: { ...settings.branding, logoAlt } })}
+        folder="theflix/branding"
         configured={configured}
-        onUpload={(file) => void uploadAndAssign("logo", file)}
-        onChoose={() => setPicker("logo")}
-        onRemove={() => setSettings({ ...settings, branding: { ...settings.branding, logo: null } })}
+        assets={assets}
+        onChange={(logo) => setSettings({ ...settings, branding: { ...settings.branding, logo } })}
+        onUploaded={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
+        onNotice={notice}
       />
-      <AssetCard
+      <ImageField
         title="Favicon"
-        hint="Recommended: 32×32 or 48×48 PNG/WEBP. After save, hard-refresh or open a new tab if the old icon is cached."
+        specId="favicon"
         value={settings.branding.favicon}
+        folder="theflix/branding"
         configured={configured}
-        onUpload={(file) => void uploadAndAssign("favicon", file)}
-        onChoose={() => setPicker("favicon")}
-        onRemove={() => setSettings({ ...settings, branding: { ...settings.branding, favicon: null } })}
+        assets={assets}
+        onChange={(favicon) => setSettings({ ...settings, branding: { ...settings.branding, favicon } })}
+        onUploaded={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
+        onNotice={notice}
       />
-      <AssetCard
+      <ImageField
         title="Default Open Graph image"
-        hint="Recommended 1200 × 630. Used as the site-wide social sharing image until page SEO overrides exist."
+        specId="defaultOg"
         value={settings.branding.defaultOgImage}
+        folder="theflix/og"
         configured={configured}
-        onUpload={(file) => void uploadAndAssign("og", file)}
-        onChoose={() => setPicker("og")}
-        onRemove={() =>
-          setSettings({ ...settings, branding: { ...settings.branding, defaultOgImage: null } })
+        assets={assets}
+        onChange={(defaultOgImage) =>
+          setSettings({ ...settings, branding: { ...settings.branding, defaultOgImage } })
         }
+        onUploaded={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
+        onNotice={notice}
       />
 
-      <ContactAndChromeSettings settings={settings} setSettings={setSettings} assets={assets} />
+      <ContactAndChromeSettings
+        settings={settings}
+        setSettings={setSettings}
+        assets={assets}
+        configured={configured}
+        onAssets={setAssets}
+        onNotice={notice}
+        setSocial={setSocial}
+      />
 
       <button
         type="button"
@@ -159,46 +162,6 @@ export function SiteSettingsForm({
       >
         {saving ? "Saving…" : "Save changes"}
       </button>
-
-      {picker ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-xl bg-white p-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Choose from media library</h3>
-              <button type="button" className="text-sm text-muted" onClick={() => setPicker(null)}>
-                Close
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              {assets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  className="overflow-hidden rounded-lg border border-line text-left hover:border-brand"
-                  onClick={() => {
-                    const ref = toRef(asset);
-                    setSettings((current) => ({
-                      ...current,
-                      branding: {
-                        ...current.branding,
-                        logo: picker === "logo" ? ref : current.branding.logo,
-                        favicon: picker === "favicon" ? ref : current.branding.favicon,
-                        defaultOgImage: picker === "og" ? ref : current.branding.defaultOgImage,
-                      },
-                    }));
-                    setPicker(null);
-                    setMessage({ tone: "info", text: "Selected. Click Save changes to apply." });
-                  }}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={asset.secureUrl} alt="" className="h-24 w-full object-cover" />
-                  <span className="block truncate px-2 py-1 text-xs">{asset.originalFilename}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -207,15 +170,35 @@ function ContactAndChromeSettings({
   settings,
   setSettings,
   assets,
+  configured,
+  onAssets,
+  onNotice,
+  setSocial,
 }: {
   settings: SiteSettings;
   setSettings: (settings: SiteSettings) => void;
   assets: LibraryAsset[];
+  configured: boolean;
+  onAssets: (assets: LibraryAsset[]) => void;
+  onNotice: (text: string, tone?: "ok" | "error" | "info") => void;
+  setSocial: (key: keyof SiteSettings["socials"], patch: Partial<SocialPlatform>) => void;
 }) {
+  const generatedWa = whatsappUrl(settings.whatsapp, settings.whatsappMessage);
+  const optionalSocials = [
+    { key: "facebook" as const, label: "Facebook" },
+    { key: "instagram" as const, label: "Instagram" },
+    { key: "twitter" as const, label: "X / Twitter" },
+    { key: "youtube" as const, label: "YouTube" },
+  ];
+
   return (
     <>
       <section className="rounded-xl border border-line bg-white p-5">
         <h2 className="font-semibold">Contact & communication</h2>
+        <p className="mt-1 text-xs text-muted">
+          These values feed the Contact page, footer, messaging CTAs, and the floating WhatsApp button.
+          Empty or hidden channels are omitted from the public site.
+        </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <Field label="Email">
             <TextInput value={settings.email} onChange={(event) => setSettings({ ...settings, email: event.target.value })} />
@@ -223,21 +206,59 @@ function ContactAndChromeSettings({
           <Field label="Phone">
             <TextInput value={settings.phone} onChange={(event) => setSettings({ ...settings, phone: event.target.value })} />
           </Field>
-          <Field label="WhatsApp number" hint="Digits only, international format. Used to generate wa.me links.">
+          <Field label="WhatsApp number" hint="Digits only, international format.">
             <TextInput value={settings.whatsapp} onChange={(event) => setSettings({ ...settings, whatsapp: event.target.value })} />
           </Field>
           <Field label="WhatsApp display">
-            <TextInput value={settings.whatsappDisplay} onChange={(event) => setSettings({ ...settings, whatsappDisplay: event.target.value })} />
+            <TextInput
+              value={settings.whatsappDisplay}
+              onChange={(event) => setSettings({ ...settings, whatsappDisplay: event.target.value })}
+            />
           </Field>
           <Field label="Default WhatsApp message">
-            <TextInput value={settings.whatsappMessage} onChange={(event) => setSettings({ ...settings, whatsappMessage: event.target.value })} />
+            <TextInput
+              value={settings.whatsappMessage}
+              onChange={(event) => setSettings({ ...settings, whatsappMessage: event.target.value })}
+            />
           </Field>
-          <p className="sm:col-span-2 text-xs text-muted">
-            Generated chat URL: {whatsappUrl(settings.whatsapp, settings.whatsappMessage) || "Enter a WhatsApp number to generate wa.me"}
-          </p>
+          <div className="sm:col-span-2 space-y-2">
+            <ShowToggle
+              checked={settings.whatsappEnabled}
+              onChange={(whatsappEnabled) => setSettings({ ...settings, whatsappEnabled })}
+              label="Show WhatsApp on website"
+            />
+            <p className="text-xs text-muted">
+              Generated chat URL: {generatedWa || "Enter a WhatsApp number to generate wa.me"}
+            </p>
+          </div>
           <Field label="Telegram URL">
-            <TextInput value={settings.telegramUrl} onChange={(event) => setSettings({ ...settings, telegramUrl: event.target.value })} />
+            <TextInput
+              value={settings.telegramUrl}
+              onChange={(event) =>
+                setSettings({
+                  ...settings,
+                  telegramUrl: event.target.value,
+                  socials: {
+                    ...settings.socials,
+                    telegram: { ...settings.socials.telegram, url: event.target.value },
+                  },
+                })
+              }
+            />
           </Field>
+          <div className="flex items-end">
+            <ShowToggle
+              checked={settings.telegramEnabled}
+              onChange={(telegramEnabled) =>
+                setSettings({
+                  ...settings,
+                  telegramEnabled,
+                  socials: { ...settings.socials, telegram: { ...settings.socials.telegram, visible: telegramEnabled } },
+                })
+              }
+              label="Show Telegram on website"
+            />
+          </div>
           <Field label="Support hours">
             <TextInput value={settings.hours} onChange={(event) => setSettings({ ...settings, hours: event.target.value })} />
           </Field>
@@ -247,17 +268,27 @@ function ContactAndChromeSettings({
         </div>
       </section>
       <section className="rounded-xl border border-line bg-white p-5">
-        <h2 className="font-semibold">Social links</h2>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          {(["facebook", "instagram", "twitter", "youtube", "telegram"] as const).map((key) => (
-            <Field key={key} label={key}>
-              <TextInput
-                value={settings.socials[key]}
-                onChange={(event) =>
-                  setSettings({ ...settings, socials: { ...settings.socials, [key]: event.target.value } })
-                }
-              />
-            </Field>
+        <h2 className="font-semibold">Optional social links</h2>
+        <p className="mt-1 text-xs text-muted">
+          Icons only appear when a URL is set and Show on website is enabled. Empty or hidden fields leave
+          no blank icon in the footer.
+        </p>
+        <div className="mt-4 grid gap-4">
+          {optionalSocials.map((item) => (
+            <div key={item.key} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-[1fr_auto] sm:items-end">
+              <Field label={`${item.label} URL`}>
+                <TextInput
+                  value={settings.socials[item.key].url}
+                  onChange={(event) => setSocial(item.key, { url: event.target.value })}
+                />
+              </Field>
+              <div className="pb-2">
+                <ShowToggle
+                  checked={settings.socials[item.key].visible}
+                  onChange={(visible) => setSocial(item.key, { visible })}
+                />
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -287,45 +318,113 @@ function ContactAndChromeSettings({
         <NavEditor items={settings.footerQuickLinks} onChange={(footerQuickLinks) => setSettings({ ...settings, footerQuickLinks })} />
         <h3 className="mt-6 text-sm font-semibold">Support links</h3>
         <NavEditor items={settings.footerSupportLinks} onChange={(footerSupportLinks) => setSettings({ ...settings, footerSupportLinks })} />
-        <h3 className="mt-6 text-sm font-semibold">Payment icons</h3>
-        <p className="mt-1 text-xs text-muted">Optional images shown in the footer bar. Choose from the media library after upload.</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {settings.footerPaymentImages.map((image) => (
-            <button
-              key={image.id}
-              type="button"
-              className="overflow-hidden rounded border border-line"
-              onClick={() =>
-                setSettings({
-                  ...settings,
-                  footerPaymentImages: settings.footerPaymentImages.filter((item) => item.id !== image.id),
-                })
-              }
-              title="Remove"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.secureUrl} alt="" className="h-10 w-16 object-contain" />
-            </button>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-4">
-          {assets.slice(0, 8).map((asset) => (
-            <button
-              key={asset.id}
-              type="button"
-              className="overflow-hidden rounded border border-line"
-              onClick={() => {
-                const ref = toRef(asset);
-                if (settings.footerPaymentImages.some((item) => item.id === ref.id)) return;
-                setSettings({ ...settings, footerPaymentImages: [...settings.footerPaymentImages, ref] });
-              }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset.secureUrl} alt="" className="h-12 w-full object-cover" />
-            </button>
-          ))}
-        </div>
+        <PaymentImagesEditor
+          settings={settings}
+          setSettings={setSettings}
+          assets={assets}
+          configured={configured}
+          onAssets={onAssets}
+          onNotice={onNotice}
+        />
       </section>
+    </>
+  );
+}
+
+function PaymentImagesEditor({
+  settings,
+  setSettings,
+  assets,
+  configured,
+  onAssets,
+  onNotice,
+}: {
+  settings: SiteSettings;
+  setSettings: (settings: SiteSettings) => void;
+  assets: LibraryAsset[];
+  configured: boolean;
+  onAssets: (assets: LibraryAsset[]) => void;
+  onNotice: (text: string, tone?: "ok" | "error" | "info") => void;
+}) {
+  const [picker, setPicker] = useState(false);
+  const [uploading, setUploading] = useState(false);
+
+  async function upload(file: File) {
+    setUploading(true);
+    try {
+      const asset = await uploadSidhuImage(file, "theflix/site");
+      onAssets([asset, ...assets.filter((item) => item.id !== asset.id)]);
+      if (!settings.footerPaymentImages.some((item) => item.id === asset.id)) {
+        setSettings({ ...settings, footerPaymentImages: [...settings.footerPaymentImages, toMediaRef(asset)] });
+      }
+      onNotice("Uploaded to Cloudinary immediately. Click Save to apply it on the website.", "info");
+    } catch (error) {
+      onNotice(error instanceof Error ? error.message : "Upload failed.", "error");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <>
+      <h3 className="mt-6 text-sm font-semibold">Payment icons</h3>
+      <MediaSpecHint specId="footerPayment" />
+      <p className="mt-2 text-xs text-muted">
+        Upload New Image sends the file to Cloudinary immediately. Choose from Media Library assigns an
+        existing file. Click Save to apply.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {settings.footerPaymentImages.map((image) => (
+          <button
+            key={image.id}
+            type="button"
+            className="overflow-hidden rounded border border-line"
+            onClick={() =>
+              setSettings({
+                ...settings,
+                footerPaymentImages: settings.footerPaymentImages.filter((item) => item.id !== image.id),
+              })
+            }
+            title="Remove"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={image.secureUrl} alt="" className="h-10 w-16 object-contain" />
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <label className="inline-flex cursor-pointer items-center rounded-md bg-brand px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50">
+          {uploading ? "Uploading…" : "Upload New Image"}
+          <input
+            type="file"
+            className="sr-only"
+            accept={MEDIA_UPLOAD.accept}
+            disabled={!configured || uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void upload(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        <button type="button" className="rounded border border-line px-3 py-1.5 text-xs" onClick={() => setPicker(true)}>
+          Choose from Media Library
+        </button>
+      </div>
+      {picker ? (
+        <MediaPickerModal
+          assets={assets}
+          onClose={() => setPicker(false)}
+          onSelect={(asset) => {
+            const ref = toMediaRef(asset);
+            if (!settings.footerPaymentImages.some((item) => item.id === ref.id)) {
+              setSettings({ ...settings, footerPaymentImages: [...settings.footerPaymentImages, ref] });
+            }
+            setPicker(false);
+            onNotice("Selected from library — Save to apply.", "info");
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -352,18 +451,30 @@ function NavEditor({ items, onChange }: { items: NavLink[]; onChange: (items: Na
               />{" "}
               Show
             </label>
-            <button type="button" className="text-xs" onClick={() => {
-              if (index === 0) return;
-              const next = [...items];
-              [next[index - 1], next[index]] = [next[index], next[index - 1]];
-              onChange(next);
-            }}>Up</button>
-            <button type="button" className="text-xs" onClick={() => {
-              if (index === items.length - 1) return;
-              const next = [...items];
-              [next[index + 1], next[index]] = [next[index], next[index + 1]];
-              onChange(next);
-            }}>Down</button>
+            <button
+              type="button"
+              className="text-xs"
+              onClick={() => {
+                if (index === 0) return;
+                const next = [...items];
+                [next[index - 1], next[index]] = [next[index], next[index - 1]];
+                onChange(next);
+              }}
+            >
+              Up
+            </button>
+            <button
+              type="button"
+              className="text-xs"
+              onClick={() => {
+                if (index === items.length - 1) return;
+                const next = [...items];
+                [next[index + 1], next[index]] = [next[index], next[index + 1]];
+                onChange(next);
+              }}
+            >
+              Down
+            </button>
             <button type="button" className="text-xs" onClick={() => onChange(items.filter((_, i) => i !== index))}>
               Remove
             </button>
@@ -378,69 +489,5 @@ function NavEditor({ items, onChange }: { items: NavLink[]; onChange: (items: Na
         + Add link
       </button>
     </div>
-  );
-}
-
-function AssetCard({
-  title,
-  hint,
-  value,
-  alt,
-  onAlt,
-  configured,
-  onUpload,
-  onChoose,
-  onRemove,
-}: {
-  title: string;
-  hint: string;
-  value: MediaRef | null;
-  alt?: string;
-  onAlt?: (value: string) => void;
-  configured: boolean;
-  onUpload: (file: File) => void;
-  onChoose: () => void;
-  onRemove: () => void;
-}) {
-  return (
-    <section className="rounded-xl border border-line bg-white p-5">
-      <h2 className="font-semibold">{title}</h2>
-      <p className="mt-1 text-xs text-muted">{hint}</p>
-      <div className="mt-4 flex flex-wrap items-start gap-4">
-        <div className="flex h-24 w-40 items-center justify-center overflow-hidden rounded-md border border-line bg-paper">
-          {value ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={value.secureUrl} alt="" className="max-h-full max-w-full object-contain" />
-          ) : (
-            <span className="text-xs text-muted">No image</span>
-          )}
-        </div>
-        <div className="space-y-2">
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={!configured}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onUpload(file);
-              event.target.value = "";
-            }}
-          />
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className="rounded border border-line px-3 py-1.5 text-xs" onClick={onChoose}>
-              Choose from library
-            </button>
-            <button type="button" className="rounded border border-line px-3 py-1.5 text-xs" onClick={onRemove}>
-              Remove from website
-            </button>
-          </div>
-          {onAlt ? (
-            <Field label="Alt text">
-              <TextInput value={alt ?? ""} onChange={(event) => onAlt(event.target.value)} />
-            </Field>
-          ) : null}
-        </div>
-      </div>
-    </section>
   );
 }

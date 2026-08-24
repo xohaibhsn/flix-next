@@ -14,8 +14,10 @@ import type {
 } from "@/lib/cms/types";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
 
+import { publicErrorMessage } from "@/lib/security/errors";
+
 function fail(error: unknown, fallback: string) {
-  return { ok: false as const, error: error instanceof Error ? error.message : fallback };
+  return { ok: false as const, error: publicErrorMessage(error, fallback) };
 }
 
 export async function savePageAction(page: CmsPage) {
@@ -175,6 +177,21 @@ export async function getCloudinaryStatusAction() {
   return {
     configured: isCloudinaryConfigured(),
     cloudName,
+  };
+}
+
+export async function getSystemStatusAction() {
+  const unauthorized = await requireAdminAction();
+  if (unauthorized) return unauthorized;
+  const { isDatabaseConfigured } = await import("@/lib/db/config");
+  const { getAdminAuthConfig } = await import("@/lib/auth/config");
+  return {
+    ok: true as const,
+    database: isDatabaseConfigured(),
+    cloudinary: isCloudinaryConfigured(),
+    adminAuth: Boolean(getAdminAuthConfig()),
+    environment: process.env.NODE_ENV === "production" ? "production" : "development",
+    version: "0.1.0",
   };
 }
 

@@ -14,6 +14,7 @@ import {
   sanitizePost,
   sanitizeRedirect,
 } from "@/lib/cms/validation";
+import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination } from "@/lib/cms/redirects";
 import type {
   BlogCategory,
   BlogPost,
@@ -134,10 +135,10 @@ export class JsonCatalogRepository implements CatalogRepository {
   }
   async saveRedirect(rule: RedirectRule) {
     const safe = sanitizeRedirect(rule);
-    if (!safe.sourcePath || safe.sourcePath === "/" || safe.sourcePath === "/welcome/" || safe.sourcePath === "/welcome") {
+    if (!safe.sourcePath || isReservedRedirectSource(safe.sourcePath)) {
       throw new Error("That source path is reserved.");
     }
-    if (safe.sourcePath === safe.destinationPath) {
+    if (isSelfRedirect(safe.sourcePath, sanitizeRedirectDestination(rule.destinationPath))) {
       throw new Error("Source and destination cannot be the same.");
     }
     const items = await this.listRedirects();

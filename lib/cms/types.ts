@@ -55,12 +55,17 @@ export type NavLink = {
   visible: boolean;
 };
 
+export type SocialPlatform = {
+  url: string;
+  visible: boolean;
+};
+
 export type SocialLinks = {
-  facebook: string;
-  instagram: string;
-  twitter: string;
-  youtube: string;
-  telegram: string;
+  facebook: SocialPlatform;
+  instagram: SocialPlatform;
+  twitter: SocialPlatform;
+  youtube: SocialPlatform;
+  telegram: SocialPlatform;
 };
 
 export type PageSeo = {
@@ -290,9 +295,11 @@ export type SiteSettings = {
   whatsapp: string;
   whatsappDisplay: string;
   whatsappMessage: string;
+  whatsappEnabled: boolean;
   hours: string;
   location: string;
   telegramUrl: string;
+  telegramEnabled: boolean;
   socials: SocialLinks;
   headerNav: NavLink[];
   headerCtaLabel: string;

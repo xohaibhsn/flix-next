@@ -6,6 +6,7 @@ import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
+import { publicWhatsAppUrl } from "@/lib/cms/public-contact";
 import type { LogoBranding } from "@/components/layout/Logo";
 
 export async function SiteShell({
@@ -35,7 +36,7 @@ export async function SiteShell({
       />
       <main className="flex-1">{children}</main>
       <Footer branding={branding} settings={settings} />
-      <WhatsAppButton number={settings.whatsapp} message={settings.whatsappMessage} />
+      <WhatsAppButton href={publicWhatsAppUrl(settings)} />
     </>
   );
 }

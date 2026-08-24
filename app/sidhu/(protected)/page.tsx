@@ -1,12 +1,25 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { cms } from "@/lib/cms/repository";
-import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getCloudinaryStatusAction, getSystemStatusAction } from "@/lib/cms/actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function SidhuDashboardPage() {
-  const [stats, cloud] = await Promise.all([cms.dashboardStats(), getCloudinaryStatusAction()]);
+  const [stats, cloud, system] = await Promise.all([
+    cms.dashboardStats(),
+    getCloudinaryStatusAction(),
+    getSystemStatusAction(),
+  ]);
+  const status = system.ok
+    ? system
+    : {
+        database: false,
+        cloudinary: false,
+        adminAuth: false,
+        environment: "unknown",
+        version: "0.1.0",
+      };
 
   return (
     <AdminShell title="Dashboard" subtitle="CMS overview only. No revenue, orders, or ERP widgets.">
@@ -25,6 +38,32 @@ export default async function SidhuDashboardPage() {
         <p className="mt-2 text-sm text-muted">
           Cloud name: {cloud.cloudName}. Status: {cloud.configured ? "configured" : "API key/secret missing"}
         </p>
+      </div>
+      <div className="mt-6 rounded-xl border border-line bg-white p-5">
+        <p className="text-sm font-semibold">System / Security</p>
+        <p className="mt-1 text-xs text-muted">Safe status only. Secrets are never shown here.</p>
+        <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Database</dt>
+            <dd>{status.database ? "Configured" : "Not configured"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Cloudinary</dt>
+            <dd>{status.cloudinary ? "Configured" : "Not configured"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Admin auth</dt>
+            <dd>{status.adminAuth ? "Active" : "Not configured"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Environment</dt>
+            <dd>{status.environment}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">App version</dt>
+            <dd>{status.version}</dd>
+          </div>
+        </dl>
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link href="/sidhu/pages/home/" className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white">

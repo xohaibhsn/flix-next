@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-token";
+import { resolveSafeRedirectUrl } from "@/lib/cms/redirects";
 import { cms } from "@/lib/cms/repository";
+import { applySecurityHeaders } from "@/lib/security/headers";
 
 function isLoginPath(pathname: string) {
   return pathname === "/sidhu/login" || pathname === "/sidhu/login/";
@@ -29,8 +31,9 @@ async function cmsRedirect(request: NextRequest) {
     const rules = await cms.listActiveRedirects();
     const match = rules.find((rule) => withSlash(rule.sourcePath) === source);
     if (!match) return null;
-    const status = match.statusCode;
-    return NextResponse.redirect(new URL(match.destinationPath, request.url), status);
+    const dest = resolveSafeRedirectUrl(match.destinationPath, request.url);
+    if (!dest) return null;
+    return NextResponse.redirect(dest, match.statusCode);
   } catch {
     return null;
   }
@@ -41,21 +44,29 @@ export async function proxy(request: NextRequest) {
   const session = verifySessionToken(request.cookies.get(ADMIN_SESSION_COOKIE)?.value);
 
   if (isSidhuApi(pathname) && !session) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return applySecurityHeaders(
+      NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 }),
+      pathname,
+      request,
+    );
   }
 
   if (isSidhuPage(pathname) && !isLoginPath(pathname) && !session) {
-    return NextResponse.redirect(new URL("/sidhu/login/", request.url));
+    return applySecurityHeaders(
+      NextResponse.redirect(new URL("/sidhu/login/", request.url)),
+      pathname,
+      request,
+    );
   }
 
   if (isLoginPath(pathname) && session) {
-    return NextResponse.redirect(new URL("/sidhu/", request.url));
+    return applySecurityHeaders(NextResponse.redirect(new URL("/sidhu/", request.url)), pathname, request);
   }
 
   const redirected = await cmsRedirect(request);
-  if (redirected) return redirected;
+  if (redirected) return applySecurityHeaders(redirected, pathname, request);
 
-  return NextResponse.next();
+  return applySecurityHeaders(NextResponse.next(), pathname, request);
 }
 
 export const config = {

@@ -1,18 +1,15 @@
 import Link from "next/link";
 import { Mail, MapPin, MessageCircle, Phone, Send } from "lucide-react";
 import { Logo, type LogoBranding } from "@/components/layout/Logo";
-import { isPlaceholderPhone, telUrl, whatsappUrl } from "@/lib/cms/contact";
+import {
+  publicEmail,
+  publicPhone,
+  publicPhoneHref,
+  publicSocialLinks,
+  publicTelegramUrl,
+  publicWhatsAppUrl,
+} from "@/lib/cms/public-contact";
 import type { SiteSettings } from "@/lib/cms/types";
-
-function socialEntries(settings: SiteSettings) {
-  return [
-    { label: "Facebook", href: settings.socials.facebook, short: "f" },
-    { label: "Instagram", href: settings.socials.instagram, short: "ig" },
-    { label: "X", href: settings.socials.twitter, short: "x" },
-    { label: "YouTube", href: settings.socials.youtube, short: "yt" },
-    { label: "Telegram", href: settings.socials.telegram || settings.telegramUrl, short: "tg" },
-  ].filter((item) => item.href);
-}
 
 export function Footer({
   branding,
@@ -21,12 +18,14 @@ export function Footer({
   branding?: LogoBranding;
   settings: SiteSettings;
 }) {
-  const wa = whatsappUrl(settings.whatsapp, settings.whatsappMessage);
-  const telegram = settings.telegramUrl || settings.socials.telegram;
-  const phone = settings.phone && !isPlaceholderPhone(settings.phone) ? settings.phone : "";
+  const wa = publicWhatsAppUrl(settings);
+  const telegram = publicTelegramUrl(settings);
+  const phone = publicPhone(settings);
+  const email = publicEmail(settings);
+  const phoneHref = publicPhoneHref(settings);
   const quick = settings.footerQuickLinks.filter((item) => item.visible);
   const support = settings.footerSupportLinks.filter((item) => item.visible);
-  const socials = socialEntries(settings);
+  const socials = publicSocialLinks(settings);
   const year = new Date().getFullYear();
 
   return (
@@ -94,18 +93,18 @@ export function Footer({
         <div>
           <h2 className="text-sm font-bold tracking-wide uppercase">Contact Us</h2>
           <ul className="mt-4 space-y-3 text-sm text-white/65">
-            {settings.email ? (
+            {email ? (
               <li className="flex items-start gap-2">
                 <Mail className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
-                <a href={`mailto:${settings.email}`} className="hover:text-white">
-                  {settings.email}
+                <a href={`mailto:${email}`} className="hover:text-white">
+                  {email}
                 </a>
               </li>
             ) : null}
-            {phone ? (
+            {phone && phoneHref ? (
               <li className="flex items-start gap-2">
                 <Phone className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
-                <a href={telUrl(phone)} className="hover:text-white">
+                <a href={phoneHref} className="hover:text-white">
                   {settings.whatsappDisplay || phone}
                 </a>
               </li>

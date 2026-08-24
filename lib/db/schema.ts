@@ -138,4 +138,10 @@ export const CMS_SCHEMA_STATEMENTS = [
     PRIMARY KEY (id),
     KEY contact_messages_created (created_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS login_attempts (
+    ip_hash CHAR(64) NOT NULL,
+    fail_count INT NOT NULL DEFAULT 0,
+    reset_at BIGINT NOT NULL,
+    PRIMARY KEY (ip_hash)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ] as const;

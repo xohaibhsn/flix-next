@@ -45,12 +45,7 @@ export function sanitizeFolder(value: string | null | undefined): CloudinaryFold
 
 function assertSafePublicId(publicId: string) {
   const id = publicId.trim();
-  if (
-    !id ||
-    id.includes("..") ||
-    id.includes("\\") ||
-    (!id.startsWith("theflix/") && !id.startsWith("theflix/"))
-  ) {
+  if (!id || id.includes("..") || id.includes("\\") || !id.startsWith("theflix/")) {
     throw new Error("Invalid Cloudinary public ID.");
   }
   return id;

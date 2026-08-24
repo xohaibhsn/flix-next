@@ -35,7 +35,7 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
   const headerStore = await headers();
   const ip = clientIp(headerStore);
-  const limit = checkLoginRateLimit(ip);
+  const limit = await checkLoginRateLimit(ip);
   if (!limit.ok) {
     return { error: "Too many login attempts. Please try again later." };
   }
@@ -51,11 +51,11 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   const usernameOk = safeEqual(username, config.username);
   const passwordOk = safeEqual(password, config.password);
   if (!usernameOk || !passwordOk) {
-    recordFailedLogin(ip);
+    await recordFailedLogin(ip);
     return { error: INVALID_LOGIN };
   }
 
-  clearLoginRateLimit(ip);
+  await clearLoginRateLimit(ip);
   await createAdminSession(config.username);
   redirect("/sidhu/");
 }
