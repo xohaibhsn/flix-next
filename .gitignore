@@ -43,6 +43,10 @@ Desktop.ini
 .env*
 !.env.example
 
+# Local contact form inbox (JSON fallback)
+/data/contact-messages.json
+
+
 # vercel
 .vercel
 

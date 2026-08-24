@@ -9,6 +9,7 @@ import {
   insertMediaRow,
   parseJsonColumn,
   seedCmsIfEmpty,
+  seedExtendedIfEmpty,
 } from "@/lib/cms/mysql-migrate";
 import type { CmsPage, CmsSection, MediaAsset, SectionType, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
@@ -101,19 +102,24 @@ function mapMedia(row: MediaRow): MediaAsset {
 }
 
 export class MysqlCmsRepository {
-  private ready: Promise<void> | null = null;
+  private readyPromise: Promise<void> | null = null;
 
   private async ensureReady() {
-    if (!this.ready) {
-      this.ready = (async () => {
+    if (!this.readyPromise) {
+      this.readyPromise = (async () => {
         await ensureCmsSchema();
         await seedCmsIfEmpty();
+        await seedExtendedIfEmpty();
       })().catch((error) => {
-        this.ready = null;
+        this.readyPromise = null;
         throw cmsDbError(error);
       });
     }
-    await this.ready;
+    await this.readyPromise;
+  }
+
+  ready() {
+    return this.ensureReady();
   }
 
   async listPages() {

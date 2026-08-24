@@ -1,12 +1,24 @@
 import type {
+  BlogCategory,
+  BlogPost,
   CmsPage,
   CmsSection,
+  ContactMessage,
+  FaqItem,
   MediaRef,
+  NavLink,
+  PageSeo,
+  PricingPlan,
+  RedirectRule,
   SectionType,
   SiteSettings,
+  SocialLinks,
 } from "@/lib/cms/types";
 import { isIconName } from "@/lib/cms/icons";
-import { mergeSectionData } from "@/lib/cms/defaults";
+import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
+import { sanitizeHtml } from "@/lib/cms/html";
+import { sanitizeHttpUrl, normalizePath } from "@/lib/cms/contact";
+import { slugify } from "@/lib/cms/slug";
 
 const SECTION_TYPES: SectionType[] = [
   "hero",
@@ -19,6 +31,13 @@ const SECTION_TYPES: SectionType[] = [
   "why-choose",
   "faq",
   "cta",
+  "page-hero",
+  "rich-text",
+  "info-cards",
+  "contact-info",
+  "contact-form",
+  "messaging-cta",
+  "hours",
 ];
 
 export function isSectionType(value: string): value is SectionType {
@@ -94,19 +113,190 @@ export function sanitizePage(input: CmsPage): CmsPage {
 }
 
 export function sanitizeSettings(input: SiteSettings): SiteSettings {
+  const fallback = defaultSettings();
+  const source = input && typeof input === "object" ? input : fallback;
   return {
-    siteName: sanitizeText(input.siteName, 80) || "THE FLIX IPTV",
-    tagline: sanitizeText(input.tagline, 160),
-    email: sanitizeText(input.email, 120),
-    phone: sanitizeText(input.phone, 60),
-    whatsapp: sanitizeText(input.whatsapp, 40).replace(/[^\d]/g, ""),
-    hours: sanitizeText(input.hours, 120),
-    location: sanitizeText(input.location, 160),
+    siteName: sanitizeText(source.siteName, 80) || "THE FLIX IPTV",
+    tagline: sanitizeText(source.tagline, 160),
+    email: sanitizeText(source.email, 120),
+    phone: sanitizeText(source.phone, 60),
+    whatsapp: sanitizeText(source.whatsapp, 40).replace(/[^\d]/g, ""),
+    whatsappDisplay: sanitizeText(source.whatsappDisplay, 60),
+    whatsappMessage: sanitizeText(source.whatsappMessage, 300),
+    hours: sanitizeText(source.hours, 120),
+    location: sanitizeText(source.location, 160),
+    telegramUrl: sanitizeHttpUrl(sanitizeText(source.telegramUrl, 300)),
+    socials: sanitizeSocials(source.socials),
+    headerNav: sanitizeNavList(source.headerNav, fallback.headerNav),
+    headerCtaLabel: sanitizeText(source.headerCtaLabel, 40) || "Get Started",
+    headerCtaHref: sanitizeHref(source.headerCtaHref),
+    footerIntro: sanitizeText(source.footerIntro, 400),
+    footerCopyright: sanitizeText(source.footerCopyright, 160),
+    footerQuickLinks: sanitizeNavList(source.footerQuickLinks, fallback.footerQuickLinks),
+    footerSupportLinks: sanitizeNavList(source.footerSupportLinks, fallback.footerSupportLinks),
+    footerPaymentImages: Array.isArray(source.footerPaymentImages)
+      ? source.footerPaymentImages.map(sanitizeMediaRef).filter((item): item is NonNullable<typeof item> => Boolean(item))
+      : [],
     branding: {
-      logo: sanitizeMediaRef(input.branding?.logo),
-      logoAlt: sanitizeText(input.branding?.logoAlt, 120),
-      favicon: sanitizeMediaRef(input.branding?.favicon),
-      defaultOgImage: sanitizeMediaRef(input.branding?.defaultOgImage),
+      logo: sanitizeMediaRef(source.branding?.logo),
+      logoAlt: sanitizeText(source.branding?.logoAlt, 120),
+      favicon: sanitizeMediaRef(source.branding?.favicon),
+      defaultOgImage: sanitizeMediaRef(source.branding?.defaultOgImage),
     },
+    pageSeo: {
+      home: sanitizePageSeo(source.pageSeo?.home, fallback.pageSeo.home),
+      subscriptions: sanitizePageSeo(source.pageSeo?.subscriptions, fallback.pageSeo.subscriptions),
+      contact: sanitizePageSeo(source.pageSeo?.contact, fallback.pageSeo.contact),
+      blog: sanitizePageSeo(source.pageSeo?.blog, fallback.pageSeo.blog),
+    },
+  };
+}
+
+function sanitizeSocials(value: unknown): SocialLinks {
+  const input = value && typeof value === "object" ? (value as SocialLinks) : defaultSettings().socials;
+  return {
+    facebook: sanitizeHttpUrl(sanitizeText(input.facebook, 300)),
+    instagram: sanitizeHttpUrl(sanitizeText(input.instagram, 300)),
+    twitter: sanitizeHttpUrl(sanitizeText(input.twitter, 300)),
+    youtube: sanitizeHttpUrl(sanitizeText(input.youtube, 300)),
+    telegram: sanitizeHttpUrl(sanitizeText(input.telegram, 300)),
+  };
+}
+
+function sanitizeNavList(value: unknown, fallback: NavLink[]): NavLink[] {
+  if (!Array.isArray(value) || value.length === 0) return fallback;
+  return value
+    .map((item, index) => ({
+      id: sanitizeText(item?.id, 80) || `nav_${index}`,
+      label: sanitizeText(item?.label, 60),
+      href: sanitizeHref(item?.href),
+      visible: item?.visible !== false,
+    }))
+    .filter((item) => item.label);
+}
+
+export function sanitizePageSeo(value: unknown, fallback: PageSeo): PageSeo {
+  const input = value && typeof value === "object" ? (value as PageSeo) : fallback;
+  return {
+    title: sanitizeText(input.title, 70) || fallback.title,
+    description: sanitizeText(input.description, 180) || fallback.description,
+    focusKeyword: sanitizeText(input.focusKeyword, 80),
+    canonicalUrl: sanitizeText(input.canonicalUrl, 200) || fallback.canonicalUrl,
+    robotsIndex: input.robotsIndex !== false,
+    robotsFollow: input.robotsFollow !== false,
+    ogTitle: sanitizeText(input.ogTitle, 70),
+    ogDescription: sanitizeText(input.ogDescription, 180),
+    ogImage: sanitizeMediaRef(input.ogImage),
+    sitemapInclude: input.sitemapInclude !== false,
+  };
+}
+
+export function sanitizePricingPlan(input: PricingPlan): PricingPlan {
+  const now = new Date().toISOString();
+  const name = sanitizeText(input.name, 80) || "Plan";
+  return {
+    id: sanitizeText(input.id, 80) || slugify(name),
+    name,
+    slug: slugify(sanitizeText(input.slug, 80) || name) || "plan",
+    price: sanitizeText(input.price, 20),
+    duration: sanitizeText(input.duration, 40),
+    badge: sanitizeText(input.badge, 40),
+    popular: Boolean(input.popular),
+    features: Array.isArray(input.features)
+      ? input.features.map((feature) => sanitizeText(feature, 120)).filter(Boolean)
+      : [],
+    buttonLabel: sanitizeText(input.buttonLabel, 40) || "Choose Plan",
+    buttonHref: sanitizeHref(input.buttonHref),
+    sortOrder: Number(input.sortOrder) || 0,
+    active: input.active !== false,
+    createdAt: sanitizeText(input.createdAt, 40) || now,
+    updatedAt: now,
+  };
+}
+
+export function sanitizeFaq(input: FaqItem): FaqItem {
+  const now = new Date().toISOString();
+  return {
+    id: sanitizeText(input.id, 80),
+    question: sanitizeText(input.question, 200),
+    answer: sanitizeText(input.answer, 2000),
+    category: sanitizeText(input.category, 40) || "General",
+    sortOrder: Number(input.sortOrder) || 0,
+    visible: input.visible !== false,
+    createdAt: sanitizeText(input.createdAt, 40) || now,
+    updatedAt: now,
+  };
+}
+
+export function sanitizeCategory(input: BlogCategory): BlogCategory {
+  const now = new Date().toISOString();
+  const name = sanitizeText(input.name, 80) || "Category";
+  return {
+    id: sanitizeText(input.id, 80),
+    name,
+    slug: slugify(sanitizeText(input.slug, 80) || name) || "category",
+    description: sanitizeText(input.description, 200),
+    active: input.active !== false,
+    createdAt: sanitizeText(input.createdAt, 40) || now,
+    updatedAt: now,
+  };
+}
+
+export function sanitizePost(input: BlogPost): BlogPost {
+  const now = new Date().toISOString();
+  const title = sanitizeText(input.title, 160) || "Untitled";
+  const status = input.status === "published" ? "published" : "draft";
+  return {
+    id: sanitizeText(input.id, 80),
+    title,
+    slug: slugify(sanitizeText(input.slug, 160) || title) || "post",
+    excerpt: sanitizeText(input.excerpt, 400),
+    content: sanitizeHtml(typeof input.content === "string" ? input.content : ""),
+    categoryId: input.categoryId ? sanitizeText(input.categoryId, 80) : null,
+    featuredImage: sanitizeMediaRef(input.featuredImage),
+    status,
+    featured: Boolean(input.featured),
+    publishedAt: status === "published" ? sanitizeText(input.publishedAt, 40) || now : input.publishedAt,
+    createdAt: sanitizeText(input.createdAt, 40) || now,
+    updatedAt: now,
+    seoTitle: sanitizeText(input.seoTitle, 70),
+    seoDescription: sanitizeText(input.seoDescription, 180),
+    focusKeyword: sanitizeText(input.focusKeyword, 80),
+    canonicalUrl: sanitizeText(input.canonicalUrl, 200),
+    robotsIndex: input.robotsIndex !== false,
+    robotsFollow: input.robotsFollow !== false,
+    ogTitle: sanitizeText(input.ogTitle, 70),
+    ogDescription: sanitizeText(input.ogDescription, 180),
+    ogImage: sanitizeMediaRef(input.ogImage),
+    sitemapInclude: input.sitemapInclude !== false,
+  };
+}
+
+export function sanitizeRedirect(input: RedirectRule): RedirectRule {
+  const now = new Date().toISOString();
+  const sourcePath = normalizePath(sanitizeText(input.sourcePath, 200));
+  const destinationPath = sanitizeHref(input.destinationPath);
+  const statusCode =
+    input.statusCode === 302 || input.statusCode === 307 || input.statusCode === 308 ? input.statusCode : 301;
+  return {
+    id: sanitizeText(input.id, 80),
+    sourcePath,
+    destinationPath,
+    statusCode,
+    active: input.active !== false,
+    createdAt: sanitizeText(input.createdAt, 40) || now,
+    updatedAt: now,
+  };
+}
+
+export function sanitizeMessage(input: ContactMessage): ContactMessage {
+  return {
+    id: sanitizeText(input.id, 80),
+    name: sanitizeText(input.name, 80),
+    email: sanitizeText(input.email, 120),
+    phone: sanitizeText(input.phone, 40),
+    subject: sanitizeText(input.subject, 160),
+    message: sanitizeText(input.message, 4000),
+    createdAt: sanitizeText(input.createdAt, 40) || new Date().toISOString(),
   };
 }

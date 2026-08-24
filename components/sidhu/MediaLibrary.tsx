@@ -100,17 +100,22 @@ export function MediaLibrary({
             <option value="theflix/og">theflix/og</option>
             <option value="theflix/site">theflix/site</option>
           </select>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={!configured || busy}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              const folder = (document.getElementById("folder") as HTMLSelectElement | null)?.value || "theflix/site";
-              if (file) void upload(file, folder);
-              event.target.value = "";
-            }}
-          />
+          <label className="inline-flex cursor-pointer items-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
+            {busy ? "Uploading…" : "Upload"}
+            <input
+              type="file"
+              className="sr-only"
+              accept="image/jpeg,image/png,image/webp"
+              disabled={!configured || busy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                const folder = (document.getElementById("folder") as HTMLSelectElement | null)?.value || "theflix/site";
+                if (file) void upload(file, folder);
+                event.target.value = "";
+              }}
+            />
+          </label>
+          {busy ? <span className="text-xs text-muted">Please wait…</span> : null}
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

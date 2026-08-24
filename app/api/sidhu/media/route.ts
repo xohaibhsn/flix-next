@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/guards";
 import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
+import { referencedMediaIds } from "@/lib/cms/media-refs";
 import { cms } from "@/lib/cms/repository";
 import {
   destroyCloudinaryImage,
@@ -27,18 +28,14 @@ export async function GET() {
   const unauthorized = await requireAdminApi();
   if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
-  const settings = await cms.getSettings();
-  const usedIds = [
-    settings.branding.logo?.id,
-    settings.branding.favicon?.id,
-    settings.branding.defaultOgImage?.id,
-  ].filter(Boolean) as string[];
+  const [settings, posts] = await Promise.all([cms.getSettings(), cms.listPosts()]);
+  const usedIds = referencedMediaIds(settings, posts);
   return NextResponse.json({
     ok: true,
     configured: isCloudinaryConfigured(),
     assets: assets.map((asset) => ({
       ...asset,
-      inUse: usedIds.includes(asset.id),
+      inUse: usedIds.has(asset.id),
     })),
   });
 }
@@ -111,13 +108,10 @@ export async function DELETE(request: Request) {
   const asset = await cms.getMediaById(id);
   if (!asset) return jsonError("That media item is not in the library.", 404);
   const settings = await cms.getSettings();
-  const used =
-    settings.branding.logo?.id === id ||
-    settings.branding.favicon?.id === id ||
-    settings.branding.defaultOgImage?.id === id;
-  if (used) {
+  const posts = await cms.listPosts();
+  if (referencedMediaIds(settings, posts).has(id)) {
     return jsonError(
-      "This image is assigned in Site Settings. Remove it from Logo, Favicon, or OG Image first.",
+      "This image is used as logo, favicon, OG, payment icon, or a blog image. Unassign it first.",
       409,
     );
   }

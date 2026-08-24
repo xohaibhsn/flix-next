@@ -3,7 +3,9 @@ import { connection } from "next/server";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
+import { organizationJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
 import type { LogoBranding } from "@/components/layout/Logo";
 
 export async function SiteShell({
@@ -22,10 +24,18 @@ export async function SiteShell({
 
   return (
     <>
-      <Header overlay={overlayHeader} branding={branding} />
+      <JsonLd data={organizationJsonLd(settings)} />
+      <JsonLd data={websiteJsonLd(settings)} />
+      <Header
+        overlay={overlayHeader}
+        branding={branding}
+        nav={settings.headerNav}
+        ctaLabel={settings.headerCtaLabel}
+        ctaHref={settings.headerCtaHref}
+      />
       <main className="flex-1">{children}</main>
-      <Footer branding={branding} siteName={settings.siteName} tagline={settings.tagline} />
-      <WhatsAppButton />
+      <Footer branding={branding} settings={settings} />
+      <WhatsAppButton number={settings.whatsapp} message={settings.whatsappMessage} />
     </>
   );
 }

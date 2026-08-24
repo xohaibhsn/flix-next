@@ -5,18 +5,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Logo, type LogoBranding } from "@/components/layout/Logo";
-import { siteConfig } from "@/lib/site-config";
+import type { NavLink } from "@/lib/cms/types";
 
 export function Header({
   overlay = false,
   branding,
+  nav,
+  ctaLabel,
+  ctaHref,
 }: {
   overlay?: boolean;
   branding?: LogoBranding;
+  nav: NavLink[];
+  ctaLabel: string;
+  ctaHref: string;
 }) {
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const links = nav.filter((item) => item.visible);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -43,14 +50,14 @@ export function Header({
       <div className="mx-auto flex h-[76px] max-w-6xl items-center justify-between px-5 lg:px-8">
         <Logo imageUrl={branding?.imageUrl} alt={branding?.alt} />
         <nav className="hidden items-center gap-7 lg:flex" aria-label="Primary">
-          {siteConfig.nav.map((item) => {
+          {links.map((item) => {
             const active =
-              item.href === "/"
-                ? pathname === "/"
+              item.href === "/welcome/" || item.href === "/"
+                ? pathname === "/welcome" || pathname === "/welcome/"
                 : pathname.startsWith(item.href.replace(/\/$/, ""));
             return (
               <Link
-                key={item.href}
+                key={item.id}
                 href={item.href}
                 className={`text-[13.5px] font-medium transition ${
                   active ? "text-white" : "text-white/80 hover:text-white"
@@ -61,12 +68,14 @@ export function Header({
             );
           })}
         </nav>
-        <Link
-          href="/iptv-subscriptions-uk/"
-          className="hidden rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-hover lg:inline-flex"
-        >
-          Get Started
-        </Link>
+        {ctaLabel && ctaHref ? (
+          <Link
+            href={ctaHref}
+            className="hidden rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-brand/30 transition hover:bg-brand-hover lg:inline-flex"
+          >
+            {ctaLabel}
+          </Link>
+        ) : null}
         <button
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white lg:hidden"
@@ -79,14 +88,11 @@ export function Header({
         </button>
       </div>
       {open ? (
-        <div
-          id="mobile-nav"
-          className="border-t border-white/10 bg-ink px-5 pt-2 pb-6 lg:hidden"
-        >
+        <div id="mobile-nav" className="border-t border-white/10 bg-ink px-5 pt-2 pb-6 lg:hidden">
           <nav className="flex flex-col gap-1" aria-label="Mobile">
-            {siteConfig.nav.map((item) => (
+            {links.map((item) => (
               <Link
-                key={item.href}
+                key={item.id}
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className="rounded-md px-3 py-3 text-sm font-medium text-white/85 hover:bg-white/5"
@@ -95,13 +101,15 @@ export function Header({
               </Link>
             ))}
           </nav>
-          <Link
-            href="/iptv-subscriptions-uk/"
-            onClick={() => setOpen(false)}
-            className="mt-3 flex items-center justify-center rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white"
-          >
-            Get Started
-          </Link>
+          {ctaLabel && ctaHref ? (
+            <Link
+              href={ctaHref}
+              onClick={() => setOpen(false)}
+              className="mt-3 flex items-center justify-center rounded-md bg-brand px-5 py-3 text-sm font-semibold text-white"
+            >
+              {ctaLabel}
+            </Link>
+          ) : null}
         </div>
       ) : null}
     </header>

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "faq1",
+    "question": "What do I need to get started?",
+    "answer": "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer.",
+    "category": "General",
+    "sortOrder": 1,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "faq2",
+    "question": "How fast will I receive my subscription?",
+    "answer": "Activation is typically instant after payment. This local site does not process payments yet — copy is a placeholder for later CMS content.",
+    "category": "General",
+    "sortOrder": 2,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "faq3",
+    "question": "Can I use it on more than one device?",
+    "answer": "Yes. You can install the service on multiple devices. Simultaneous streams depend on the plan — contact us if you need extra connections.",
+    "category": "General",
+    "sortOrder": 3,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "faq4",
+    "question": "Do you offer a refund or trial?",
+    "answer": "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only.",
+    "category": "General",
+    "sortOrder": 4,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "faq5",
+    "question": "Which apps should I use?",
+    "answer": "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins.",
+    "category": "General",
+    "sortOrder": 5,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "faq6",
+    "question": "Is my payment secure?",
+    "answer": "Checkout will use trusted payment providers in production. This local foundation has no payment gateway connected.",
+    "category": "General",
+    "sortOrder": 6,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "cf1",
+    "question": "How quickly do you reply?",
+    "answer": "Support aims to reply around the clock on WhatsApp and email.",
+    "category": "Contact",
+    "sortOrder": 1,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "cf2",
+    "question": "Can I ask about an existing order?",
+    "answer": "Yes — include your email in the form so we can match your request.",
+    "category": "Contact",
+    "sortOrder": 2,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  },
+  {
+    "id": "cf3",
+    "question": "Do you help with Firestick setup?",
+    "answer": "Setup help is one of the most common requests. We send steps with each new login.",
+    "category": "Contact",
+    "sortOrder": 3,
+    "visible": true,
+    "createdAt": "2026-08-24T01:35:36.992Z",
+    "updatedAt": "2026-08-24T01:35:36.992Z"
+  }
+]

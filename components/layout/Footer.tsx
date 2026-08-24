@@ -1,44 +1,62 @@
 import Link from "next/link";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { Mail, MapPin, MessageCircle, Phone, Send } from "lucide-react";
 import { Logo, type LogoBranding } from "@/components/layout/Logo";
-import { siteConfig, whatsappLink } from "@/lib/site-config";
+import { isPlaceholderPhone, telUrl, whatsappUrl } from "@/lib/cms/contact";
+import type { SiteSettings } from "@/lib/cms/types";
+
+function socialEntries(settings: SiteSettings) {
+  return [
+    { label: "Facebook", href: settings.socials.facebook, short: "f" },
+    { label: "Instagram", href: settings.socials.instagram, short: "ig" },
+    { label: "X", href: settings.socials.twitter, short: "x" },
+    { label: "YouTube", href: settings.socials.youtube, short: "yt" },
+    { label: "Telegram", href: settings.socials.telegram || settings.telegramUrl, short: "tg" },
+  ].filter((item) => item.href);
+}
 
 export function Footer({
   branding,
-  siteName,
-  tagline,
+  settings,
 }: {
   branding?: LogoBranding;
-  siteName?: string;
-  tagline?: string;
+  settings: SiteSettings;
 }) {
+  const wa = whatsappUrl(settings.whatsapp, settings.whatsappMessage);
+  const telegram = settings.telegramUrl || settings.socials.telegram;
+  const phone = settings.phone && !isPlaceholderPhone(settings.phone) ? settings.phone : "";
+  const quick = settings.footerQuickLinks.filter((item) => item.visible);
+  const support = settings.footerSupportLinks.filter((item) => item.visible);
+  const socials = socialEntries(settings);
+  const year = new Date().getFullYear();
+
   return (
     <footer className="bg-[#08090d] text-white">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
           <Logo imageUrl={branding?.imageUrl} alt={branding?.alt} />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
-            {tagline ||
-              "Premium IPTV with live channels, movies, and series on every device. Reliable streams. Honest pricing."}
+            {settings.footerIntro || settings.tagline}
           </p>
-          <div className="mt-5 flex gap-3">
-            {siteConfig.socials.map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                aria-label={`${s.label} (placeholder)`}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-xs font-bold text-white/80"
-              >
-                {s.short}
-              </a>
-            ))}
-          </div>
+          {socials.length ? (
+            <div className="mt-5 flex gap-3">
+              {socials.map((item) => (
+                <a
+                  key={item.label}
+                  href={item.href}
+                  aria-label={item.label}
+                  className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 text-xs font-bold text-white/80 hover:border-white/40"
+                >
+                  {item.short}
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
         <div>
           <h2 className="text-sm font-bold tracking-wide uppercase">Quick Links</h2>
           <ul className="mt-4 space-y-2 text-sm text-white/65">
-            {siteConfig.footerQuickLinks.map((item) => (
-              <li key={item.href}>
+            {quick.map((item) => (
+              <li key={item.id}>
                 <Link href={item.href} className="hover:text-white">
                   {item.label}
                 </Link>
@@ -49,63 +67,80 @@ export function Footer({
         <div>
           <h2 className="text-sm font-bold tracking-wide uppercase">Support</h2>
           <ul className="mt-4 space-y-2 text-sm text-white/65">
-            {siteConfig.footerSupportLinks.map((item) => (
-              <li key={item.href + item.label}>
+            {support.map((item) => (
+              <li key={item.id}>
                 <Link href={item.href} className="hover:text-white">
                   {item.label}
                 </Link>
               </li>
             ))}
-            <li>
-              <a href={whatsappLink} className="hover:text-white">
-                WhatsApp Help
-              </a>
-            </li>
+            {wa ? (
+              <li>
+                <a href={wa} className="hover:text-white">
+                  WhatsApp Help
+                </a>
+              </li>
+            ) : null}
+            {telegram ? (
+              <li>
+                <a href={telegram} className="inline-flex items-center gap-1 hover:text-white">
+                  <Send className="h-3.5 w-3.5" aria-hidden="true" />
+                  Telegram
+                </a>
+              </li>
+            ) : null}
           </ul>
         </div>
         <div>
           <h2 className="text-sm font-bold tracking-wide uppercase">Contact Us</h2>
           <ul className="mt-4 space-y-3 text-sm text-white/65">
-            <li className="flex items-start gap-2">
-              <Mail className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
-              <a href={`mailto:${siteConfig.email}`} className="hover:text-white">
-                {siteConfig.email}
-              </a>
-            </li>
-            <li className="flex items-start gap-2">
-              <Phone className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
-              <a href={`tel:${siteConfig.phone}`} className="hover:text-white">
-                {siteConfig.phone}
-              </a>
-            </li>
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
-              <span>{siteConfig.location}</span>
-            </li>
+            {settings.email ? (
+              <li className="flex items-start gap-2">
+                <Mail className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
+                <a href={`mailto:${settings.email}`} className="hover:text-white">
+                  {settings.email}
+                </a>
+              </li>
+            ) : null}
+            {phone ? (
+              <li className="flex items-start gap-2">
+                <Phone className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
+                <a href={telUrl(phone)} className="hover:text-white">
+                  {settings.whatsappDisplay || phone}
+                </a>
+              </li>
+            ) : null}
+            {settings.location ? (
+              <li className="flex items-start gap-2">
+                <MapPin className="mt-0.5 h-4 w-4 text-brand" aria-hidden="true" />
+                <span>{settings.location}</span>
+              </li>
+            ) : null}
           </ul>
-          <a
-            href={whatsappLink}
-            className="mt-5 inline-flex w-full items-center justify-center rounded-md bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
-          >
-            Chat on WhatsApp
-          </a>
+          {wa ? (
+            <a
+              href={wa}
+              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5d]"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden="true" />
+              Chat on WhatsApp
+            </a>
+          ) : null}
         </div>
       </div>
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-5 text-xs text-white/45 sm:flex-row lg:px-8">
           <p>
-            © {new Date().getFullYear()} {siteName || siteConfig.name}. All rights reserved.
+            © {year} {settings.siteName}. {settings.footerCopyright || "All rights reserved."}
           </p>
-          <div className="flex items-center gap-2">
-            {siteConfig.payments.map((p) => (
-              <span
-                key={p}
-                className="rounded border border-white/15 px-2 py-1 font-semibold tracking-wide text-white/70"
-              >
-                {p}
-              </span>
-            ))}
-          </div>
+          {settings.footerPaymentImages.length ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {settings.footerPaymentImages.map((image) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={image.id} src={image.secureUrl} alt="" className="h-6 w-auto opacity-80" />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
     </footer>

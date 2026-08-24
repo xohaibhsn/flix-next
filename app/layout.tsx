@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return getSiteMetadata();
 }
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-white font-sans text-ink">

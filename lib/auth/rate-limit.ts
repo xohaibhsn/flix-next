@@ -40,3 +40,21 @@ export function recordFailedLogin(ip: string) {
 export function clearLoginRateLimit(ip: string) {
   attempts.delete(ip);
 }
+
+const CONTACT_WINDOW_MS = 15 * 60 * 1000;
+const CONTACT_MAX = 5;
+const contactAttempts = new Map<string, AttemptState>();
+
+export function checkContactRateLimit(ip: string): RateLimitResult {
+  const now = Date.now();
+  const current = contactAttempts.get(ip);
+  if (!current || current.resetAt <= now) {
+    contactAttempts.set(ip, { count: 1, resetAt: now + CONTACT_WINDOW_MS });
+    return { ok: true };
+  }
+  if (current.count >= CONTACT_MAX) {
+    return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((current.resetAt - now) / 1000)) };
+  }
+  current.count += 1;
+  return { ok: true };
+}

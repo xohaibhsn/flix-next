@@ -1,6 +1,9 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
+import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
+import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
+import { MysqlCatalogRepository } from "@/lib/cms/mysql-catalog";
 import { MysqlCmsRepository, MysqlWithBuildFallback } from "@/lib/cms/mysql-repository";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { isDatabaseConfigured } from "@/lib/db/config";
@@ -84,13 +87,30 @@ export class LocalJsonRepository implements CmsRepository {
   }
 }
 
+export type Cms = CmsRepository & CatalogRepository;
+
+function mergeCms(pages: CmsRepository, catalog: CatalogRepository): Cms {
+  return new Proxy({} as Cms, {
+    get(_, prop) {
+      const source = prop in pages ? pages : catalog;
+      const value = Reflect.get(source as object, prop);
+      return typeof value === "function" ? value.bind(source) : value;
+    },
+  });
+}
+
 const jsonCms = new LocalJsonRepository();
+const jsonCatalog = new JsonCatalogRepository();
 const useMysql = isDatabaseConfigured();
 
 if (process.env.NEXT_PHASE !== "phase-production-build") {
   console.info(`[cms] persistence adapter: ${useMysql ? "mysql" : "json"}`);
 }
 
-export const cms: CmsRepository = useMysql
-  ? new MysqlWithBuildFallback(new MysqlCmsRepository(), jsonCms)
-  : jsonCms;
+function createMysqlCms(): Cms {
+  const mysqlPages = new MysqlCmsRepository();
+  const mysqlCatalog = new MysqlCatalogRepository(() => mysqlPages.ready());
+  return mergeCms(new MysqlWithBuildFallback(mysqlPages, jsonCms), mysqlCatalog);
+}
+
+export const cms: Cms = useMysql ? createMysqlCms() : mergeCms(jsonCms, jsonCatalog);

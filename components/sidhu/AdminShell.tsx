@@ -9,6 +9,7 @@ import {
   ImageIcon,
   LayoutDashboard,
   Menu,
+  Mail,
   Newspaper,
   Redo2,
   Search,
@@ -28,6 +29,7 @@ const NAV = [
   { href: "/sidhu/media/", label: "Media", icon: ImageIcon },
   { href: "/sidhu/redirects/", label: "Redirects", icon: Redo2 },
   { href: "/sidhu/settings/", label: "Site Settings", icon: Settings },
+  { href: "/sidhu/messages/", label: "Messages", icon: Mail },
 ];
 
 function isActive(pathname: string, href: string) {

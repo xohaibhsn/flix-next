@@ -5,7 +5,19 @@ import { SectionRenderer } from "@/components/cms/SectionRenderer";
 
 export async function HomePage() {
   await connection();
-  const page = await cms.getPageBySlug("/");
+  const [page, settings, plans, faqs] = await Promise.all([
+    cms.getPageBySlug("/"),
+    cms.getSettings(),
+    cms.listPlans(),
+    cms.listFaqs(),
+  ]);
   const sections = page?.sections?.length ? page.sections : createHomeSections();
-  return <SectionRenderer sections={sections} />;
+  return (
+    <SectionRenderer
+      sections={sections}
+      settings={settings}
+      plans={plans.filter((plan) => plan.active)}
+      faqs={faqs.filter((item) => item.visible)}
+    />
+  );
 }

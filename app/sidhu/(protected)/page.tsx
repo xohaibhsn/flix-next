@@ -6,20 +6,19 @@ import { getCloudinaryStatusAction } from "@/lib/cms/actions";
 export const dynamic = "force-dynamic";
 
 export default async function SidhuDashboardPage() {
-  const pages = await cms.listPages();
-  const home = await cms.getPageBySlug("/");
-  const media = await cms.listMedia();
-  const cloud = await getCloudinaryStatusAction();
-  const visible = home?.sections.filter((section) => section.visible).length ?? 0;
-  const hidden = home?.sections.filter((section) => !section.visible).length ?? 0;
+  const [stats, cloud] = await Promise.all([cms.dashboardStats(), getCloudinaryStatusAction()]);
 
   return (
-    <AdminShell title="Dashboard" subtitle="Local CMS overview. No revenue, orders, or ERP widgets.">
+    <AdminShell title="Dashboard" subtitle="CMS overview only. No revenue, orders, or ERP widgets.">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Pages" value={String(pages.length)} />
-        <Stat label="Home sections" value={String(home?.sections.length ?? 0)} />
-        <Stat label="Visible / hidden" value={`${visible} / ${hidden}`} />
-        <Stat label="Media assets" value={String(media.length)} />
+        <Stat label="Pages" value={String(stats.pages)} />
+        <Stat label="Blog posts" value={String(stats.posts)} />
+        <Stat label="Drafts" value={String(stats.drafts)} />
+        <Stat label="Published posts" value={String(stats.publishedPosts)} />
+        <Stat label="FAQs" value={String(stats.faqs)} />
+        <Stat label="Pricing plans" value={String(stats.plans)} />
+        <Stat label="Media" value={String(stats.media)} />
+        <Stat label="Redirects" value={String(stats.redirects)} />
       </div>
       <div className="mt-6 rounded-xl border border-line bg-white p-5">
         <p className="text-sm font-semibold">Cloudinary</p>
@@ -29,13 +28,22 @@ export default async function SidhuDashboardPage() {
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
         <Link href="/sidhu/pages/home/" className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white">
-          Edit Home page
+          Edit Home
         </Link>
-        <Link href="/sidhu/settings/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          Site settings
+        <Link href="/sidhu/blog/new/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
+          New blog post
         </Link>
         <Link href="/sidhu/media/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          Media library
+          Media
+        </Link>
+        <Link href="/sidhu/seo/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
+          SEO
+        </Link>
+        <Link href="/sidhu/redirects/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
+          Redirects
+        </Link>
+        <Link href="/sidhu/settings/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
+          Site Settings
         </Link>
         <Link href="/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
           View website

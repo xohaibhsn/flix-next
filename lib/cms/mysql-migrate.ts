@@ -1,7 +1,14 @@
 import "server-only";
 
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
+import {
+  defaultBlogCategories,
+  defaultBlogPosts,
+  defaultFaqs,
+  defaultPages,
+  defaultPricingPlans,
+  defaultSettings,
+} from "@/lib/cms/defaults";
 import { readJsonFile } from "@/lib/cms/json-store";
 import type { MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
@@ -158,5 +165,143 @@ export function parseJsonColumn<T>(value: unknown, fallback: T): T {
     return JSON.parse(value) as T;
   } catch {
     return fallback;
+  }
+}
+
+async function countTable(table: string) {
+  const [rows] = await getDbPool().query<CountRow[]>(`SELECT COUNT(*) AS n FROM ${table}`);
+  return Number(rows[0]?.n ?? 0);
+}
+
+export async function seedExtendedIfEmpty() {
+  const pool = getDbPool();
+  if ((await countTable("pricing_plans")) === 0) {
+    for (const plan of defaultPricingPlans()) {
+      await pool.execute(
+        `INSERT INTO pricing_plans
+          (id, name, slug, price, duration, badge_text, is_popular, features, button_label, button_url, sort_order, is_active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          plan.id,
+          plan.name,
+          plan.slug,
+          plan.price,
+          plan.duration,
+          plan.badge,
+          plan.popular ? 1 : 0,
+          JSON.stringify(plan.features),
+          plan.buttonLabel,
+          plan.buttonHref,
+          plan.sortOrder,
+          plan.active ? 1 : 0,
+        ],
+      );
+    }
+  }
+  if ((await countTable("faqs")) === 0) {
+    for (const item of defaultFaqs()) {
+      await pool.execute(
+        `INSERT INTO faqs (id, question, answer, category, sort_order, is_visible)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [item.id, item.question, item.answer, item.category, item.sortOrder, item.visible ? 1 : 0],
+      );
+    }
+  }
+  if ((await countTable("blog_categories")) === 0) {
+    for (const category of defaultBlogCategories()) {
+      await pool.execute(
+        `INSERT INTO blog_categories (id, name, slug, description, is_active)
+         VALUES (?, ?, ?, ?, ?)`,
+        [category.id, category.name, category.slug, category.description, category.active ? 1 : 0],
+      );
+    }
+  }
+  if ((await countTable("blog_posts")) === 0) {
+    for (const post of defaultBlogPosts()) {
+      await pool.execute(
+        `INSERT INTO blog_posts (
+          id, title, slug, excerpt, content, category_id, featured_image, status, featured, published_at,
+          seo_title, seo_description, focus_keyword, canonical_url, robots_index, robots_follow,
+          og_title, og_description, og_image, sitemap_include
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          post.id,
+          post.title,
+          post.slug,
+          post.excerpt,
+          post.content,
+          post.categoryId,
+          JSON.stringify(post.featuredImage),
+          post.status,
+          post.featured ? 1 : 0,
+          post.publishedAt ? toMysqlDateTime(post.publishedAt) : null,
+          post.seoTitle,
+          post.seoDescription,
+          post.focusKeyword,
+          post.canonicalUrl,
+          post.robotsIndex ? 1 : 0,
+          post.robotsFollow ? 1 : 0,
+          post.ogTitle,
+          post.ogDescription,
+          JSON.stringify(post.ogImage),
+          post.sitemapInclude ? 1 : 0,
+        ],
+      );
+    }
+  }
+
+  const defaults = defaultPages();
+  for (const page of defaults.filter((item) => item.slug !== "/")) {
+    const [rows] = await pool.query<Array<RowDataPacket & { id: string }>>(
+      "SELECT id FROM pages WHERE slug = ? LIMIT 1",
+      [page.slug],
+    );
+    const existingId = rows[0]?.id;
+    if (!existingId) {
+      const safe = sanitizePage(page);
+      await pool.execute(
+        `INSERT INTO pages (id, name, slug, status, cms_enabled) VALUES (?, ?, ?, ?, ?)`,
+        [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
+      );
+      for (const section of safe.sections) {
+        await pool.execute(
+          `INSERT INTO page_sections
+            (id, page_id, section_type, label, sort_order, visible, section_data)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            section.id,
+            safe.id,
+            section.type,
+            section.label,
+            section.order,
+            section.visible ? 1 : 0,
+            JSON.stringify(section.data),
+          ],
+        );
+      }
+      continue;
+    }
+    const [sectionCount] = await pool.query<CountRow[]>(
+      "SELECT COUNT(*) AS n FROM page_sections WHERE page_id = ?",
+      [existingId],
+    );
+    if (Number(sectionCount[0]?.n ?? 0) > 0) continue;
+    await pool.execute("UPDATE pages SET cms_enabled = 1, name = ? WHERE id = ?", [page.name, existingId]);
+    for (const section of sanitizePage({ ...page, id: existingId }).sections) {
+      await pool.execute(
+        `INSERT INTO page_sections
+          (id, page_id, section_type, label, sort_order, visible, section_data)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [
+          section.id,
+          existingId,
+          section.type,
+          section.label,
+          section.order,
+          section.visible ? 1 : 0,
+          JSON.stringify(section.data),
+        ],
+      );
+    }
   }
 }

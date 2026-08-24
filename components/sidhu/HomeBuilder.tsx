@@ -9,7 +9,15 @@ import type { CmsPage, CmsSection, SectionType } from "@/lib/cms/types";
 import { SectionEditor } from "@/components/sidhu/SectionEditor";
 import { Banner } from "@/components/sidhu/fields";
 
-export function HomeBuilder({ page: initialPage }: { page: CmsPage }) {
+export function HomeBuilder({
+  page: initialPage,
+  title = "Home page builder",
+  hint = "Saving updates the live Home page at /welcome/ after a refresh.",
+}: {
+  page: CmsPage;
+  title?: string;
+  hint?: string;
+}) {
   const [page, setPage] = useState(initialPage);
   const [saved, setSaved] = useState(initialPage);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,7 +56,7 @@ export function HomeBuilder({ page: initialPage }: { page: CmsPage }) {
     if (result.ok) {
       setPage(result.page);
       setSaved(result.page);
-      setMessage({ tone: "ok", text: "Home page saved. Refresh /welcome/ to see the live Hero and sections." });
+      setMessage({ tone: "ok", text: hint });
     } else {
       setMessage({ tone: "error", text: result.error });
     }
@@ -58,7 +66,7 @@ export function HomeBuilder({ page: initialPage }: { page: CmsPage }) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-white p-4">
         <div>
-          <p className="text-sm font-semibold">Home page builder</p>
+          <p className="text-sm font-semibold">{title}</p>
           <p className="text-xs text-muted">
             {dirty ? "Unsaved changes" : "All changes saved"} · {sections.length} sections
           </p>
@@ -192,7 +200,7 @@ export function HomeBuilder({ page: initialPage }: { page: CmsPage }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-lg rounded-xl bg-white p-6">
             <h2 className="text-lg font-bold">Add section</h2>
-            <p className="mt-1 text-sm text-muted">Choose a supported homepage block.</p>
+            <p className="mt-1 text-sm text-muted">Choose a supported section block.</p>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
               {SUPPORTED_SECTION_TYPES.map((item) => (
                 <button

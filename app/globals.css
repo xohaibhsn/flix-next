@@ -61,3 +61,45 @@ body {
 .wa-pulse {
   animation: pulse-wa 1.8s infinite;
 }
+
+.prose-cms h2 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0b0d12;
+}
+
+.prose-cms h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.prose-cms h4 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.prose-cms p,
+.prose-cms ul,
+.prose-cms ol {
+  margin: 0.75rem 0;
+}
+
+.prose-cms a {
+  color: #e50914;
+  text-decoration: underline;
+}
+
+.prose-cms img {
+  margin: 1rem 0;
+  max-width: 100%;
+  border-radius: 0.75rem;
+}
+
+.prose-cms blockquote {
+  border-left: 3px solid #e50914;
+  padding-left: 1rem;
+  color: #6b7280;
+}

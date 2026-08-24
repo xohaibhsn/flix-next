@@ -1,0 +1,77 @@
+[
+  {
+    "id": "plan-1",
+    "name": "1 Month Plan",
+    "price": "15.99",
+    "duration": "/ month",
+    "badge": "",
+    "popular": false,
+    "features": [
+      "20,000+ Live Channels (demo)",
+      "80,000+ Movies & Series (demo)",
+      "4K / FHD / HD Quality",
+      "Anti-Freeze Technology",
+      "All Devices Supported",
+      "Instant Activation",
+      "TV Guide (EPG)",
+      "24/7 Customer Support"
+    ],
+    "buttonLabel": "Choose Plan",
+    "buttonHref": "/contact/",
+    "slug": "plan-1",
+    "sortOrder": 1,
+    "active": true,
+    "createdAt": "2026-08-24T01:35:36.991Z",
+    "updatedAt": "2026-08-24T01:35:36.991Z"
+  },
+  {
+    "id": "plan-12",
+    "name": "12 Months Plan",
+    "price": "69.99",
+    "duration": "/ year",
+    "badge": "Most Popular",
+    "popular": true,
+    "features": [
+      "20,000+ Live Channels (demo)",
+      "80,000+ Movies & Series (demo)",
+      "4K / FHD / HD Quality",
+      "Anti-Freeze Technology",
+      "All Devices Supported",
+      "Instant Activation",
+      "TV Guide (EPG)",
+      "24/7 Customer Support"
+    ],
+    "buttonLabel": "Choose Plan",
+    "buttonHref": "/contact/",
+    "slug": "plan-12",
+    "sortOrder": 2,
+    "active": true,
+    "createdAt": "2026-08-24T01:35:36.991Z",
+    "updatedAt": "2026-08-24T01:35:36.991Z"
+  },
+  {
+    "id": "plan-3",
+    "name": "3 Months Plan",
+    "price": "35.99",
+    "duration": "/ 3 months",
+    "badge": "",
+    "popular": false,
+    "features": [
+      "20,000+ Live Channels (demo)",
+      "80,000+ Movies & Series (demo)",
+      "4K / FHD / HD Quality",
+      "Anti-Freeze Technology",
+      "All Devices Supported",
+      "Instant Activation",
+      "TV Guide (EPG)",
+      "24/7 Customer Support"
+    ],
+    "buttonLabel": "Choose Plan",
+    "buttonHref": "/contact/",
+    "slug": "plan-3",
+    "sortOrder": 3,
+    "active": true,
+    "createdAt": "2026-08-24T01:35:36.991Z",
+    "updatedAt": "2026-08-24T01:35:36.991Z"
+  }
+]

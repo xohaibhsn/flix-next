@@ -4,17 +4,24 @@ import type { ReactNode } from "react";
 import { createId } from "@/lib/cms/ids";
 import type {
   CmsSection,
+  ContactFormData,
+  ContactInfoData,
   CtaData,
   DevicesData,
   FaqData,
   HeroData,
   HighlightsData,
   HowItWorksData,
+  InfoCardsData,
+  MessagingCtaData,
+  PageHeroData,
   PricingData,
+  RichTextData,
   ServicesData,
   TrustStatsData,
   WhyChooseData,
 } from "@/lib/cms/types";
+import { FAQ_CATEGORIES } from "@/lib/cms/faq-categories";
 import { Field, IconSelect, RowActions, TextArea, TextInput } from "@/components/sidhu/fields";
 
 function move<T>(items: T[], index: number, direction: -1 | 1) {
@@ -70,6 +77,19 @@ export function SectionEditor({
       return <FaqFields data={section.data as FaqData} onChange={setData} />;
     case "cta":
       return <CtaFields data={section.data as CtaData} onChange={setData} />;
+    case "page-hero":
+      return <PageHeroFields data={section.data as PageHeroData} onChange={setData} />;
+    case "rich-text":
+      return <RichTextFields data={section.data as RichTextData} onChange={setData} />;
+    case "info-cards":
+      return <InfoCardFields data={section.data as InfoCardsData} onChange={setData} />;
+    case "contact-info":
+    case "hours":
+      return <HeaderFields data={section.data as ContactInfoData} onChange={setData} />;
+    case "contact-form":
+      return <ContactFormFields data={section.data as ContactFormData} onChange={setData} />;
+    case "messaging-cta":
+      return <MessagingFields data={section.data as MessagingCtaData} onChange={setData} />;
     default:
       return <p className="text-sm text-muted">This section type cannot be edited yet.</p>;
   }
@@ -469,6 +489,18 @@ function PricingFields({ data, onChange }: { data: PricingData; onChange: (data:
   return (
     <div className="space-y-4">
       <HeaderFields data={data} onChange={onChange as never} />
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={Boolean(data.useCentralPlans)}
+          onChange={(event) => onChange({ ...data, useCentralPlans: event.target.checked })}
+        />
+        Use central pricing plans
+      </label>
+      {data.useCentralPlans ? (
+        <p className="text-xs text-muted">Plans are managed under Sidhu → Pricing. This section still uses the heading above.</p>
+      ) : (
+        <>
       <AddButton
         label="+ Add plan"
         onClick={() =>
@@ -626,6 +658,8 @@ function PricingFields({ data, onChange }: { data: PricingData; onChange: (data:
           </Field>
         </Box>
       ))}
+        </>
+      )}
     </div>
   );
 }
@@ -752,48 +786,78 @@ function FaqFields({ data, onChange }: { data: FaqData; onChange: (data: FaqData
   return (
     <div className="space-y-4">
       <HeaderFields data={data} onChange={onChange as never} />
-      <AddButton
-        label="+ Add FAQ"
-        onClick={() =>
-          onChange({
-            ...data,
-            items: [...items, { id: createId("faq"), question: "New question", answer: "" }],
-          })
-        }
-      />
-      {items.map((item, index) => (
-        <Box
-          key={item.id}
-          onUp={() => onChange({ ...data, items: move(items, index, -1) })}
-          onDown={() => onChange({ ...data, items: move(items, index, 1) })}
-          onRemove={() => onChange({ ...data, items: items.filter((row) => row.id !== item.id) })}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={Boolean(data.useCentralFaqs)}
+          onChange={(event) => onChange({ ...data, useCentralFaqs: event.target.checked })}
+        />
+        Use central FAQ library
+      </label>
+      <Field label="FAQ category">
+        <select
+          className="w-full rounded-md border border-line px-3 py-2 text-sm"
+          value={data.category}
+          onChange={(event) => onChange({ ...data, category: event.target.value })}
         >
-          <Field label="Question">
-            <TextInput
-              value={item.question}
-              onChange={(event) =>
-                onChange({
-                  ...data,
-                  items: items.map((row) =>
-                    row.id === item.id ? { ...row, question: event.target.value } : row,
-                  ),
-                })
-              }
-            />
-          </Field>
-          <Field label="Answer">
-            <TextArea
-              value={item.answer}
-              onChange={(event) =>
-                onChange({
-                  ...data,
-                  items: items.map((row) => (row.id === item.id ? { ...row, answer: event.target.value } : row)),
-                })
-              }
-            />
-          </Field>
-        </Box>
-      ))}
+          <option value="">All categories</option>
+          {FAQ_CATEGORIES.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {data.useCentralFaqs ? (
+        <p className="text-xs text-muted">Questions come from Sidhu → FAQs for the selected category.</p>
+      ) : (
+        <>
+          <AddButton
+            label="+ Add FAQ"
+            onClick={() =>
+              onChange({
+                ...data,
+                items: [...items, { id: createId("faq"), question: "New question", answer: "" }],
+              })
+            }
+          />
+          {items.map((item, index) => (
+            <Box
+              key={item.id}
+              onUp={() => onChange({ ...data, items: move(items, index, -1) })}
+              onDown={() => onChange({ ...data, items: move(items, index, 1) })}
+              onRemove={() => onChange({ ...data, items: items.filter((row) => row.id !== item.id) })}
+            >
+              <Field label="Question">
+                <TextInput
+                  value={item.question}
+                  onChange={(event) =>
+                    onChange({
+                      ...data,
+                      items: items.map((row) =>
+                        row.id === item.id ? { ...row, question: event.target.value } : row,
+                      ),
+                    })
+                  }
+                />
+              </Field>
+              <Field label="Answer">
+                <TextArea
+                  value={item.answer}
+                  onChange={(event) =>
+                    onChange({
+                      ...data,
+                      items: items.map((row) =>
+                        row.id === item.id ? { ...row, answer: event.target.value } : row,
+                      ),
+                    })
+                  }
+                />
+              </Field>
+            </Box>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -812,6 +876,118 @@ function CtaFields({ data, onChange }: { data: CtaData; onChange: (data: CtaData
       </Field>
       <Field label="Button URL">
         <TextInput value={data.buttonHref} onChange={(event) => onChange({ ...data, buttonHref: event.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+function PageHeroFields({ data, onChange }: { data: PageHeroData; onChange: (data: PageHeroData) => void }) {
+  return (
+    <div className="space-y-4">
+      <Field label="Eyebrow">
+        <TextInput value={data.eyebrow} onChange={(event) => onChange({ ...data, eyebrow: event.target.value })} />
+      </Field>
+      <Field label="Heading">
+        <TextInput value={data.heading} onChange={(event) => onChange({ ...data, heading: event.target.value })} />
+      </Field>
+      <Field label="Highlight">
+        <TextInput value={data.highlight} onChange={(event) => onChange({ ...data, highlight: event.target.value })} />
+      </Field>
+      <Field label="Description">
+        <TextArea value={data.description} onChange={(event) => onChange({ ...data, description: event.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+function RichTextFields({ data, onChange }: { data: RichTextData; onChange: (data: RichTextData) => void }) {
+  return (
+    <div className="space-y-4">
+      <Field label="Heading">
+        <TextInput value={data.heading} onChange={(event) => onChange({ ...data, heading: event.target.value })} />
+      </Field>
+      <Field label="HTML content" hint="Keep this simple. Scripts are stripped on save.">
+        <TextArea value={data.html} onChange={(event) => onChange({ ...data, html: event.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+function InfoCardFields({ data, onChange }: { data: InfoCardsData; onChange: (data: InfoCardsData) => void }) {
+  const cards = Array.isArray(data.cards) ? data.cards : [];
+  return (
+    <div className="space-y-4">
+      <HeaderFields data={data} onChange={onChange as never} />
+      <AddButton
+        label="+ Add card"
+        onClick={() =>
+          onChange({
+            ...data,
+            cards: [...cards, { id: createId("card"), icon: "Check", title: "New card", description: "" }],
+          })
+        }
+      />
+      {cards.map((card, index) => (
+        <Box
+          key={card.id}
+          onUp={() => onChange({ ...data, cards: move(cards, index, -1) })}
+          onDown={() => onChange({ ...data, cards: move(cards, index, 1) })}
+          onRemove={() => onChange({ ...data, cards: cards.filter((row) => row.id !== card.id) })}
+        >
+          <Field label="Title">
+            <TextInput
+              value={card.title}
+              onChange={(event) =>
+                onChange({
+                  ...data,
+                  cards: cards.map((row) => (row.id === card.id ? { ...row, title: event.target.value } : row)),
+                })
+              }
+            />
+          </Field>
+          <Field label="Description">
+            <TextArea
+              value={card.description}
+              onChange={(event) =>
+                onChange({
+                  ...data,
+                  cards: cards.map((row) =>
+                    row.id === card.id ? { ...row, description: event.target.value } : row,
+                  ),
+                })
+              }
+            />
+          </Field>
+        </Box>
+      ))}
+    </div>
+  );
+}
+
+function ContactFormFields({ data, onChange }: { data: ContactFormData; onChange: (data: ContactFormData) => void }) {
+  return (
+    <div className="space-y-4">
+      <HeaderFields data={data} onChange={onChange as never} />
+      {(["nameLabel", "emailLabel", "phoneLabel", "subjectLabel", "messageLabel", "buttonLabel", "successMessage"] as const).map(
+        (key) => (
+          <Field key={key} label={key}>
+            <TextInput value={data[key]} onChange={(event) => onChange({ ...data, [key]: event.target.value })} />
+          </Field>
+        ),
+      )}
+    </div>
+  );
+}
+
+function MessagingFields({ data, onChange }: { data: MessagingCtaData; onChange: (data: MessagingCtaData) => void }) {
+  return (
+    <div className="space-y-4">
+      <HeaderFields data={data} onChange={onChange as never} />
+      <Field label="WhatsApp button">
+        <TextInput value={data.whatsappLabel} onChange={(event) => onChange({ ...data, whatsappLabel: event.target.value })} />
+      </Field>
+      <Field label="Telegram button">
+        <TextInput value={data.telegramLabel} onChange={(event) => onChange({ ...data, telegramLabel: event.target.value })} />
       </Field>
     </div>
   );

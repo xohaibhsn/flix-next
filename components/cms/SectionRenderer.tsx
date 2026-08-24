@@ -8,23 +8,50 @@ import { Services } from "@/components/sections/Services";
 import { StatsStrip } from "@/components/sections/StatsStrip";
 import { TrustStats } from "@/components/sections/TrustStats";
 import { WhyChooseUs } from "@/components/sections/WhyChooseUs";
+import {
+  ContactFormBlock,
+  ContactInfoCards,
+  InfoCards,
+  MessagingCta,
+  RichTextBlock,
+  SupportHours,
+} from "@/components/sections/ExtraSections";
+import { InnerPageHero } from "@/components/sections/InnerPageHero";
 import { SectionErrorBoundary } from "@/components/cms/SectionErrorBoundary";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { mergeSectionData } from "@/lib/cms/defaults";
+import { faqPageJsonLd } from "@/lib/cms/json-ld";
+import { resolveFaqData, resolvePricingData } from "@/lib/cms/resolve";
 import type {
   CmsSection,
+  ContactFormData,
+  ContactInfoData,
   CtaData,
   DevicesData,
   FaqData,
+  FaqItem,
   HeroData,
   HighlightsData,
+  HoursData,
   HowItWorksData,
+  InfoCardsData,
+  MessagingCtaData,
+  PageHeroData,
   PricingData,
+  PricingPlan,
+  RichTextData,
   ServicesData,
+  SiteSettings,
   TrustStatsData,
   WhyChooseData,
 } from "@/lib/cms/types";
 
-function renderSection(section: CmsSection) {
+function renderSection(
+  section: CmsSection,
+  settings: SiteSettings,
+  plans: PricingPlan[],
+  faqs: FaqItem[],
+) {
   const data = mergeSectionData(section.type, section.data);
   switch (section.type) {
     case "hero":
@@ -36,23 +63,54 @@ function renderSection(section: CmsSection) {
     case "services":
       return <Services data={data as ServicesData} />;
     case "pricing":
-      return <Pricing data={data as PricingData} />;
+      return <Pricing data={resolvePricingData(data as PricingData, plans)} />;
     case "devices":
       return <Devices data={data as DevicesData} />;
     case "trust-stats":
       return <TrustStats data={data as TrustStatsData} />;
     case "why-choose":
       return <WhyChooseUs data={data as WhyChooseData} />;
-    case "faq":
-      return <FAQ data={data as FaqData} />;
+    case "faq": {
+      const resolved = resolveFaqData(data as FaqData, faqs);
+      return (
+        <>
+          <JsonLd data={faqPageJsonLd(resolved)} />
+          <FAQ data={resolved} />
+        </>
+      );
+    }
     case "cta":
       return <CTA data={data as CtaData} />;
+    case "page-hero":
+      return <InnerPageHero data={data as PageHeroData} />;
+    case "rich-text":
+      return <RichTextBlock data={data as RichTextData} />;
+    case "info-cards":
+      return <InfoCards data={data as InfoCardsData} />;
+    case "contact-info":
+      return <ContactInfoCards data={data as ContactInfoData} settings={settings} />;
+    case "contact-form":
+      return <ContactFormBlock data={data as ContactFormData} />;
+    case "messaging-cta":
+      return <MessagingCta data={data as MessagingCtaData} settings={settings} />;
+    case "hours":
+      return <SupportHours data={data as HoursData} settings={settings} />;
     default:
       return null;
   }
 }
 
-export function SectionRenderer({ sections }: { sections: CmsSection[] }) {
+export function SectionRenderer({
+  sections,
+  settings,
+  plans = [],
+  faqs = [],
+}: {
+  sections: CmsSection[];
+  settings: SiteSettings;
+  plans?: PricingPlan[];
+  faqs?: FaqItem[];
+}) {
   return (
     <>
       {sections
@@ -60,7 +118,7 @@ export function SectionRenderer({ sections }: { sections: CmsSection[] }) {
         .sort((a, b) => a.order - b.order)
         .map((section) => (
           <SectionErrorBoundary key={section.id} label={`“${section.label}” could not be displayed.`}>
-            {renderSection(section)}
+            {renderSection(section, settings, plans, faqs)}
           </SectionErrorBoundary>
         ))}
     </>

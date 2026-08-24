@@ -1,4 +1,15 @@
-import type { CmsPage, CmsSection, SectionType, SiteSettings } from "@/lib/cms/types";
+import { defaultPageSeo } from "@/lib/seo";
+import type {
+  BlogCategory,
+  BlogPost,
+  CmsPage,
+  CmsSection,
+  FaqItem,
+  NavLink,
+  PricingPlan,
+  SectionType,
+  SiteSettings,
+} from "@/lib/cms/types";
 import { createId } from "@/lib/cms/ids";
 
 const PLAN_FEATURES = [
@@ -23,6 +34,13 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   "why-choose": "Why Choose Us",
   faq: "FAQ",
   cta: "Final CTA",
+  "page-hero": "Page Hero",
+  "rich-text": "Rich Text",
+  "info-cards": "Info Cards",
+  "contact-info": "Contact Information",
+  "contact-form": "Contact Form",
+  "messaging-cta": "WhatsApp / Telegram CTA",
+  hours: "Support Hours",
 };
 
 export function createDefaultSectionData(type: SectionType): CmsSection["data"] {
@@ -145,6 +163,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         heading: "Simple, Transparent Pricing",
         description:
           "Temporary local demo prices only. One package, full access — checkout is not connected yet.",
+        useCentralPlans: true,
         plans: [
           {
             id: "plan-1",
@@ -259,6 +278,8 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         heading: "Frequently Asked Questions",
         description:
           "Quick answers about setup, devices, and billing. Still stuck? Chat with us on WhatsApp.",
+        useCentralFaqs: true,
+        category: "General",
         items: [
           {
             id: "faq1",
@@ -306,6 +327,61 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         buttonLabel: "Get Started Now",
         buttonHref: "/iptv-subscriptions-uk/",
       };
+    case "page-hero":
+      return {
+        eyebrow: "The Flix",
+        heading: "Page title",
+        highlight: "",
+        description: "Short supporting text for this page.",
+      };
+    case "rich-text":
+      return {
+        heading: "",
+        html: "<p>Add your content here.</p>",
+      };
+    case "info-cards":
+      return {
+        eyebrow: "",
+        heading: "Highlights",
+        description: "",
+        cards: [
+          {
+            id: "info-1",
+            icon: "Check",
+            title: "Card title",
+            description: "Short supporting copy for this card.",
+          },
+        ],
+      };
+    case "contact-info":
+      return {
+        heading: "Contact details",
+        description: "Reach us using the details managed in Site Settings.",
+      };
+    case "contact-form":
+      return {
+        heading: "Send a message",
+        description: "Tell us what you need help with. We store messages in Sidhu until email sending is connected.",
+        nameLabel: "Name",
+        emailLabel: "Email",
+        phoneLabel: "Phone (optional)",
+        subjectLabel: "Subject",
+        messageLabel: "Message",
+        buttonLabel: "Send message",
+        successMessage: "Thanks — your message was received. We will get back to you shortly.",
+      };
+    case "messaging-cta":
+      return {
+        heading: "Prefer WhatsApp or Telegram?",
+        description: "Most setup questions are faster in chat.",
+        whatsappLabel: "Open WhatsApp",
+        telegramLabel: "Open Telegram",
+      };
+    case "hours":
+      return {
+        heading: "Support hours",
+        description: "Hours come from Site Settings so they stay consistent across the site.",
+      };
   }
 }
 
@@ -343,6 +419,97 @@ export function createHomeSections(): CmsSection[] {
   }));
 }
 
+function nav(id: string, label: string, href: string): NavLink {
+  return { id, label, href, visible: true };
+}
+
+export function createSubscriptionSections(): CmsSection[] {
+  const hero = createSection("page-hero", 1);
+  hero.id = "sec-sub-hero";
+  hero.data = {
+    eyebrow: "UK IPTV subscriptions",
+    heading: "IPTV Subscriptions",
+    highlight: "Built for Everyday Watching",
+    description:
+      "Live TV, movies, and series on the devices you already own. Plans, setup, and FAQs are managed from Sidhu.",
+  };
+  const intro = createSection("rich-text", 2);
+  intro.id = "sec-sub-intro";
+  intro.label = "Intro";
+  intro.data = {
+    heading: "",
+    html: "<p>Choose a plan, receive login details, and start watching. Channel lists and checkout will be connected later; this page is fully editable in Sidhu.</p>",
+  };
+  const pricing = createSection("pricing", 3);
+  pricing.id = "sec-sub-pricing";
+  const benefits = createSection("info-cards", 4);
+  benefits.id = "sec-sub-benefits";
+  benefits.label = "Benefits";
+  benefits.data = {
+    eyebrow: "",
+    heading: "Why subscribers choose The Flix",
+    description: "The same visual language as Home, with copy you can edit per page.",
+    cards: [
+      { id: "ben-1", icon: "Tv", title: "Live sports & news", description: "Follow leagues, breaking news, and international channels without juggling apps." },
+      { id: "ben-2", icon: "Clapperboard", title: "On-demand library", description: "Movies and series in HD, FHD, and 4K so you can catch up whenever you want." },
+      { id: "ben-3", icon: "Zap", title: "Simple setup", description: "Most customers are watching within minutes on Firestick, Smart TV, or phone." },
+      { id: "ben-4", icon: "Headphones", title: "Support when you need it", description: "WhatsApp and email help for playlist setup, device questions, and plan changes." },
+    ],
+  };
+  const how = createSection("how-it-works", 5);
+  how.id = "sec-sub-how";
+  const devices = createSection("devices", 6);
+  devices.id = "sec-sub-devices";
+  const info = createSection("info-cards", 7);
+  info.id = "sec-sub-info";
+  info.label = "Good to know";
+  info.data = {
+    eyebrow: "",
+    heading: "Good to know",
+    description: "Structured informational content you can replace from Sidhu.",
+    cards: [
+      { id: "info-1", icon: "Users", title: "Who this is for", description: "Households that want live TV, sports, and a large VOD library on the devices they already own." },
+      { id: "info-2", icon: "Mail", title: "What you receive", description: "Login details, a short setup guide, and access for the billed period." },
+      { id: "info-3", icon: "ShieldCheck", title: "What this page is not", description: "There is no checkout or reseller portal on this build. Plan buttons go to Contact." },
+    ],
+  };
+  const faq = createSection("faq", 8);
+  faq.id = "sec-sub-faq";
+  (faq.data as { category: string }).category = "Subscription";
+  const cta = createSection("cta", 9);
+  cta.id = "sec-sub-cta";
+  cta.data = {
+    heading: "Ready to choose a plan?",
+    description: "Use Contact for this local preview. Payment is not live yet.",
+    buttonLabel: "Talk to support",
+    buttonHref: "/contact/",
+  };
+  return [hero, intro, pricing, benefits, how, devices, info, faq, cta];
+}
+
+export function createContactSections(): CmsSection[] {
+  const hero = createSection("page-hero", 1);
+  hero.id = "sec-contact-hero";
+  hero.data = {
+    eyebrow: "Support",
+    heading: "Contact",
+    highlight: "The Flix",
+    description: "WhatsApp, email, and a contact form. Phone, email, and chat links come from Site Settings.",
+  };
+  const info = createSection("contact-info", 2);
+  info.id = "sec-contact-info";
+  const form = createSection("contact-form", 3);
+  form.id = "sec-contact-form";
+  const chat = createSection("messaging-cta", 4);
+  chat.id = "sec-contact-chat";
+  const hours = createSection("hours", 5);
+  hours.id = "sec-contact-hours";
+  const faq = createSection("faq", 6);
+  faq.id = "sec-contact-faq";
+  (faq.data as { category: string }).category = "Contact";
+  return [hero, info, form, chat, hours, faq];
+}
+
 export function defaultPages(): CmsPage[] {
   return [
     {
@@ -358,16 +525,16 @@ export function defaultPages(): CmsPage[] {
       name: "IPTV Subscription",
       slug: "/iptv-subscriptions-uk/",
       status: "published",
-      cmsEnabled: false,
-      sections: [],
+      cmsEnabled: true,
+      sections: createSubscriptionSections(),
     },
     {
       id: "page-contact",
       name: "Contact",
       slug: "/contact/",
       status: "published",
-      cmsEnabled: false,
-      sections: [],
+      cmsEnabled: true,
+      sections: createContactSections(),
     },
   ];
 }
@@ -377,17 +544,246 @@ export function defaultSettings(): SiteSettings {
     siteName: "THE FLIX IPTV",
     tagline: "Your Entertainment. Your Way.",
     email: "support@theflixiptv.com",
-    phone: "+1 (234) 567-8900",
-    whatsapp: "1234567890",
-    hours: "24/7 support (demo placeholder)",
-    location: "Available worldwide · local demo",
+    phone: "",
+    whatsapp: "",
+    whatsappDisplay: "",
+    whatsappMessage: "Hi The Flix, I need help with my IPTV plan.",
+    hours: "24/7 support",
+    location: "Available worldwide",
+    telegramUrl: "",
+    socials: {
+      facebook: "",
+      instagram: "",
+      twitter: "",
+      youtube: "",
+      telegram: "",
+    },
+    headerNav: [
+      nav("nav-home", "Home", "/welcome/"),
+      nav("nav-iptv", "IPTV Subscription", "/iptv-subscriptions-uk/"),
+      nav("nav-blog", "Blog", "/blog/"),
+      nav("nav-contact", "Contact", "/contact/"),
+    ],
+    headerCtaLabel: "Get Started",
+    headerCtaHref: "/iptv-subscriptions-uk/",
+    footerIntro:
+      "Premium IPTV with live channels, movies, and series on every device. Reliable streams. Honest pricing.",
+    footerCopyright: "All rights reserved.",
+    footerQuickLinks: [
+      nav("fq-home", "Home", "/welcome/"),
+      nav("fq-iptv", "IPTV Subscription", "/iptv-subscriptions-uk/"),
+      nav("fq-blog", "Blog", "/blog/"),
+      nav("fq-contact", "Contact", "/contact/"),
+    ],
+    footerSupportLinks: [
+      nav("fs-contact", "Contact", "/contact/"),
+      nav("fs-faq", "FAQ", "/welcome/#faq"),
+      nav("fs-plans", "Plans", "/iptv-subscriptions-uk/"),
+    ],
+    footerPaymentImages: [],
     branding: {
       logo: null,
       logoAlt: "THE FLIX IPTV",
       favicon: null,
       defaultOgImage: null,
     },
+    pageSeo: {
+      home: defaultPageSeo("Welcome", "Stream live TV, movies, and series with THE FLIX IPTV.", "/welcome/"),
+      subscriptions: defaultPageSeo(
+        "IPTV Subscriptions UK",
+        "IPTV plans, devices, and FAQs for THE FLIX IPTV.",
+        "/iptv-subscriptions-uk/",
+      ),
+      contact: defaultPageSeo("Contact", "Contact THE FLIX IPTV support by WhatsApp, email, or form.", "/contact/"),
+      blog: defaultPageSeo("Blog", "Guides and updates from THE FLIX IPTV.", "/blog/"),
+    },
   };
+}
+
+export function defaultPricingPlans(): PricingPlan[] {
+  const now = new Date().toISOString();
+  const data = createDefaultSectionData("pricing") as {
+    plans: Array<{
+      id: string;
+      name: string;
+      price: string;
+      duration: string;
+      badge: string;
+      popular: boolean;
+      features: string[];
+      buttonLabel: string;
+      buttonHref: string;
+    }>;
+  };
+  return data.plans.map((plan, index) => ({
+    ...plan,
+    slug: plan.id,
+    sortOrder: index + 1,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  }));
+}
+
+export function defaultFaqs(): FaqItem[] {
+  const now = new Date().toISOString();
+  const home = createDefaultSectionData("faq") as {
+    items: Array<{ id: string; question: string; answer: string }>;
+  };
+  const contact = [
+    {
+      id: "cf1",
+      question: "How quickly do you reply?",
+      answer: "Support aims to reply around the clock on WhatsApp and email.",
+      category: "Contact",
+    },
+    {
+      id: "cf2",
+      question: "Can I ask about an existing order?",
+      answer: "Yes — include your email in the form so we can match your request.",
+      category: "Contact",
+    },
+    {
+      id: "cf3",
+      question: "Do you help with Firestick setup?",
+      answer: "Setup help is one of the most common requests. We send steps with each new login.",
+      category: "Contact",
+    },
+  ];
+  return [
+    ...home.items.map((item, index) => ({
+      ...item,
+      category: "General",
+      sortOrder: index + 1,
+      visible: true,
+      createdAt: now,
+      updatedAt: now,
+    })),
+    ...contact.map((item, index) => ({
+      ...item,
+      sortOrder: index + 1,
+      visible: true,
+      createdAt: now,
+      updatedAt: now,
+    })),
+  ];
+}
+
+export function defaultBlogCategories(): BlogCategory[] {
+  const now = new Date().toISOString();
+  return [
+    { id: "cat-setup", name: "Setup", slug: "setup", description: "Device and playlist setup guides.", active: true, createdAt: now, updatedAt: now },
+    { id: "cat-devices", name: "Devices", slug: "devices", description: "Smart TVs, Firestick, and apps.", active: true, createdAt: now, updatedAt: now },
+    { id: "cat-quality", name: "Quality", slug: "quality", description: "Streaming quality and bandwidth.", active: true, createdAt: now, updatedAt: now },
+    { id: "cat-guides", name: "Guides", slug: "guides", description: "Getting started with The Flix.", active: true, createdAt: now, updatedAt: now },
+  ];
+}
+
+export function defaultBlogPosts(): BlogPost[] {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: "post-firestick",
+      title: "How to Watch IPTV on Firestick",
+      slug: "how-to-watch-iptv-on-firestick",
+      excerpt:
+        "A local demo guide covering the usual Firestick apps, playlist steps, and what to check if the stream will not load.",
+      content:
+        "<h2>Install a player</h2><p>Most Firestick viewers install a player, add a playlist or Xtream details, then pin the app to the home row.</p><h3>If a channel fails</h3><p>Check internet speed, try another server line, and confirm the subscription is still active.</p>",
+      categoryId: "cat-setup",
+      featuredImage: null,
+      status: "published",
+      featured: true,
+      publishedAt: "2026-08-12T10:00:00.000Z",
+      createdAt: now,
+      updatedAt: now,
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "firestick iptv",
+      canonicalUrl: "",
+      robotsIndex: true,
+      robotsFollow: true,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: true,
+    },
+    {
+      id: "post-smart-tv",
+      title: "Best IPTV Apps for Smart TVs",
+      slug: "best-iptv-apps-for-smart-tvs",
+      excerpt: "A short overview of common Smart TV players and why a stable playlist matters more than the app brand.",
+      content:
+        "<p>Smart TVs vary by brand. Some use built-in apps; others work better with a Firestick or Android box.</p><p>Look for EPG support, catch-up if your plan includes it, and a simple favorites row.</p>",
+      categoryId: "cat-devices",
+      featuredImage: null,
+      status: "published",
+      featured: false,
+      publishedAt: "2026-08-05T10:00:00.000Z",
+      createdAt: now,
+      updatedAt: now,
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "",
+      canonicalUrl: "",
+      robotsIndex: true,
+      robotsFollow: true,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: true,
+    },
+    {
+      id: "post-hd-4k",
+      title: "HD vs 4K Streaming: What You Need",
+      slug: "hd-vs-4k-streaming-what-you-need",
+      excerpt: "Bandwidth, TV capability, and source quality all matter. Here is a plain-language explainer.",
+      content:
+        "<p>HD is enough for many living rooms. 4K needs a 4K panel and a stronger connection — typically 25 Mbps or more.</p><p>If the picture stutters, drop to FHD before assuming the service is down.</p>",
+      categoryId: "cat-quality",
+      featuredImage: null,
+      status: "published",
+      featured: false,
+      publishedAt: "2026-07-28T10:00:00.000Z",
+      createdAt: now,
+      updatedAt: now,
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "",
+      canonicalUrl: "",
+      robotsIndex: true,
+      robotsFollow: true,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: true,
+    },
+    {
+      id: "post-getting-started",
+      title: "Getting Started with The Flix",
+      slug: "getting-started-with-the-flix",
+      excerpt: "Choose a plan, receive details, and start watching. A walkthrough that mirrors How It Works on Home.",
+      content:
+        "<p>Pick a 1, 3, or 12 month plan on the subscription page.</p><p>When payments are connected, details will arrive by email. For now, use the Contact page if you need help.</p>",
+      categoryId: "cat-guides",
+      featuredImage: null,
+      status: "published",
+      featured: false,
+      publishedAt: "2026-07-20T10:00:00.000Z",
+      createdAt: now,
+      updatedAt: now,
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "",
+      canonicalUrl: "",
+      robotsIndex: true,
+      robotsFollow: true,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: true,
+    },
+  ];
 }
 
 export function mergeSectionData(type: SectionType, data: unknown): CmsSection["data"] {

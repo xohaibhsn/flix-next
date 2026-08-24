@@ -2,8 +2,10 @@
 
 import { useCallback, useState } from "react";
 import { saveSettingsAction } from "@/lib/cms/actions";
-import type { MediaAsset, MediaRef, SiteSettings } from "@/lib/cms/types";
-import { Banner, Field, TextInput } from "@/components/sidhu/fields";
+import { createId } from "@/lib/cms/ids";
+import { whatsappUrl } from "@/lib/cms/contact";
+import type { MediaAsset, MediaRef, NavLink, SiteSettings } from "@/lib/cms/types";
+import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 
 type LibraryAsset = MediaAsset & { inUse?: boolean };
 
@@ -147,6 +149,8 @@ export function SiteSettingsForm({
         }
       />
 
+      <ContactAndChromeSettings settings={settings} setSettings={setSettings} assets={assets} />
+
       <button
         type="button"
         className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
@@ -195,6 +199,184 @@ export function SiteSettingsForm({
           </div>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function ContactAndChromeSettings({
+  settings,
+  setSettings,
+  assets,
+}: {
+  settings: SiteSettings;
+  setSettings: (settings: SiteSettings) => void;
+  assets: LibraryAsset[];
+}) {
+  return (
+    <>
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Contact & communication</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="Email">
+            <TextInput value={settings.email} onChange={(event) => setSettings({ ...settings, email: event.target.value })} />
+          </Field>
+          <Field label="Phone">
+            <TextInput value={settings.phone} onChange={(event) => setSettings({ ...settings, phone: event.target.value })} />
+          </Field>
+          <Field label="WhatsApp number" hint="Digits only, international format. Used to generate wa.me links.">
+            <TextInput value={settings.whatsapp} onChange={(event) => setSettings({ ...settings, whatsapp: event.target.value })} />
+          </Field>
+          <Field label="WhatsApp display">
+            <TextInput value={settings.whatsappDisplay} onChange={(event) => setSettings({ ...settings, whatsappDisplay: event.target.value })} />
+          </Field>
+          <Field label="Default WhatsApp message">
+            <TextInput value={settings.whatsappMessage} onChange={(event) => setSettings({ ...settings, whatsappMessage: event.target.value })} />
+          </Field>
+          <p className="sm:col-span-2 text-xs text-muted">
+            Generated chat URL: {whatsappUrl(settings.whatsapp, settings.whatsappMessage) || "Enter a WhatsApp number to generate wa.me"}
+          </p>
+          <Field label="Telegram URL">
+            <TextInput value={settings.telegramUrl} onChange={(event) => setSettings({ ...settings, telegramUrl: event.target.value })} />
+          </Field>
+          <Field label="Support hours">
+            <TextInput value={settings.hours} onChange={(event) => setSettings({ ...settings, hours: event.target.value })} />
+          </Field>
+          <Field label="Location / address text">
+            <TextInput value={settings.location} onChange={(event) => setSettings({ ...settings, location: event.target.value })} />
+          </Field>
+        </div>
+      </section>
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Social links</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          {(["facebook", "instagram", "twitter", "youtube", "telegram"] as const).map((key) => (
+            <Field key={key} label={key}>
+              <TextInput
+                value={settings.socials[key]}
+                onChange={(event) =>
+                  setSettings({ ...settings, socials: { ...settings.socials, [key]: event.target.value } })
+                }
+              />
+            </Field>
+          ))}
+        </div>
+      </section>
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Header</h2>
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <Field label="CTA label">
+            <TextInput value={settings.headerCtaLabel} onChange={(event) => setSettings({ ...settings, headerCtaLabel: event.target.value })} />
+          </Field>
+          <Field label="CTA URL">
+            <TextInput value={settings.headerCtaHref} onChange={(event) => setSettings({ ...settings, headerCtaHref: event.target.value })} />
+          </Field>
+        </div>
+        <NavEditor items={settings.headerNav} onChange={(headerNav) => setSettings({ ...settings, headerNav })} />
+      </section>
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Footer</h2>
+        <div className="mt-4 space-y-4">
+          <Field label="Intro / about text">
+            <TextArea value={settings.footerIntro} onChange={(event) => setSettings({ ...settings, footerIntro: event.target.value })} />
+          </Field>
+          <Field label="Copyright line">
+            <TextInput value={settings.footerCopyright} onChange={(event) => setSettings({ ...settings, footerCopyright: event.target.value })} />
+          </Field>
+        </div>
+        <h3 className="mt-6 text-sm font-semibold">Quick links</h3>
+        <NavEditor items={settings.footerQuickLinks} onChange={(footerQuickLinks) => setSettings({ ...settings, footerQuickLinks })} />
+        <h3 className="mt-6 text-sm font-semibold">Support links</h3>
+        <NavEditor items={settings.footerSupportLinks} onChange={(footerSupportLinks) => setSettings({ ...settings, footerSupportLinks })} />
+        <h3 className="mt-6 text-sm font-semibold">Payment icons</h3>
+        <p className="mt-1 text-xs text-muted">Optional images shown in the footer bar. Choose from the media library after upload.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {settings.footerPaymentImages.map((image) => (
+            <button
+              key={image.id}
+              type="button"
+              className="overflow-hidden rounded border border-line"
+              onClick={() =>
+                setSettings({
+                  ...settings,
+                  footerPaymentImages: settings.footerPaymentImages.filter((item) => item.id !== image.id),
+                })
+              }
+              title="Remove"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={image.secureUrl} alt="" className="h-10 w-16 object-contain" />
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-4">
+          {assets.slice(0, 8).map((asset) => (
+            <button
+              key={asset.id}
+              type="button"
+              className="overflow-hidden rounded border border-line"
+              onClick={() => {
+                const ref = toRef(asset);
+                if (settings.footerPaymentImages.some((item) => item.id === ref.id)) return;
+                setSettings({ ...settings, footerPaymentImages: [...settings.footerPaymentImages, ref] });
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={asset.secureUrl} alt="" className="h-12 w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function NavEditor({ items, onChange }: { items: NavLink[]; onChange: (items: NavLink[]) => void }) {
+  return (
+    <div className="mt-4 space-y-3">
+      {items.map((item, index) => (
+        <div key={item.id} className="grid gap-2 rounded-md border border-line p-3 sm:grid-cols-[1fr_1fr_auto]">
+          <TextInput
+            value={item.label}
+            onChange={(event) => onChange(items.map((row) => (row.id === item.id ? { ...row, label: event.target.value } : row)))}
+          />
+          <TextInput
+            value={item.href}
+            onChange={(event) => onChange(items.map((row) => (row.id === item.id ? { ...row, href: event.target.value } : row)))}
+          />
+          <div className="flex items-center gap-2">
+            <label className="text-xs">
+              <input
+                type="checkbox"
+                checked={item.visible}
+                onChange={(event) => onChange(items.map((row) => (row.id === item.id ? { ...row, visible: event.target.checked } : row)))}
+              />{" "}
+              Show
+            </label>
+            <button type="button" className="text-xs" onClick={() => {
+              if (index === 0) return;
+              const next = [...items];
+              [next[index - 1], next[index]] = [next[index], next[index - 1]];
+              onChange(next);
+            }}>Up</button>
+            <button type="button" className="text-xs" onClick={() => {
+              if (index === items.length - 1) return;
+              const next = [...items];
+              [next[index + 1], next[index]] = [next[index], next[index + 1]];
+              onChange(next);
+            }}>Down</button>
+            <button type="button" className="text-xs" onClick={() => onChange(items.filter((_, i) => i !== index))}>
+              Remove
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="text-xs font-semibold text-brand"
+        onClick={() => onChange([...items, { id: createId("nav"), label: "New link", href: "/", visible: true }])}
+      >
+        + Add link
+      </button>
     </div>
   );
 }

@@ -1,9 +1,12 @@
-import { whatsappLink } from "@/lib/site-config";
+import { whatsappUrl } from "@/lib/cms/contact";
 
-export function WhatsAppButton() {
+export function WhatsAppButton({ number, message }: { number: string; message?: string }) {
+  const href = whatsappUrl(number, message);
+  if (!href) return null;
+
   return (
     <a
-      href={whatsappLink}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className="wa-pulse fixed right-5 bottom-5 z-50 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-4 py-3 text-sm font-semibold text-white shadow-lg hover:bg-[#1ebe5d]"
