@@ -9,7 +9,7 @@ export default async function SidhuRedirectsPage() {
   return (
     <AdminShell
       title="Redirects"
-      subtitle="Database-backed redirects applied at request time. `/` → `/welcome/` stays in Next config and cannot be duplicated here."
+      subtitle="Database-backed redirects applied at request time. `/` → `/welcome/` is managed here, not in Next.js config."
     >
       <RedirectManager initialRules={rules} />
     </AdminShell>

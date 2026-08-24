@@ -5,7 +5,7 @@ import { savePageAction } from "@/lib/cms/actions";
 import { createSection } from "@/lib/cms/defaults";
 import { createId } from "@/lib/cms/ids";
 import { SUPPORTED_SECTION_TYPES } from "@/lib/cms/section-registry";
-import type { CmsPage, CmsSection, SectionType } from "@/lib/cms/types";
+import type { CmsPage, CmsSection, FaqItem, MediaAsset, SectionType } from "@/lib/cms/types";
 import { SectionEditor } from "@/components/sidhu/SectionEditor";
 import { Banner } from "@/components/sidhu/fields";
 
@@ -13,10 +13,14 @@ export function HomeBuilder({
   page: initialPage,
   title = "Home page builder",
   hint = "Saving updates the live Home page at /welcome/ after a refresh.",
+  faqs = [],
+  assets = [],
 }: {
   page: CmsPage;
   title?: string;
   hint?: string;
+  faqs?: FaqItem[];
+  assets?: MediaAsset[];
 }) {
   const [page, setPage] = useState(initialPage);
   const [saved, setSaved] = useState(initialPage);
@@ -185,6 +189,8 @@ export function HomeBuilder({
               </div>
               <SectionEditor
                 section={selected}
+                faqs={faqs}
+                assets={assets}
                 onChange={(next) =>
                   updateSections(sections.map((row) => (row.id === next.id ? next : row)))
                 }

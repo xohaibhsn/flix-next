@@ -25,7 +25,6 @@ function withSlash(path: string) {
 async function cmsRedirect(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const source = withSlash(pathname);
-  if (source === "/" || source === "/welcome/") return null;
   if (isSidhuPage(pathname) || isSidhuApi(pathname)) return null;
   try {
     const rules = await cms.listActiveRedirects();

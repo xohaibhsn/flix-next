@@ -5,6 +5,7 @@ import {
   defaultFaqs,
   defaultPricingPlans,
 } from "@/lib/cms/defaults";
+import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/lib/cms/managed-redirects";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import {
   sanitizeCategory,
@@ -14,7 +15,7 @@ import {
   sanitizePost,
   sanitizeRedirect,
 } from "@/lib/cms/validation";
-import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination } from "@/lib/cms/redirects";
+import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
 import type {
   BlogCategory,
   BlogPost,
@@ -30,7 +31,22 @@ const FAQS_FILE = "faqs.json";
 const CATEGORIES_FILE = "blog-categories.json";
 const POSTS_FILE = "blog-posts.json";
 const REDIRECTS_FILE = "redirects.json";
+const REDIRECT_SEED_FILE = "redirect-seeds.json";
 const MESSAGES_FILE = "contact-messages.json";
+
+async function ensureJsonManagedRedirects(items: RedirectRule[]) {
+  const flag = await readJsonFile<{ seeded?: boolean }>(REDIRECT_SEED_FILE, {});
+  if (flag.seeded) return items;
+  const now = new Date().toISOString();
+  const next = [...items];
+  for (const seed of MANAGED_REDIRECTS) {
+    if (next.some((item) => item.sourcePath === seed.sourcePath)) continue;
+    next.push(toRedirectRule(seed, now));
+  }
+  await saveList(REDIRECTS_FILE, next);
+  await writeJsonFile(REDIRECT_SEED_FILE, { seeded: true, key: MANAGED_REDIRECT_SEED_KEY });
+  return next;
+}
 
 async function saveList<T>(file: string, items: T[]) {
   await writeJsonFile(file, items);
@@ -127,7 +143,9 @@ export class JsonCatalogRepository implements CatalogRepository {
   }
   async listRedirects() {
     const items = await readJsonFile<RedirectRule[]>(REDIRECTS_FILE, []);
-    return (Array.isArray(items) ? items : []).map(sanitizeRedirect);
+    const list = Array.isArray(items) ? items : [];
+    const seeded = await ensureJsonManagedRedirects(list);
+    return seeded.map(sanitizeRedirect);
   }
   async listActiveRedirects() {
     const items = await this.listRedirects();
@@ -142,6 +160,9 @@ export class JsonCatalogRepository implements CatalogRepository {
       throw new Error("Source and destination cannot be the same.");
     }
     const items = await this.listRedirects();
+    if (wouldCreateRedirectLoop(safe, items)) {
+      throw new Error("That redirect would create a loop.");
+    }
     if (items.some((item) => item.sourcePath === safe.sourcePath && item.id !== safe.id && item.active && safe.active)) {
       throw new Error("An active redirect already uses that source path.");
     }

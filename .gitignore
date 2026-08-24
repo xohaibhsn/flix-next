@@ -45,6 +45,8 @@ Desktop.ini
 
 # Local contact form inbox (JSON fallback)
 /data/contact-messages.json
+/data/redirects.json
+/data/redirect-seeds.json
 
 
 # vercel

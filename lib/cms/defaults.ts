@@ -36,6 +36,7 @@ export const SECTION_LABELS: Record<SectionType, string> = {
   cta: "Final CTA",
   "page-hero": "Page Hero",
   "rich-text": "Rich Text",
+  "rich-content": "Rich Content / Long Description",
   "info-cards": "Info Cards",
   "contact-info": "Contact Information",
   "contact-form": "Contact Form",
@@ -278,8 +279,11 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         heading: "Frequently Asked Questions",
         description:
           "Quick answers about setup, devices, and billing. Still stuck? Chat with us on WhatsApp.",
+        sourceMode: "category",
         useCentralFaqs: true,
         category: "General",
+        selectedFaqIds: [],
+        maxItems: 0,
         items: [
           {
             id: "faq1",
@@ -338,6 +342,15 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
       return {
         heading: "",
         html: "<p>Add your content here.</p>",
+      };
+    case "rich-content":
+      return {
+        eyebrow: "",
+        heading: "",
+        html: "<p>Write a longer description, comparison, or SEO article block here.</p>",
+        buttonLabel: "",
+        buttonHref: "",
+        width: "narrow",
       };
     case "info-cards":
       return {

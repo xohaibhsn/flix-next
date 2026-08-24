@@ -23,20 +23,32 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
   const [rules, setRules] = useState(initialRules);
   const [editing, setEditing] = useState<RedirectRule | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  function upsert(rule: RedirectRule) {
+    setRules((current) =>
+      current.some((item) => item.id === rule.id)
+        ? current.map((item) => (item.id === rule.id ? rule : item))
+        : [...current, rule],
+    );
+  }
 
   async function save(rule: RedirectRule) {
     const result = await saveRedirectAction(rule);
     if (!result.ok) {
       setMessage({ tone: "error", text: result.error });
-      return;
+      return false;
     }
-    setRules((current) =>
-      current.some((item) => item.id === result.rule.id)
-        ? current.map((item) => (item.id === result.rule.id ? result.rule : item))
-        : [...current, result.rule],
-    );
+    upsert(result.rule);
     setEditing(null);
     setMessage({ tone: "ok", text: "Redirect saved. It applies on the next request without a code push." });
+    return true;
+  }
+
+  async function toggleActive(rule: RedirectRule) {
+    setBusyId(rule.id);
+    await save({ ...rule, active: !rule.active });
+    setBusyId(null);
   }
 
   async function remove(id: string) {
@@ -47,12 +59,15 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
       return;
     }
     setRules((current) => current.filter((item) => item.id !== id));
+    setMessage({ tone: "ok", text: "Redirect deleted." });
   }
 
   return (
     <div className="space-y-4">
       <Banner tone="info">
-        `/` → `/welcome/` is handled in Next config and cannot be duplicated here. Use this manager for extra Junaid redirects.
+        All public redirects live here, including `/` → `/welcome/`. Disable or delete a rule to stop it.
+        If the root redirect is off, `/` shows the same Home CMS as `/welcome/`. `/sidhu` and `/api` cannot
+        be used as sources.
       </Banner>
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <button type="button" className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={() => setEditing(blank())}>
@@ -80,6 +95,14 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
                   <button type="button" className="mr-3 font-semibold text-brand" onClick={() => setEditing(rule)}>
                     Edit
                   </button>
+                  <button
+                    type="button"
+                    className="mr-3 font-semibold text-brand disabled:opacity-50"
+                    disabled={busyId === rule.id}
+                    onClick={() => void toggleActive(rule)}
+                  >
+                    {rule.active ? "Disable" : "Enable"}
+                  </button>
                   <button type="button" className="text-red-700" onClick={() => void remove(rule.id)}>
                     Delete
                   </button>
@@ -97,10 +120,10 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
             void save(editing);
           }}
         >
-          <Field label="Source path">
+          <Field label="Source path" hint="Including `/`. Trailing slashes are normalized.">
             <TextInput value={editing.sourcePath} onChange={(event) => setEditing({ ...editing, sourcePath: event.target.value })} />
           </Field>
-          <Field label="Destination">
+          <Field label="Destination" hint="Internal path or http(s) URL.">
             <TextInput value={editing.destinationPath} onChange={(event) => setEditing({ ...editing, destinationPath: event.target.value })} />
           </Field>
           <Field label="Status">
@@ -111,10 +134,10 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
                 setEditing({ ...editing, statusCode: Number(event.target.value) as RedirectRule["statusCode"] })
               }
             >
-              <option value={301}>301</option>
-              <option value={302}>302</option>
-              <option value={307}>307</option>
-              <option value={308}>308</option>
+              <option value={301}>301 permanent</option>
+              <option value={302}>302 temporary</option>
+              <option value={307}>307 temporary</option>
+              <option value={308}>308 permanent</option>
             </select>
           </Field>
           <label className="text-sm">

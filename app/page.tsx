@@ -1,5 +1,17 @@
-import { permanentRedirect } from "next/navigation";
+import { CmsPageView } from "@/components/cms/CmsPageView";
+import { SiteShell } from "@/components/layout/SiteShell";
+import { pageSeoMetadata } from "@/lib/metadata";
 
-export default function Home() {
-  permanentRedirect("/welcome/");
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata() {
+  return pageSeoMetadata("home", "Welcome", "", "/");
+}
+
+export default function HomePage() {
+  return (
+    <SiteShell overlayHeader>
+      <CmsPageView slug="/" />
+    </SiteShell>
+  );
 }

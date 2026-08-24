@@ -10,6 +10,7 @@ import {
   parseJsonColumn,
   seedCmsIfEmpty,
   seedExtendedIfEmpty,
+  seedManagedRedirectsIfNeeded,
 } from "@/lib/cms/mysql-migrate";
 import type { CmsPage, CmsSection, MediaAsset, SectionType, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
@@ -110,6 +111,7 @@ export class MysqlCmsRepository {
         await ensureCmsSchema();
         await seedCmsIfEmpty();
         await seedExtendedIfEmpty();
+        await seedManagedRedirectsIfNeeded();
       })().catch((error) => {
         this.readyPromise = null;
         throw cmsDbError(error);

@@ -9,11 +9,13 @@ import type {
   HoursData,
   InfoCardsData,
   MessagingCtaData,
+  RichContentData,
   RichTextData,
   SiteSettings,
 } from "@/lib/cms/types";
 import { getIcon } from "@/lib/cms/icons";
 import { ContactForm } from "@/components/contact/ContactForm";
+import { ButtonLink } from "@/components/ui/ButtonLink";
 
 export function RichTextBlock({ data }: { data: RichTextData }) {
   return (
@@ -24,6 +26,37 @@ export function RichTextBlock({ data }: { data: RichTextData }) {
           className="prose-cms mt-4 text-sm leading-relaxed text-muted"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html) }}
         />
+      </Container>
+    </section>
+  );
+}
+
+const RICH_WIDTH = {
+  narrow: "max-w-3xl",
+  normal: "max-w-4xl",
+  wide: "",
+} as const;
+
+export function RichContentBlock({ data }: { data: RichContentData }) {
+  const width = RICH_WIDTH[data.width] || RICH_WIDTH.narrow;
+  return (
+    <section className="bg-white py-16">
+      <Container className={width}>
+        {data.eyebrow ? (
+          <p className="text-xs font-bold tracking-[0.18em] text-brand uppercase">{data.eyebrow}</p>
+        ) : null}
+        {data.heading ? (
+          <h2 className={`text-3xl font-extrabold text-ink ${data.eyebrow ? "mt-3" : ""}`}>{data.heading}</h2>
+        ) : null}
+        <div
+          className={`prose-cms text-[15px] leading-relaxed text-ink/80 ${data.heading || data.eyebrow ? "mt-6" : ""}`}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(data.html) }}
+        />
+        {data.buttonLabel && data.buttonHref ? (
+          <ButtonLink href={data.buttonHref} className="mt-8">
+            {data.buttonLabel}
+          </ButtonLink>
+        ) : null}
       </Container>
     </section>
   );

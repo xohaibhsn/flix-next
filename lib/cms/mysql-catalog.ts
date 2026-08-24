@@ -13,7 +13,7 @@ import {
   sanitizePost,
   sanitizeRedirect,
 } from "@/lib/cms/validation";
-import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination } from "@/lib/cms/redirects";
+import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
 import type {
   BlogCategory,
@@ -367,6 +367,10 @@ export class MysqlCatalogRepository implements CatalogRepository {
     }
     if (isSelfRedirect(safe.sourcePath, sanitizeRedirectDestination(rule.destinationPath))) {
       throw new Error("Source and destination cannot be the same.");
+    }
+    const existing = await this.listRedirects();
+    if (wouldCreateRedirectLoop(safe, existing)) {
+      throw new Error("That redirect would create a loop.");
     }
     const [dupes] = await getDbPool().query<RedirectRow[]>(
       "SELECT id FROM redirects WHERE source_path = ? AND id <> ? AND is_active = 1 LIMIT 1",

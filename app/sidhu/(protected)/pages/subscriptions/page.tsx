@@ -7,10 +7,13 @@ import { cms } from "@/lib/cms/repository";
 export const dynamic = "force-dynamic";
 
 export default async function SidhuSubscriptionsBuilderPage() {
-  const page =
-    (await cms.getPageBySlug("/iptv-subscriptions-uk/")) ??
-    defaultPages().find((item) => item.slug === "/iptv-subscriptions-uk/");
-  if (!page) notFound();
+  const [page, faqs, assets] = await Promise.all([
+    cms.getPageBySlug("/iptv-subscriptions-uk/"),
+    cms.listFaqs(),
+    cms.listMedia(),
+  ]);
+  const resolved = page ?? defaultPages().find((item) => item.slug === "/iptv-subscriptions-uk/");
+  if (!resolved) notFound();
 
   return (
     <AdminShell
@@ -18,9 +21,11 @@ export default async function SidhuSubscriptionsBuilderPage() {
       subtitle="Same section builder as Home. Saving updates /iptv-subscriptions-uk/."
     >
       <HomeBuilder
-        page={page}
+        page={resolved}
         title="IPTV Subscription builder"
         hint="Saving updates the live IPTV Subscription page after a refresh."
+        faqs={faqs}
+        assets={assets}
       />
     </AdminShell>
   );

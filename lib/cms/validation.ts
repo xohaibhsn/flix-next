@@ -13,6 +13,8 @@ import type {
   PricingData,
   PricingPlan,
   RedirectRule,
+  RichContentData,
+  RichContentWidth,
   RichTextData,
   SectionType,
   ServicesData,
@@ -23,10 +25,11 @@ import type {
 import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import { sanitizeHtml } from "@/lib/cms/html";
-import { sanitizeHttpUrl, normalizePath } from "@/lib/cms/contact";
+import { sanitizeHttpUrl } from "@/lib/cms/contact";
 import {
   isReservedRedirectSource,
   isSelfRedirect,
+  normalizeRedirectSource,
   sanitizeRedirectDestination,
 } from "@/lib/cms/redirects";
 import { slugify } from "@/lib/cms/slug";
@@ -44,6 +47,7 @@ const SECTION_TYPES: SectionType[] = [
   "cta",
   "page-hero",
   "rich-text",
+  "rich-content",
   "info-cards",
   "contact-info",
   "contact-form",
@@ -225,6 +229,19 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       html: sanitizeHtml(current.html),
     };
   }
+  if (type === "rich-content") {
+    const current = data as RichContentData;
+    const width: RichContentWidth =
+      current.width === "wide" || current.width === "normal" ? current.width : "narrow";
+    return {
+      eyebrow: sanitizeText(current.eyebrow, 80),
+      heading: sanitizeText(current.heading, 160),
+      html: sanitizeHtml(current.html),
+      buttonLabel: sanitizeText(current.buttonLabel, 40),
+      buttonHref: current.buttonHref ? sanitizeHref(current.buttonHref) : "",
+      width,
+    };
+  }
   if (type === "cta") {
     const current = data as CtaData;
     return {
@@ -260,13 +277,29 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
   }
   if (type === "faq") {
     const current = data as FaqData;
+    const sourceMode = current.sourceMode === "selected" ? "selected" : "category";
+    const selectedFaqIds = Array.isArray(current.selectedFaqIds)
+      ? current.selectedFaqIds.map((id) => sanitizeText(id, 80)).filter(Boolean)
+      : [];
+    const maxItems = Number(current.maxItems);
     return {
       ...current,
-      items: current.items.map((item) => ({
-        ...item,
-        question: sanitizeText(item.question, 200),
-        answer: sanitizeText(item.answer, 2000),
-      })),
+      eyebrow: sanitizeText(current.eyebrow, 80),
+      heading: sanitizeText(current.heading, 160),
+      description: sanitizeText(current.description, 400),
+      sourceMode,
+      useCentralFaqs: current.useCentralFaqs !== false,
+      category: sanitizeText(current.category, 40),
+      selectedFaqIds,
+      maxItems: Number.isFinite(maxItems) && maxItems > 0 ? Math.min(50, Math.round(maxItems)) : 0,
+      items: Array.isArray(current.items)
+        ? current.items.map((item) => ({
+            ...item,
+            id: sanitizeText(item.id, 80),
+            question: sanitizeText(item.question, 200),
+            answer: sanitizeText(item.answer, 2000),
+          }))
+        : [],
     };
   }
   return data;
@@ -383,15 +416,15 @@ export function sanitizePost(input: BlogPost): BlogPost {
 
 export function sanitizeRedirect(input: RedirectRule): RedirectRule {
   const now = new Date().toISOString();
-  const sourcePath = normalizePath(sanitizeText(input.sourcePath, 200));
+  const sourcePath = normalizeRedirectSource(input.sourcePath);
   const destinationPath = sanitizeRedirectDestination(input.destinationPath);
   const statusCode =
     input.statusCode === 302 || input.statusCode === 307 || input.statusCode === 308 ? input.statusCode : 301;
-  if (isReservedRedirectSource(sourcePath) || isSelfRedirect(sourcePath, destinationPath)) {
+  if (!sourcePath || isReservedRedirectSource(sourcePath) || isSelfRedirect(sourcePath, destinationPath)) {
     return {
       id: sanitizeText(input.id, 80),
-      sourcePath,
-      destinationPath: "/",
+      sourcePath: sourcePath || "/old-path/",
+      destinationPath,
       statusCode,
       active: false,
       createdAt: sanitizeText(input.createdAt, 40) || now,

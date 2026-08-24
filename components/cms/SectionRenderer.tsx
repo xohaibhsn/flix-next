@@ -13,6 +13,7 @@ import {
   ContactInfoCards,
   InfoCards,
   MessagingCta,
+  RichContentBlock,
   RichTextBlock,
   SupportHours,
 } from "@/components/sections/ExtraSections";
@@ -39,6 +40,7 @@ import type {
   PageHeroData,
   PricingData,
   PricingPlan,
+  RichContentData,
   RichTextData,
   ServicesData,
   SiteSettings,
@@ -72,12 +74,7 @@ function renderSection(
       return <WhyChooseUs data={data as WhyChooseData} />;
     case "faq": {
       const resolved = resolveFaqData(data as FaqData, faqs);
-      return (
-        <>
-          <JsonLd data={faqPageJsonLd(resolved)} />
-          <FAQ data={resolved} />
-        </>
-      );
+      return <FAQ data={resolved} />;
     }
     case "cta":
       return <CTA data={data as CtaData} />;
@@ -85,6 +82,8 @@ function renderSection(
       return <InnerPageHero data={data as PageHeroData} />;
     case "rich-text":
       return <RichTextBlock data={data as RichTextData} />;
+    case "rich-content":
+      return <RichContentBlock data={data as RichContentData} />;
     case "info-cards":
       return <InfoCards data={data as InfoCardsData} />;
     case "contact-info":
@@ -113,6 +112,23 @@ export function SectionRenderer({
 }) {
   return (
     <>
+      <JsonLd
+        data={faqPageJsonLd({
+          eyebrow: "",
+          heading: "",
+          description: "",
+          sourceMode: "selected",
+          useCentralFaqs: true,
+          category: "",
+          selectedFaqIds: [],
+          maxItems: 0,
+          items: sections
+            .filter((section) => section.visible && section.type === "faq")
+            .sort((a, b) => a.order - b.order)
+            .flatMap((section) => resolveFaqData(mergeSectionData("faq", section.data) as FaqData, faqs).items)
+            .filter((item, index, list) => item.question && item.answer && list.findIndex((row) => row.id === item.id) === index),
+        })}
+      />
       {sections
         .filter((section) => section.visible)
         .sort((a, b) => a.order - b.order)

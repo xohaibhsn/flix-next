@@ -15,10 +15,12 @@ export function RichTextEditor({
   value,
   onChange,
   onRequestImage,
+  placeholder = "Write the article…",
 }: {
   value: string;
   onChange: (html: string) => void;
   onRequestImage?: () => void;
+  placeholder?: string;
 }) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -29,7 +31,7 @@ export function RichTextEditor({
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Link.configure({ openOnClick: false, autolink: true }),
       Image,
-      Placeholder.configure({ placeholder: "Write the article…" }),
+      Placeholder.configure({ placeholder }),
       CharacterCount,
     ],
     content: value,

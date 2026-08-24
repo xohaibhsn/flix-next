@@ -11,6 +11,7 @@ export type SectionType =
   | "cta"
   | "page-hero"
   | "rich-text"
+  | "rich-content"
   | "info-cards"
   | "contact-info"
   | "contact-form"
@@ -176,12 +177,17 @@ export type WhyChooseData = {
   }>;
 };
 
+export type FaqSourceMode = "category" | "selected";
+
 export type FaqData = {
   eyebrow: string;
   heading: string;
   description: string;
+  sourceMode: FaqSourceMode;
   useCentralFaqs: boolean;
   category: string;
+  selectedFaqIds: string[];
+  maxItems: number;
   items: Array<{
     id: string;
     question: string;
@@ -206,6 +212,17 @@ export type PageHeroData = {
 export type RichTextData = {
   heading: string;
   html: string;
+};
+
+export type RichContentWidth = "normal" | "narrow" | "wide";
+
+export type RichContentData = {
+  eyebrow: string;
+  heading: string;
+  html: string;
+  buttonLabel: string;
+  buttonHref: string;
+  width: RichContentWidth;
 };
 
 export type InfoCardsData = {
@@ -262,6 +279,7 @@ export type SectionDataMap = {
   cta: CtaData;
   "page-hero": PageHeroData;
   "rich-text": RichTextData;
+  "rich-content": RichContentData;
   "info-cards": InfoCardsData;
   "contact-info": ContactInfoData;
   "contact-form": ContactFormData;

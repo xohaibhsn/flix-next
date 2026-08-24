@@ -7,9 +7,13 @@ import { cms } from "@/lib/cms/repository";
 export const dynamic = "force-dynamic";
 
 export default async function SidhuContactBuilderPage() {
-  const page =
-    (await cms.getPageBySlug("/contact/")) ?? defaultPages().find((item) => item.slug === "/contact/");
-  if (!page) notFound();
+  const [page, faqs, assets] = await Promise.all([
+    cms.getPageBySlug("/contact/"),
+    cms.listFaqs(),
+    cms.listMedia(),
+  ]);
+  const resolved = page ?? defaultPages().find((item) => item.slug === "/contact/");
+  if (!resolved) notFound();
 
   return (
     <AdminShell
@@ -17,9 +21,11 @@ export default async function SidhuContactBuilderPage() {
       subtitle="Section builder for /contact/. Global phone, email, and WhatsApp still come from Site Settings."
     >
       <HomeBuilder
-        page={page}
+        page={resolved}
         title="Contact page builder"
         hint="Saving updates the live Contact page after a refresh. Contact values come from Site Settings."
+        faqs={faqs}
+        assets={assets}
       />
     </AdminShell>
   );

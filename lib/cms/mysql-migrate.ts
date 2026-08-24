@@ -10,6 +10,7 @@ import {
   defaultSettings,
 } from "@/lib/cms/defaults";
 import { readJsonFile } from "@/lib/cms/json-store";
+import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import type { MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
@@ -304,4 +305,33 @@ export async function seedExtendedIfEmpty() {
       );
     }
   }
+}
+
+export async function seedManagedRedirectsIfNeeded() {
+  const pool = getDbPool();
+  const [flagRows] = await pool.query<Array<RowDataPacket & { setting_value: unknown }>>(
+    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+    [MANAGED_REDIRECT_SEED_KEY],
+  );
+  if (flagRows[0]) return;
+
+  for (const rule of MANAGED_REDIRECTS) {
+    const [existing] = await pool.query<Array<RowDataPacket & { id: string }>>(
+      "SELECT id FROM redirects WHERE source_path = ? LIMIT 1",
+      [rule.sourcePath],
+    );
+    if (existing[0]) continue;
+    await pool.execute(
+      `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
+       VALUES (?, ?, ?, ?, ?)`,
+      [rule.id, rule.sourcePath, rule.destinationPath, rule.statusCode, rule.active ? 1 : 0],
+    );
+  }
+
+  await pool.execute(
+    `INSERT INTO site_settings (setting_key, setting_value)
+     VALUES (?, '1')
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [MANAGED_REDIRECT_SEED_KEY],
+  );
 }

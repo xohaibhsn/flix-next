@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useState } from "react";
 import { createId } from "@/lib/cms/ids";
 import type {
   CmsSection,
@@ -9,13 +10,16 @@ import type {
   CtaData,
   DevicesData,
   FaqData,
+  FaqItem,
   HeroData,
   HighlightsData,
   HowItWorksData,
   InfoCardsData,
+  MediaAsset,
   MessagingCtaData,
   PageHeroData,
   PricingData,
+  RichContentData,
   RichTextData,
   ServicesData,
   TrustStatsData,
@@ -23,6 +27,9 @@ import type {
 } from "@/lib/cms/types";
 import { FAQ_CATEGORIES } from "@/lib/cms/faq-categories";
 import { Field, IconSelect, RowActions, TextArea, TextInput } from "@/components/sidhu/fields";
+import { MediaSpecHint } from "@/components/sidhu/ImageField";
+import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
+import { RichTextEditor, insertEditorImage } from "@/components/sidhu/RichTextEditor";
 
 function move<T>(items: T[], index: number, direction: -1 | 1) {
   const next = index + direction;
@@ -36,9 +43,13 @@ function move<T>(items: T[], index: number, direction: -1 | 1) {
 export function SectionEditor({
   section,
   onChange,
+  faqs = [],
+  assets = [],
 }: {
   section: CmsSection;
   onChange: (section: CmsSection) => void;
+  faqs?: FaqItem[];
+  assets?: MediaAsset[];
 }) {
   const setData = (data: CmsSection["data"]) => onChange({ ...section, data });
 
@@ -74,13 +85,15 @@ export function SectionEditor({
     case "why-choose":
       return <WhyFields data={section.data as WhyChooseData} onChange={setData} />;
     case "faq":
-      return <FaqFields data={section.data as FaqData} onChange={setData} />;
+      return <FaqFields data={section.data as FaqData} faqs={faqs} onChange={setData} />;
     case "cta":
       return <CtaFields data={section.data as CtaData} onChange={setData} />;
     case "page-hero":
       return <PageHeroFields data={section.data as PageHeroData} onChange={setData} />;
     case "rich-text":
       return <RichTextFields data={section.data as RichTextData} onChange={setData} />;
+    case "rich-content":
+      return <RichContentFields data={section.data as RichContentData} assets={assets} onChange={setData} />;
     case "info-cards":
       return <InfoCardFields data={section.data as InfoCardsData} onChange={setData} />;
     case "contact-info":
@@ -781,82 +794,118 @@ function WhyFields({ data, onChange }: { data: WhyChooseData; onChange: (data: W
   );
 }
 
-function FaqFields({ data, onChange }: { data: FaqData; onChange: (data: FaqData) => void }) {
-  const items = Array.isArray(data.items) ? data.items : [];
+function FaqFields({
+  data,
+  faqs,
+  onChange,
+}: {
+  data: FaqData;
+  faqs: FaqItem[];
+  onChange: (data: FaqData) => void;
+}) {
+  const sourceMode = data.sourceMode === "selected" ? "selected" : "category";
+  const selectedFaqIds = Array.isArray(data.selectedFaqIds) ? data.selectedFaqIds : [];
+  const visibleFaqs = faqs.filter((item) => item.visible);
+
+  function moveSelected(index: number, direction: -1 | 1) {
+    const next = index + direction;
+    if (next < 0 || next >= selectedFaqIds.length) return;
+    const copy = [...selectedFaqIds];
+    const [item] = copy.splice(index, 1);
+    copy.splice(next, 0, item);
+    onChange({ ...data, selectedFaqIds: copy, sourceMode: "selected" });
+  }
+
   return (
     <div className="space-y-4">
       <HeaderFields data={data} onChange={onChange as never} />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={Boolean(data.useCentralFaqs)}
-          onChange={(event) => onChange({ ...data, useCentralFaqs: event.target.checked })}
-        />
-        Use central FAQ library
-      </label>
-      <Field label="FAQ category">
+      <Field label="FAQ Source">
         <select
           className="w-full rounded-md border border-line px-3 py-2 text-sm"
-          value={data.category}
-          onChange={(event) => onChange({ ...data, category: event.target.value })}
+          value={sourceMode}
+          onChange={(event) =>
+            onChange({
+              ...data,
+              sourceMode: event.target.value === "selected" ? "selected" : "category",
+              useCentralFaqs: true,
+            })
+          }
         >
-          <option value="">All categories</option>
-          {FAQ_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
+          <option value="category">Category</option>
+          <option value="selected">Select FAQs manually</option>
         </select>
       </Field>
-      {data.useCentralFaqs ? (
-        <p className="text-xs text-muted">Questions come from Sidhu → FAQs for the selected category.</p>
+      <Field label="Maximum FAQs" hint="0 = show all matching FAQs.">
+        <TextInput
+          type="number"
+          min={0}
+          max={50}
+          value={String(data.maxItems || 0)}
+          onChange={(event) => onChange({ ...data, maxItems: Number(event.target.value) || 0 })}
+        />
+      </Field>
+      {sourceMode === "category" ? (
+        <Field label="FAQ category">
+          <select
+            className="w-full rounded-md border border-line px-3 py-2 text-sm"
+            value={data.category}
+            onChange={(event) => onChange({ ...data, category: event.target.value, sourceMode: "category", useCentralFaqs: true })}
+          >
+            <option value="">All categories</option>
+            {FAQ_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </select>
+        </Field>
       ) : (
-        <>
-          <AddButton
-            label="+ Add FAQ"
-            onClick={() =>
-              onChange({
-                ...data,
-                items: [...items, { id: createId("faq"), question: "New question", answer: "" }],
-              })
-            }
-          />
-          {items.map((item, index) => (
-            <Box
-              key={item.id}
-              onUp={() => onChange({ ...data, items: move(items, index, -1) })}
-              onDown={() => onChange({ ...data, items: move(items, index, 1) })}
-              onRemove={() => onChange({ ...data, items: items.filter((row) => row.id !== item.id) })}
+        <div className="space-y-3">
+          <p className="text-xs text-muted">Choose central FAQs. Order on this page is independent of the FAQ manager.</p>
+          {selectedFaqIds.map((id, index) => {
+            const item = visibleFaqs.find((row) => row.id === id) || faqs.find((row) => row.id === id);
+            return (
+              <div key={id} className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-2">
+                <p className="text-sm">{item?.question || "FAQ removed from library"}</p>
+                <div className="flex gap-1">
+                  <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={() => moveSelected(index, -1)}>
+                    Up
+                  </button>
+                  <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={() => moveSelected(index, 1)}>
+                    Down
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded border border-red-200 px-2 py-1 text-xs text-red-700"
+                    onClick={() => onChange({ ...data, selectedFaqIds: selectedFaqIds.filter((row) => row !== id) })}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          <Field label="Add FAQ">
+            <select
+              className="w-full rounded-md border border-line px-3 py-2 text-sm"
+              value=""
+              onChange={(event) => {
+                const id = event.target.value;
+                if (!id || selectedFaqIds.includes(id)) return;
+                onChange({ ...data, selectedFaqIds: [...selectedFaqIds, id], sourceMode: "selected" });
+              }}
             >
-              <Field label="Question">
-                <TextInput
-                  value={item.question}
-                  onChange={(event) =>
-                    onChange({
-                      ...data,
-                      items: items.map((row) =>
-                        row.id === item.id ? { ...row, question: event.target.value } : row,
-                      ),
-                    })
-                  }
-                />
-              </Field>
-              <Field label="Answer">
-                <TextArea
-                  value={item.answer}
-                  onChange={(event) =>
-                    onChange({
-                      ...data,
-                      items: items.map((row) =>
-                        row.id === item.id ? { ...row, answer: event.target.value } : row,
-                      ),
-                    })
-                  }
-                />
-              </Field>
-            </Box>
-          ))}
-        </>
+              <option value="">Select a question…</option>
+              {visibleFaqs
+                .filter((item) => !selectedFaqIds.includes(item.id))
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.question}
+                  </option>
+                ))}
+            </select>
+          </Field>
+        </div>
       )}
     </div>
   );
@@ -910,6 +959,91 @@ function RichTextFields({ data, onChange }: { data: RichTextData; onChange: (dat
         <TextArea value={data.html} onChange={(event) => onChange({ ...data, html: event.target.value })} />
       </Field>
     </div>
+  );
+}
+
+function RichContentFields({
+  data,
+  assets,
+  onChange,
+}: {
+  data: RichContentData;
+  assets: MediaAsset[];
+  onChange: (data: RichContentData) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <Field label="Eyebrow / small label">
+        <TextInput value={data.eyebrow} onChange={(event) => onChange({ ...data, eyebrow: event.target.value })} />
+      </Field>
+      <Field label="Main heading">
+        <TextInput value={data.heading} onChange={(event) => onChange({ ...data, heading: event.target.value })} />
+      </Field>
+      <Field label="Content width">
+        <select
+          className="w-full rounded-md border border-line px-3 py-2 text-sm"
+          value={data.width || "narrow"}
+          onChange={(event) =>
+            onChange({
+              ...data,
+              width: event.target.value === "wide" || event.target.value === "normal" ? event.target.value : "narrow",
+            })
+          }
+        >
+          <option value="narrow">Narrow reading width</option>
+          <option value="normal">Normal</option>
+          <option value="wide">Wide</option>
+        </select>
+      </Field>
+      <Field label="Body content">
+        <RichContentEditor data={data} assets={assets} onChange={onChange} />
+      </Field>
+      <Field label="Optional CTA label">
+        <TextInput value={data.buttonLabel} onChange={(event) => onChange({ ...data, buttonLabel: event.target.value })} />
+      </Field>
+      <Field label="Optional CTA URL">
+        <TextInput value={data.buttonHref} onChange={(event) => onChange({ ...data, buttonHref: event.target.value })} />
+      </Field>
+    </div>
+  );
+}
+
+function RichContentEditor({
+  data,
+  assets,
+  onChange,
+}: {
+  data: RichContentData;
+  assets: MediaAsset[];
+  onChange: (data: RichContentData) => void;
+}) {
+  const [picker, setPicker] = useState(false);
+  return (
+    <>
+      <MediaSpecHint specId="blogContent" />
+      <div className="mt-2">
+        <RichTextEditor
+          value={data.html}
+          onChange={(html) => onChange({ ...data, html })}
+          onRequestImage={() => setPicker(true)}
+          placeholder="Write the long description…"
+        />
+      </div>
+      {picker ? (
+        <MediaPickerModal
+          title="Insert image"
+          assets={assets}
+          onClose={() => setPicker(false)}
+          onSelect={(asset) => {
+            onChange({
+              ...data,
+              html: insertEditorImage(data.html, asset.secureUrl, asset.alt || data.heading || ""),
+            });
+            setPicker(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 
