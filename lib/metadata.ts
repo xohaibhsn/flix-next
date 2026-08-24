@@ -5,13 +5,15 @@ import { siteIconMetadata } from "@/lib/cms/favicon";
 import { siteConfig } from "@/lib/site-config";
 import { seoToMetadata } from "@/lib/seo";
 import { getSiteOrigin } from "@/lib/site-url";
+import { resolveOpenGraphImageFromSettings, socialImageMeta } from "@/lib/cms/open-graph";
 import type { BlogPost, SiteSettings } from "@/lib/cms/types";
 
 export async function getSiteMetadata(): Promise<Metadata> {
   await connection();
   const settings = await cms.getSettings();
-  const og = settings.branding.defaultOgImage?.secureUrl;
   const description = settings.tagline || siteConfig.description;
+  const image = resolveOpenGraphImageFromSettings(null, settings);
+  const social = socialImageMeta(image);
   return {
     metadataBase: new URL(getSiteOrigin()),
     title: {
@@ -24,11 +26,9 @@ export async function getSiteMetadata(): Promise<Metadata> {
       siteName: settings.siteName,
       description,
       type: "website",
-      images: og ? [{ url: og, width: 1200, height: 630 }] : undefined,
+      images: social.openGraph?.images,
     },
-    twitter: og
-      ? { card: "summary_large_image", images: [og] }
-      : { card: "summary" },
+    twitter: social.twitter,
   };
 }
 
@@ -39,9 +39,11 @@ export async function pageMetadata(
 ): Promise<Metadata> {
   await connection();
   const settings = await cms.getSettings();
-  const og = settings.branding.defaultOgImage?.secureUrl;
   const resolvedDescription = description || settings.tagline || siteConfig.description;
+  const image = resolveOpenGraphImageFromSettings(null, settings, title);
+  const social = socialImageMeta(image);
   return {
+    metadataBase: new URL(getSiteOrigin()),
     title,
     description: resolvedDescription,
     alternates: { canonical: path },
@@ -52,11 +54,13 @@ export async function pageMetadata(
       url: path,
       siteName: settings.siteName,
       type: "website",
-      images: og ? [{ url: og, width: 1200, height: 630 }] : undefined,
+      images: social.openGraph?.images,
     },
     twitter: {
-      card: og ? "summary_large_image" : "summary",
-      images: og ? [og] : undefined,
+      card: "summary_large_image",
+      title,
+      description: resolvedDescription,
+      images: social.twitter?.images,
     },
   };
 }

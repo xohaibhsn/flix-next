@@ -1,6 +1,7 @@
 import { getSiteOrigin } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
 import { publicEmail, publicPhone, publicSameAs, publicWhatsAppProfileUrl } from "@/lib/cms/public-contact";
+import { resolveOpenGraphImageFromSettings } from "@/lib/cms/open-graph";
 
 export function organizationJsonLd(settings: SiteSettings) {
   const origin = getSiteOrigin();
@@ -54,7 +55,7 @@ export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
     description: post.seoDescription || post.excerpt,
     datePublished: post.publishedAt || post.createdAt,
     dateModified: post.updatedAt,
-    image: post.featuredImage?.secureUrl || settings.branding.defaultOgImage?.secureUrl,
+    image: resolveOpenGraphImageFromSettings(post.ogImage || post.featuredImage, settings, post.title).url,
     author: {
       "@type": "Organization",
       name: settings.siteName,

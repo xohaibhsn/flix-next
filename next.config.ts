@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   trailingSlash: true,
   serverExternalPackages: ["mysql2"],
+  htmlLimitedBots: /.*/,
   images: {
     remotePatterns: [
       {

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import type { MediaRef, PageSeo, SiteSettings } from "@/lib/cms/types";
+import type { PageSeo, SiteSettings } from "@/lib/cms/types";
 import { siteIconMetadata } from "@/lib/cms/favicon";
+import { resolveOpenGraphImageFromSettings, socialImageMeta } from "@/lib/cms/open-graph";
 import { siteConfig } from "@/lib/site-config";
+import { getSiteOrigin } from "@/lib/site-url";
 
 export function isSiteIndexable() {
   const raw = process.env.SITE_INDEXABLE?.trim().toLowerCase();
@@ -47,11 +49,13 @@ export function seoToMetadata(
   const description = seo.description || fallbackDescription || settings.tagline || siteConfig.description;
   const ogTitle = seo.ogTitle || title;
   const ogDescription = seo.ogDescription || description;
-  const image: MediaRef | null = seo.ogImage || settings.branding.defaultOgImage;
+  const image = resolveOpenGraphImageFromSettings(seo.ogImage, settings, ogTitle);
+  const social = socialImageMeta(image);
   const canonical = seo.canonicalUrl || path;
   return {
     title,
     description,
+    metadataBase: new URL(getSiteOrigin()),
     alternates: { canonical },
     robots: robotsContent(seo.robotsIndex, seo.robotsFollow),
     icons: siteIconMetadata(settings),
@@ -61,13 +65,13 @@ export function seoToMetadata(
       url: canonical,
       siteName: settings.siteName,
       type: "website",
-      images: image ? [{ url: image.secureUrl, width: 1200, height: 630 }] : undefined,
+      images: social.openGraph?.images,
     },
     twitter: {
-      card: image ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: ogTitle,
       description: ogDescription,
-      images: image ? [image.secureUrl] : undefined,
+      images: social.twitter?.images,
     },
   };
 }
