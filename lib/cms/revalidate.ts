@@ -52,6 +52,16 @@ export function revalidatePublicSite() {
   revalidatePath("/robots.txt");
 }
 
+export function revalidateAfterSettingsSave() {
+  for (const path of PUBLIC_PATHS) {
+    revalidatePath(path);
+  }
+  revalidatePath("/icon");
+  revalidatePath("/favicon.ico");
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/robots.txt");
+}
+
 export function revalidateSidhuCms() {
   revalidatePublicSite();
   for (const path of SIDHU_PATHS) {

@@ -2,7 +2,7 @@
 
 import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
-import { revalidateBlog, revalidateCategory, revalidateSidhuCms } from "@/lib/cms/revalidate";
+import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidateSidhuCms } from "@/lib/cms/revalidate";
 import type {
   BlogCategory,
   BlogPost,
@@ -37,7 +37,7 @@ export async function saveSettingsAction(settings: SiteSettings) {
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveSettings(settings);
-    revalidateSidhuCms();
+    revalidateAfterSettingsSave();
     return { ok: true as const, settings: saved };
   } catch (error) {
     return fail(error, "Could not save settings.");

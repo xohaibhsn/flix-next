@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { saveSettingsAction } from "@/lib/cms/actions";
 import { createId } from "@/lib/cms/ids";
 import { whatsappUrl } from "@/lib/cms/contact";
@@ -45,6 +45,7 @@ export function SiteSettingsForm({
   const [assets, setAssets] = useState<LibraryAsset[]>(initialAssets);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const savingLock = useRef(false);
 
   function notice(text: string, tone: "ok" | "error" | "info" = "info") {
     setMessage({ tone, text });
@@ -58,14 +59,22 @@ export function SiteSettingsForm({
   }
 
   async function save() {
+    if (savingLock.current) return;
+    savingLock.current = true;
     setSaving(true);
-    const result = await saveSettingsAction(settings);
-    setSaving(false);
-    if (result.ok) {
-      setSettings(result.settings);
-      notice("Site settings saved. Refresh the public site to see header, footer, and contact changes.", "ok");
-    } else {
-      notice(result.error, "error");
+    try {
+      const result = await saveSettingsAction(settings);
+      if (result.ok) {
+        setSettings(result.settings);
+        notice("Settings saved successfully", "ok");
+      } else {
+        notice(result.error, "error");
+      }
+    } catch (error) {
+      notice(error instanceof Error ? error.message : "Could not save settings.", "error");
+    } finally {
+      savingLock.current = false;
+      setSaving(false);
     }
   }
 
@@ -154,13 +163,14 @@ export function SiteSettingsForm({
         setSocial={setSocial}
       />
 
+      {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <button
         type="button"
         className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
         onClick={() => void save()}
         disabled={saving}
       >
-        {saving ? "Saving…" : "Save changes"}
+        {saving ? "Saving..." : "Save Settings"}
       </button>
     </div>
   );

@@ -12,9 +12,11 @@ import {
   seedExtendedIfEmpty,
   seedManagedRedirectsIfNeeded,
   seedSeoLongformIfNeeded,
+  cleanupKnownTestTaglineIfNeeded,
 } from "@/lib/cms/mysql-migrate";
 import type { CmsPage, CmsSection, MediaAsset, SectionType, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
+import { withKnownTestTaglineReplaced } from "@/lib/cms/settings-cleanup";
 import { isProductionBuildPhase } from "@/lib/db/config";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
 
@@ -114,6 +116,7 @@ export class MysqlCmsRepository {
         await seedExtendedIfEmpty();
         await seedManagedRedirectsIfNeeded();
         await seedSeoLongformIfNeeded();
+        await cleanupKnownTestTaglineIfNeeded();
       })().catch((error) => {
         this.readyPromise = null;
         throw cmsDbError(error);
@@ -207,12 +210,12 @@ export class MysqlCmsRepository {
       [SITE_SETTINGS_KEY],
     );
     const value = parseJsonColumn<SiteSettings>(rows[0]?.setting_value, defaultSettings());
-    return sanitizeSettings(value);
+    return withKnownTestTaglineReplaced(sanitizeSettings(value)).settings;
   }
 
   async saveSettings(settings: SiteSettings) {
     await this.ensureReady();
-    const safe = sanitizeSettings(settings);
+    const safe = withKnownTestTaglineReplaced(sanitizeSettings(settings)).settings;
     await getDbPool().execute(
       `INSERT INTO site_settings (setting_key, setting_value)
        VALUES (?, ?)

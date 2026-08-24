@@ -14,6 +14,7 @@ import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, SectionType, SiteSettings } from "@/lib/cms/types";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
+import { withKnownTestTaglineReplaced } from "@/lib/cms/settings-cleanup";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
@@ -497,4 +498,22 @@ export async function seedSeoLongformIfNeeded() {
     await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
   }
   await cleanupDemoFaqAnswers();
+}
+
+export async function cleanupKnownTestTaglineIfNeeded() {
+  const pool = getDbPool();
+  const [rows] = await pool.query<Array<RowDataPacket & { setting_value: unknown }>>(
+    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+    [SITE_SETTINGS_KEY],
+  );
+  if (!rows[0]) return;
+  const current = sanitizeSettings(parseJsonColumn<SiteSettings>(rows[0].setting_value, defaultSettings()));
+  const next = withKnownTestTaglineReplaced(current);
+  if (!next.changed) return;
+  await pool.execute(
+    `INSERT INTO site_settings (setting_key, setting_value)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [SITE_SETTINGS_KEY, JSON.stringify(next.settings)],
+  );
 }

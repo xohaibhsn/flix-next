@@ -40,14 +40,22 @@ export function SeoForm({
 
   async function save() {
     setSaving(true);
-    const result = await saveSettingsAction(settings);
-    setSaving(false);
-    if (!result.ok) {
-      setMessage({ tone: "error", text: result.error });
-      return;
+    try {
+      const result = await saveSettingsAction(settings);
+      if (!result.ok) {
+        setMessage({ tone: "error", text: result.error });
+        return;
+      }
+      setSettings(result.settings);
+      setMessage({ tone: "ok", text: "SEO settings saved. Metadata and sitemap will refresh." });
+    } catch (error) {
+      setMessage({
+        tone: "error",
+        text: error instanceof Error ? error.message : "Could not save SEO settings.",
+      });
+    } finally {
+      setSaving(false);
     }
-    setSettings(result.settings);
-    setMessage({ tone: "ok", text: "SEO settings saved. Metadata and sitemap will refresh." });
   }
 
   return (
