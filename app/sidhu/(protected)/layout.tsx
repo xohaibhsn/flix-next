@@ -19,6 +19,7 @@ export default async function ProtectedSidhuLayout({ children }: { children: Rea
   return (
     <AdminSessionProvider
       user={{
+        id: user.id,
         username: user.username,
         displayName: user.displayName,
         role: user.role,

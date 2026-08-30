@@ -4,6 +4,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { AdminRole, Permission } from "@/lib/auth/permissions";
 
 export type AdminClientUser = {
+  id: string;
   username: string;
   displayName: string;
   role: AdminRole;

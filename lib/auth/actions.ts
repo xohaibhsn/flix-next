@@ -2,25 +2,18 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAdminAuthConfig, getSessionSecret } from "@/lib/auth/config";
-import { safeEqual } from "@/lib/auth/crypto";
 import {
   checkLoginRateLimit,
   clearLoginRateLimit,
   recordFailedLogin,
 } from "@/lib/auth/rate-limit";
-import {
-  type AdminRole,
-  firstAllowedPath,
-  isAdminRole,
-  parsePermissions,
-} from "@/lib/auth/permissions";
-import { hashPassword, passwordPolicyError, verifyPassword, verifyPasswordDummy } from "@/lib/auth/password";
+import { type AdminRole, firstAllowedPath, isAdminRole, parsePermissions } from "@/lib/auth/permissions";
+import { hashPassword, passwordPolicyError, verifyPassword } from "@/lib/auth/password";
+import { authenticateAdminCredentials } from "@/lib/auth/authenticate";
 import {
   createAdminUser,
   deleteAdminUser,
   getAdminUserById,
-  getAdminUserByUsername,
   listAdminUsers,
   markAdminLogin,
   updateAdminPassword,
@@ -67,43 +60,26 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
   const username = String(formData.get("username") ?? "");
   const password = String(formData.get("password") ?? "");
-  if (!getSessionSecret()) {
-    return { error: NOT_CONFIGURED };
-  }
-
-  if (isDatabaseConfigured()) {
-    const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");
-    await bootstrapAdminUsersIfNeeded();
-    const user = await getAdminUserByUsername(username);
-    if (!user) {
-      await verifyPasswordDummy(password);
-      await recordFailedLogin(ip);
-      return { error: INVALID_LOGIN };
+  const result = await authenticateAdminCredentials(username, password);
+  if (!result.ok) {
+    if (result.error === "not_configured") return { error: NOT_CONFIGURED };
+    if (result.error === "unavailable") {
+      return { error: "Admin login is temporarily unavailable. Try again shortly." };
     }
-    const passwordOk = await verifyPassword(password, user.passwordHash);
-    if (!user.active || !passwordOk) {
-      await recordFailedLogin(ip);
-      return { error: INVALID_LOGIN };
-    }
-    await clearLoginRateLimit(ip);
-    await markAdminLogin(user.id);
-    await createAdminSession({ id: user.id, username: user.username, sessionVersion: user.sessionVersion });
-    redirect(firstAllowedPath(user.role, user.permissions));
-  }
-
-  const config = getAdminAuthConfig();
-  if (!config) {
-    return { error: NOT_CONFIGURED };
-  }
-  const usernameOk = safeEqual(username.toLowerCase(), config.username);
-  const passwordOk = safeEqual(password, config.password);
-  if (!usernameOk || !passwordOk) {
     await recordFailedLogin(ip);
     return { error: INVALID_LOGIN };
   }
+
   await clearLoginRateLimit(ip);
-  await createAdminSession({ id: "env-admin", username: config.username, sessionVersion: 1 });
-  redirect(firstAllowedPath("super_admin", []));
+  if (isDatabaseConfigured() && result.id !== "env-admin") {
+    await markAdminLogin(result.id);
+  }
+  await createAdminSession({
+    id: result.id,
+    username: result.username,
+    sessionVersion: result.sessionVersion,
+  });
+  redirect(firstAllowedPath(result.role, result.permissions));
 }
 
 export async function logoutAction() {
@@ -128,8 +104,11 @@ export async function changeOwnPasswordAction(_prev: FormState, formData: FormDa
   if (!user) return { error: "Account not found." };
   const matches = await verifyPassword(currentPassword, user.passwordHash);
   if (!matches) return { error: "Current password is incorrect." };
-  const passwordHash = await hashPassword(nextPassword);
-  await updateAdminPassword(user.id, passwordHash);
+  try {
+    await updateAdminPassword(user.id, await hashPassword(nextPassword));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update password." };
+  }
   await clearAdminSession();
   redirect("/sidhu/login/?updated=1");
 }
@@ -182,7 +161,7 @@ export async function updateUserAction(_prev: FormState, formData: FormData): Pr
   const id = String(formData.get("id") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
   const roleRaw = String(formData.get("role") ?? "custom");
-  if (!isAdminRole(roleRaw)) return { error: "Choose a valid role." };
+  if (isAdminRole(roleRaw) === false) return { error: "Choose a valid role." };
   if (roleRaw === "super_admin" && actor.user.role !== "super_admin") {
     return { error: "Only Super Admin can assign Super Admin." };
   }
@@ -222,9 +201,17 @@ export async function deleteUserAction(id: string): Promise<FormState> {
 export async function resetUserPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
-  const id = String(formData.get("id") ?? "");
+  if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
+  const id = String(formData.get("id") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const confirm = String(formData.get("confirmPassword") ?? "");
+  if (!id) return { error: "User not found." };
+  if (actor.user.id === id) {
+    return { error: "Use My Account to change your own password." };
+  }
+  if (String(formData.get("confirmReset") ?? "") !== "1") {
+    return { error: "Confirm that you want to reset this password." };
+  }
   if (password !== confirm) return { error: "Password and confirmation do not match." };
   const policy = passwordPolicyError(password);
   if (policy) return { error: policy };
@@ -233,7 +220,10 @@ export async function resetUserPasswordAction(_prev: FormState, formData: FormDa
   if (target.role === "super_admin" && actor.user.role !== "super_admin") {
     return { error: "You cannot reset a Super Admin password." };
   }
-  await updateAdminPassword(id, await hashPassword(password));
+  try {
+    await updateAdminPassword(id, await hashPassword(password));
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not reset password." };
+  }
   return { ok: true };
 }
-

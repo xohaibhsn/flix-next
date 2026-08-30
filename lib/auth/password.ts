@@ -1,3 +1,5 @@
+import bcrypt from "bcryptjs";
+
 const MIN_LENGTH = 12;
 const WEAK_PASSWORDS = new Set([
   "admin123",
@@ -13,6 +15,20 @@ const WEAK_PASSWORDS = new Set([
   "welcome123",
 ]);
 
+type BcryptApi = {
+  hash(data: string, saltOrRounds: string | number): Promise<string>;
+  compare(data: string, encrypted: string): Promise<boolean>;
+};
+
+function bcryptApi(): BcryptApi {
+  const mod = bcrypt as BcryptApi & { default?: BcryptApi };
+  const api = typeof mod.hash === "function" ? mod : mod.default;
+  if (!api?.hash || !api?.compare) {
+    throw new Error("Password hasher is unavailable.");
+  }
+  return api;
+}
+
 export function passwordPolicyError(password: string) {
   if (password.length < MIN_LENGTH) return `Password must be at least ${MIN_LENGTH} characters.`;
   if (!/[a-z]/.test(password)) return "Password must include a lowercase letter.";
@@ -24,13 +40,12 @@ export function passwordPolicyError(password: string) {
 }
 
 export async function hashPassword(password: string) {
-  const bcrypt = await import("bcryptjs");
-  return bcrypt.hash(password, 12);
+  return bcryptApi().hash(password, 12);
 }
 
 export async function verifyPassword(password: string, passwordHash: string) {
-  const bcrypt = await import("bcryptjs");
-  return bcrypt.compare(password, passwordHash);
+  if (!passwordHash || !passwordHash.startsWith("$2")) return false;
+  return bcryptApi().compare(password, passwordHash);
 }
 
 const DUMMY_HASH = "$2a$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW";

@@ -17,9 +17,11 @@ import {
 import { hashPassword } from "@/lib/auth/password";
 import { createId } from "@/lib/cms/ids";
 import { fromMysqlDateTime } from "@/lib/cms/mysql-migrate";
+import { envPasswordBootstrapAction } from "@/lib/auth/bootstrap-policy";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { getDbPool } from "@/lib/db/pool";
 import type { PublicAdminUser } from "@/lib/auth/types";
+import type { ResultSetHeader } from "mysql2/promise";
 
 export type AdminUserRecord = {
   id: string;
@@ -112,7 +114,7 @@ export function usernameError(value: string) {
   return null;
 }
 
-async function countUsers() {
+export async function countAdminUsers() {
   const [rows] = await getDbPool().query<Array<RowDataPacket & { n: number }>>(
     "SELECT COUNT(*) AS n FROM admin_users",
   );
@@ -194,25 +196,15 @@ async function emergencyPasswordResetAlreadyApplied() {
   return Boolean(rows[0]);
 }
 
-async function bootstrapPrimaryAdmin(password: string) {
+async function insertPrimaryAdminFromEnv(password: string) {
   const username = getPrimaryAdminUsername();
-  const existing = await getAdminUserByUsername(username);
-  const passwordHash = await hashPassword(password);
-  if (existing) {
-    await getDbPool().execute(
-      `UPDATE admin_users
-       SET role = 'super_admin', is_active = 1, password_hash = ?, session_version = session_version + 1
-       WHERE id = ?`,
-      [passwordHash, existing.id],
-    );
-    return;
-  }
+  if (await getAdminUserByUsername(username)) return;
   try {
     await insertAdminUser({
       id: createId("adm"),
       username,
       displayName: "Administrator",
-      passwordHash,
+      passwordHash: await hashPassword(password),
       role: "super_admin",
       permissions: [],
       createdBy: null,
@@ -223,6 +215,23 @@ async function bootstrapPrimaryAdmin(password: string) {
   }
 }
 
+async function restorePrimaryAdminFromEnv(password: string) {
+  const username = getPrimaryAdminUsername();
+  const existing = await getAdminUserByUsername(username);
+  const passwordHash = await hashPassword(password);
+  if (existing) {
+    const [result] = await getDbPool().execute<ResultSetHeader>(
+      `UPDATE admin_users
+       SET role = 'super_admin', is_active = 1, password_hash = ?, session_version = session_version + 1
+       WHERE id = ?`,
+      [passwordHash, existing.id],
+    );
+    if (!result.affectedRows) throw new Error("Emergency recovery did not update the primary admin.");
+    return;
+  }
+  await insertPrimaryAdminFromEnv(password);
+}
+
 export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: boolean }) {
   if (!isDatabaseConfigured()) return;
   const { ensureCmsSchema } = await import("@/lib/cms/mysql-migrate");
@@ -230,50 +239,52 @@ export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: b
   const bootstrap = getBootstrapCredentials();
   if (!bootstrap) return;
 
-  const total = await countUsers();
-  if (total === 0) {
-    await bootstrapPrimaryAdmin(bootstrap.password);
+  const total = await countAdminUsers();
+  const action = envPasswordBootstrapAction({
+    userCount: total,
+    allowEmergency: Boolean(options?.allowEmergency),
+    emergencyRecovery: isEmergencyRecoveryEnabled(),
+    activeSuperAdmins: total === 0 ? 0 : await countActiveSuperAdmins(),
+    emergencyReset: isEmergencyPasswordResetEnabled(),
+    emergencyResetAlreadyApplied: total === 0 ? false : await emergencyPasswordResetAlreadyApplied(),
+  });
+
+  if (action === "insert") {
+    await insertPrimaryAdminFromEnv(bootstrap.password);
     return;
   }
-
-  if (!options?.allowEmergency) return;
-
-  const activeSupers = await countActiveSuperAdmins();
-  if (isEmergencyRecoveryEnabled() && activeSupers === 0) {
+  if (action === "emergency-restore") {
     console.warn("[sidhu] emergency recovery restored the primary Super Admin. Unset ADMIN_EMERGENCY_RECOVERY.");
-    await bootstrapPrimaryAdmin(bootstrap.password);
+    await restorePrimaryAdminFromEnv(bootstrap.password);
     return;
   }
-
-  if (isEmergencyPasswordResetEnabled()) {
-    if (await emergencyPasswordResetAlreadyApplied()) {
-      console.warn("[sidhu] ADMIN_EMERGENCY_RESET_PASSWORD is set, but an emergency reset was already applied. Unset the flag; it will not overwrite the CMS password again.");
-      return;
-    }
+  if (action === "emergency-reset") {
     const primary = await getAdminUserByUsername(getPrimaryAdminUsername());
-    if (primary) {
-      console.warn("[sidhu] emergency password reset applied to the primary Super Admin. Unset ADMIN_EMERGENCY_RESET_PASSWORD immediately.");
-      const passwordHash = await hashPassword(bootstrap.password);
-      const conn = await getDbPool().getConnection();
-      try {
-        await conn.beginTransaction();
-        await conn.execute(
-          "UPDATE admin_users SET password_hash = ?, is_active = 1, session_version = session_version + 1 WHERE id = ?",
-          [passwordHash, primary.id],
-        );
-        await conn.execute(
-          `INSERT INTO site_settings (setting_key, setting_value)
-           VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
-          [EMERGENCY_RESET_SETTING_KEY, JSON.stringify({ appliedAt: new Date().toISOString() })],
-        );
-        await conn.commit();
-      } catch (error) {
-        await conn.rollback();
-        throw error;
-      } finally {
-        conn.release();
+    if (!primary) return;
+    console.warn("[sidhu] emergency password reset applied to the primary Super Admin. Unset ADMIN_EMERGENCY_RESET_PASSWORD immediately.");
+    const passwordHash = await hashPassword(bootstrap.password);
+    const conn = await getDbPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.execute<ResultSetHeader>(
+        "UPDATE admin_users SET password_hash = ?, is_active = 1, session_version = session_version + 1 WHERE id = ?",
+        [passwordHash, primary.id],
+      );
+      if (!result.affectedRows) {
+        throw new Error("Emergency password reset did not update a user row.");
       }
+      await conn.execute(
+        `INSERT INTO site_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+        [EMERGENCY_RESET_SETTING_KEY, JSON.stringify({ appliedAt: new Date().toISOString() })],
+      );
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
     }
   }
 }
@@ -290,10 +301,17 @@ export async function bumpAdminSessionVersion(id: string) {
 }
 
 export async function updateAdminPassword(id: string, passwordHash: string) {
-  await getDbPool().execute(
+  const [result] = await getDbPool().execute<ResultSetHeader>(
     "UPDATE admin_users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
     [passwordHash, id],
   );
+  if (!result.affectedRows) {
+    throw new Error("Password was not updated.");
+  }
+  const updated = await getAdminUserById(id);
+  if (!updated || updated.passwordHash !== passwordHash) {
+    throw new Error("Password was not saved.");
+  }
 }
 
 export async function createAdminUser(input: {

@@ -24,7 +24,7 @@ export default async function SidhuLoginPage({
         <p className="mt-2 text-sm text-muted">This admin area is protected. Sign in with your Sidhu account.</p>
         {query.updated === "1" ? (
           <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-            Password updated. Sign in with your new password.
+            Password changed. Please sign in again.
           </p>
         ) : null}
         <div className="mt-6">

@@ -19,7 +19,7 @@ export default async function SidhuUsersPage() {
   }
   const users = await listAdminUsers();
   return (
-    <AdminShell title="Users" subtitle="Super Admin can create users, set permissions, disable accounts, and reset passwords.">
+    <AdminShell title="Users" subtitle="Current Sidhu accounts. Edit a user to change role, permissions, or password.">
       <UsersManager users={users} />
     </AdminShell>
   );

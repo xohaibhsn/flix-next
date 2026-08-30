@@ -25,7 +25,7 @@ export function AccountForm() {
       <form action={action} className="space-y-4 rounded-xl border border-line bg-white p-5">
         <h2 className="font-semibold">Change password</h2>
         <p className="text-sm text-muted">
-          Use at least 12 characters with upper, lower, number, and symbol. You will need to sign in again.
+          Use at least 12 characters with upper, lower, number, and symbol. After saving you must sign in again.
         </p>
         {state.error ? <Banner tone="error">{state.error}</Banner> : null}
         <PasswordField name="currentPassword" label="Current password" autoComplete="current-password" />

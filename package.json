@@ -11,6 +11,7 @@
     "build:default": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:auth": "tsx --test tools/sidhu-auth.test.ts",
     "og:smoke": "node tools/og-metadata-smoke.mjs",
     "import:wordpress": "tsx tools/import-wordpress.ts"
   },
