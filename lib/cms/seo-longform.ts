@@ -174,6 +174,39 @@ function reindex(sections: CmsSection[]) {
   return sections.map((section, index) => ({ ...section, order: index + 1 }));
 }
 
+function pickIntendedHomeSection(sections: CmsSection[], type: CmsSection["type"], preferredIds: string[]) {
+  const matches = sections.filter((section) => section.type === type);
+  const preferredVisible = matches.find((section) => section.visible && preferredIds.includes(section.id));
+  if (preferredVisible) return preferredVisible;
+  const preferred = matches.find((section) => preferredIds.includes(section.id));
+  if (preferred) return preferred;
+  const visible = matches.filter((section) => section.visible);
+  return visible.at(-1);
+}
+
+export function reorderHomeClosingSections(page: CmsPage): { page: CmsPage; changed: boolean } {
+  if (page.slug !== "/") return { page, changed: false };
+
+  const sections = [...page.sections].sort((a, b) => a.order - b.order);
+  const rich = pickIntendedHomeSection(sections, "rich-content", [SEO_LONGFORM_HOME_ID, "sec-home-rich-content"]);
+  const faq = pickIntendedHomeSection(sections, "faq", ["sec-home-faq"]);
+  const cta = pickIntendedHomeSection(sections, "cta", ["sec-home-cta"]);
+  const closing = [rich, faq, cta].filter((section): section is CmsSection => Boolean(section));
+  if (!closing.length) return { page, changed: false };
+
+  const closingIds = new Set(closing.map((section) => section.id));
+  const rest = sections.filter((section) => !closingIds.has(section.id));
+  const next = reindex([...rest, ...closing]);
+  const unchanged = next.every((section, index) => section.id === sections[index]?.id && section.order === sections[index]?.order);
+  if (unchanged) return { page, changed: false };
+  return { page: { ...page, sections: next }, changed: true };
+}
+
+function finishSeoLongformPage(page: CmsPage, changed: boolean) {
+  const ordered = reorderHomeClosingSections(page);
+  return { page: ordered.page, changed: changed || ordered.changed };
+}
+
 function isPlaceholderSection(section: CmsSection) {
   if (section.type !== "rich-content") return false;
   const html = typeof (section.data as RichContentData).html === "string" ? (section.data as RichContentData).html : "";
@@ -207,7 +240,7 @@ function fillRichContent(section: CmsSection, spec: PageSpec): CmsSection {
 
 export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed: boolean } {
   const spec = SPECS.find((item) => item.slug === page.slug);
-  if (!spec) return { page, changed: false };
+  if (!spec) return finishSeoLongformPage(page, false);
 
   let sections = [...page.sections].sort((a, b) => a.order - b.order);
   const leaked = sections.filter((section) => isLeakedTestRichContent(section));
@@ -215,10 +248,7 @@ export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed:
 
   if (leaked.length && professional) {
     const drop = new Set(leaked.map((section) => section.id));
-    return {
-      page: { ...page, sections: reindex(sections.filter((section) => !drop.has(section.id))) },
-      changed: true,
-    };
+    return finishSeoLongformPage({ ...page, sections: reindex(sections.filter((section) => !drop.has(section.id))) }, true);
   }
 
   if (leaked.length) {
@@ -227,7 +257,7 @@ export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed:
     sections = sections
       .filter((section) => !drop.has(section.id))
       .map((section) => (section.id === first.id ? fillRichContent(section, spec) : section));
-    return { page: { ...page, sections: reindex(sections) }, changed: true };
+    return finishSeoLongformPage({ ...page, sections: reindex(sections) }, true);
   }
 
   const rich = sections.filter((section) => section.type === "rich-content");
@@ -235,18 +265,18 @@ export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed:
   const placeholder = rich.find((section) => isPlaceholderSection(section));
 
   if (byId && !isReplaceableRichSection(byId)) {
-    return { page, changed: false };
+    return finishSeoLongformPage({ ...page, sections }, false);
   }
 
   const target = byId && isReplaceableRichSection(byId) ? byId : placeholder;
 
   if (!target && professional) {
-    return { page, changed: false };
+    return finishSeoLongformPage({ ...page, sections }, false);
   }
 
   if (target) {
     const next = sections.map((section) => (section.id === target.id ? fillRichContent(section, spec) : section));
-    return { page: { ...page, sections: reindex(next) }, changed: true };
+    return finishSeoLongformPage({ ...page, sections: reindex(next) }, true);
   }
 
   const faqIndex = sections.findIndex((section) => section.type === "faq");
@@ -261,7 +291,7 @@ export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed:
     data: spec.data,
   };
   const next = [...sections.slice(0, insertAt), created, ...sections.slice(insertAt)];
-  return { page: { ...page, sections: reindex(next) }, changed: true };
+  return finishSeoLongformPage({ ...page, sections: reindex(next) }, true);
 }
 
 export function applySeoLongformToPages(pages: CmsPage[]) {
