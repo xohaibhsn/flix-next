@@ -150,3 +150,27 @@ CREATE TABLE IF NOT EXISTS contact_messages (
   PRIMARY KEY (id),
   KEY contact_messages_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  ip_hash CHAR(64) NOT NULL,
+  fail_count INT NOT NULL DEFAULT 0,
+  reset_at BIGINT NOT NULL,
+  PRIMARY KEY (ip_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS admin_users (
+  id VARCHAR(80) NOT NULL,
+  username VARCHAR(80) NOT NULL,
+  display_name VARCHAR(120) NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role VARCHAR(40) NOT NULL DEFAULT 'custom',
+  permissions LONGTEXT NOT NULL,
+  is_active TINYINT(1) NOT NULL DEFAULT 1,
+  session_version INT NOT NULL DEFAULT 1,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  last_login_at DATETIME NULL,
+  created_by VARCHAR(80) NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY admin_users_username_unique (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

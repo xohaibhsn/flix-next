@@ -14,22 +14,27 @@ import {
   Redo2,
   Search,
   Settings,
+  Shield,
   Tag,
+  UserRound,
   X,
 } from "lucide-react";
 import { LogoutButton } from "@/components/sidhu/LogoutButton";
+import { useAdminSession } from "@/components/sidhu/AdminSessionProvider";
+import { hasPermission, type Permission } from "@/lib/auth/permissions";
 
-const NAV = [
-  { href: "/sidhu/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/sidhu/pages/", label: "Pages", icon: FileText },
-  { href: "/sidhu/blog/", label: "Blog", icon: Newspaper },
-  { href: "/sidhu/pricing/", label: "Pricing", icon: Tag },
-  { href: "/sidhu/faqs/", label: "FAQs", icon: FolderOpen },
-  { href: "/sidhu/seo/", label: "SEO", icon: Search },
-  { href: "/sidhu/media/", label: "Media", icon: ImageIcon },
-  { href: "/sidhu/redirects/", label: "Redirects", icon: Redo2 },
-  { href: "/sidhu/settings/", label: "Site Settings", icon: Settings },
-  { href: "/sidhu/messages/", label: "Messages", icon: Mail },
+const NAV: Array<{ href: string; label: string; icon: typeof LayoutDashboard; permission: Permission }> = [
+  { href: "/sidhu/", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard" },
+  { href: "/sidhu/pages/", label: "Pages", icon: FileText, permission: "pages" },
+  { href: "/sidhu/blog/", label: "Blog", icon: Newspaper, permission: "blog" },
+  { href: "/sidhu/pricing/", label: "Pricing", icon: Tag, permission: "pricing" },
+  { href: "/sidhu/faqs/", label: "FAQs", icon: FolderOpen, permission: "faqs" },
+  { href: "/sidhu/seo/", label: "SEO", icon: Search, permission: "seo" },
+  { href: "/sidhu/media/", label: "Media", icon: ImageIcon, permission: "media" },
+  { href: "/sidhu/redirects/", label: "Redirects", icon: Redo2, permission: "redirects" },
+  { href: "/sidhu/settings/", label: "Site Settings", icon: Settings, permission: "site_settings" },
+  { href: "/sidhu/messages/", label: "Messages", icon: Mail, permission: "messages" },
+  { href: "/sidhu/users/", label: "Users", icon: Shield, permission: "users_security" },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -48,6 +53,9 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const session = useAdminSession();
+  const items = NAV.filter((item) => session && hasPermission(session.role, session.permissions, item.permission));
+  const accountActive = isActive(pathname, "/sidhu/account/");
 
   return (
     <div className="flex min-h-screen bg-[#f3f4f7] text-ink">
@@ -55,10 +63,12 @@ export function AdminShell({
         <div className="border-b border-white/10 px-5 py-5">
           <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
           <p className="mt-1 text-sm font-bold">THE FLIX CMS</p>
-          <p className="mt-1 text-[11px] text-white/45">Protected admin session</p>
+          <p className="mt-1 text-[11px] text-white/45">
+            {session ? session.displayName || session.username : "Protected admin session"}
+          </p>
         </div>
         <nav className="flex-1 space-y-1 p-3">
-          {NAV.map((item) => {
+          {items.map((item) => {
             const Icon = item.icon;
             const active = isActive(pathname, item.href);
             return (
@@ -76,7 +86,14 @@ export function AdminShell({
           })}
         </nav>
         <div className="border-t border-white/10 p-4 text-xs text-white/40">
-          <Link href="/" className="hover:text-white">
+          <Link
+            href="/sidhu/account/"
+            className={`flex items-center gap-2 ${accountActive ? "text-white" : "hover:text-white"}`}
+          >
+            <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
+            My Account
+          </Link>
+          <Link href="/" className="mt-3 block hover:text-white">
             View website →
           </Link>
           <div className="mt-3">
@@ -102,7 +119,7 @@ export function AdminShell({
         </header>
         {open ? (
           <div className="border-b border-line bg-[#0c0e14] p-3 lg:hidden">
-            {NAV.map((item) => (
+            {items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -112,6 +129,9 @@ export function AdminShell({
                 {item.label}
               </Link>
             ))}
+            <Link href="/sidhu/account/" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm text-white/80">
+              My Account
+            </Link>
             <div className="px-3 py-2">
               <LogoutButton />
             </div>

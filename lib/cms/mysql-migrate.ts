@@ -52,6 +52,9 @@ const REQUIRED_COLUMNS: Array<{ table: string; column: string; definition: strin
   { table: "media_assets", column: "folder", definition: "folder VARCHAR(160) NOT NULL DEFAULT ''" },
   { table: "media_assets", column: "bytes", definition: "bytes INT NULL" },
   { table: "media_assets", column: "alt", definition: "alt VARCHAR(160) NOT NULL DEFAULT ''" },
+  { table: "admin_users", column: "session_version", definition: "session_version INT NOT NULL DEFAULT 1" },
+  { table: "admin_users", column: "last_login_at", definition: "last_login_at DATETIME NULL" },
+  { table: "admin_users", column: "created_by", definition: "created_by VARCHAR(80) NULL" },
 ];
 
 async function ensureMissingColumns() {
@@ -67,7 +70,9 @@ async function ensureMissingColumns() {
     existing.set(table, new Set(rows.map((row) => row.COLUMN_NAME)));
   }
   for (const item of REQUIRED_COLUMNS) {
-    if (existing.get(item.table)?.has(item.column)) continue;
+    const columns = existing.get(item.table);
+    if (!columns || columns.size === 0) continue;
+    if (columns.has(item.column)) continue;
     await pool.query(`ALTER TABLE \`${item.table}\` ADD COLUMN ${item.definition}`);
   }
 }

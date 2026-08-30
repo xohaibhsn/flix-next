@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { loginAction, type LoginState } from "@/lib/auth/actions";
 import { Banner, inputClass } from "@/components/sidhu/fields";
+import { PasswordField } from "@/components/sidhu/PasswordField";
 
 const initialState: LoginState = {};
 
@@ -23,17 +24,7 @@ export function LoginForm() {
           disabled={pending}
         />
       </label>
-      <label className="block">
-        <span className="text-xs font-semibold tracking-wide text-ink/70 uppercase">Password</span>
-        <input
-          className={`${inputClass} mt-1.5`}
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          disabled={pending}
-        />
-      </label>
+      <PasswordField name="password" label="Password" autoComplete="current-password" />
       <button
         type="submit"
         disabled={pending}

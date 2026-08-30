@@ -6,16 +6,38 @@ export type AdminAuthConfig = {
   sessionSecret: string;
 };
 
-export function getAdminAuthConfig(): AdminAuthConfig | null {
-  const username = process.env.ADMIN_USERNAME?.trim() ?? "";
-  const password = process.env.ADMIN_PASSWORD ?? "";
+export function getSessionSecret() {
   const sessionSecret = process.env.ADMIN_SESSION_SECRET?.trim() ?? "";
+  if (sessionSecret.length < MIN_SESSION_SECRET_LENGTH) return null;
+  return sessionSecret;
+}
 
-  if (!username || !password || sessionSecret.length < MIN_SESSION_SECRET_LENGTH) {
-    return null;
-  }
+export function getBootstrapCredentials() {
+  const username = (process.env.ADMIN_USERNAME?.trim() || "admin").toLowerCase();
+  const password = process.env.ADMIN_PASSWORD ?? "";
+  if (!username || !password) return null;
+  return { username, password };
+}
 
-  return { username, password, sessionSecret };
+export function getPrimaryAdminUsername() {
+  return (process.env.ADMIN_USERNAME?.trim() || "admin").toLowerCase();
+}
+
+export function getAdminAuthConfig(): AdminAuthConfig | null {
+  const sessionSecret = getSessionSecret();
+  const bootstrap = getBootstrapCredentials();
+  if (!sessionSecret || !bootstrap) return null;
+  return { username: bootstrap.username, password: bootstrap.password, sessionSecret };
+}
+
+export function isEmergencyRecoveryEnabled() {
+  const raw = process.env.ADMIN_EMERGENCY_RECOVERY?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
+}
+
+export function isEmergencyPasswordResetEnabled() {
+  const raw = process.env.ADMIN_EMERGENCY_RESET_PASSWORD?.trim().toLowerCase();
+  return raw === "1" || raw === "true" || raw === "yes";
 }
 
 export function isProduction() {

@@ -39,6 +39,10 @@ const SIDHU_PATHS = [
   "/sidhu/settings/",
   "/sidhu/messages",
   "/sidhu/messages/",
+  "/sidhu/users",
+  "/sidhu/users/",
+  "/sidhu/account",
+  "/sidhu/account/",
 ];
 
 export function revalidatePublicSite() {

@@ -117,6 +117,8 @@ export class MysqlCmsRepository {
         await seedManagedRedirectsIfNeeded();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
+        const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");
+        await bootstrapAdminUsersIfNeeded({ allowEmergency: true });
       })().catch((error) => {
         this.readyPromise = null;
         throw cmsDbError(error);

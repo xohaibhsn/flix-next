@@ -22,7 +22,7 @@ function fail(error: unknown, fallback: string) {
 }
 
 export async function savePageAction(page: CmsPage) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("pages");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePage(page);
@@ -55,7 +55,7 @@ function normalizeIncomingSeo(settings: SiteSettings) {
 }
 
 export async function saveSettingsAction(settings: SiteSettings) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("site_settings");
   if (unauthorized) return unauthorized;
   try {
     const current = await cms.getSettings();
@@ -72,7 +72,7 @@ export async function saveSettingsAction(settings: SiteSettings) {
 }
 
 export async function saveSeoSettingsAction(settings: SiteSettings) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("seo");
   if (unauthorized) return unauthorized;
   try {
     const normalized = normalizeIncomingSeo(settings);
@@ -91,7 +91,7 @@ export async function saveSeoSettingsAction(settings: SiteSettings) {
 }
 
 export async function savePlanAction(plan: PricingPlan) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("pricing");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePlan(plan);
@@ -103,7 +103,7 @@ export async function savePlanAction(plan: PricingPlan) {
 }
 
 export async function deletePlanAction(id: string) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("pricing");
   if (unauthorized) return unauthorized;
   try {
     await cms.deletePlan(id);
@@ -115,7 +115,7 @@ export async function deletePlanAction(id: string) {
 }
 
 export async function saveFaqAction(item: FaqItem) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("faqs");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveFaq(item);
@@ -127,7 +127,7 @@ export async function saveFaqAction(item: FaqItem) {
 }
 
 export async function deleteFaqAction(id: string) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("faqs");
   if (unauthorized) return unauthorized;
   try {
     await cms.deleteFaq(id);
@@ -139,7 +139,7 @@ export async function deleteFaqAction(id: string) {
 }
 
 export async function saveCategoryAction(category: BlogCategory) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveCategory(category);
@@ -152,7 +152,7 @@ export async function saveCategoryAction(category: BlogCategory) {
 }
 
 export async function deleteCategoryAction(id: string) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
   try {
     await cms.deleteCategory(id);
@@ -164,7 +164,7 @@ export async function deleteCategoryAction(id: string) {
 }
 
 export async function savePostAction(post: BlogPost) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePost(post);
@@ -177,7 +177,7 @@ export async function savePostAction(post: BlogPost) {
 }
 
 export async function deletePostAction(id: string) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
   try {
     await cms.deletePost(id);
@@ -190,7 +190,7 @@ export async function deletePostAction(id: string) {
 }
 
 export async function saveRedirectAction(rule: RedirectRule) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("redirects");
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveRedirect(rule);
@@ -202,7 +202,7 @@ export async function saveRedirectAction(rule: RedirectRule) {
 }
 
 export async function deleteRedirectAction(id: string) {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("redirects");
   if (unauthorized) return unauthorized;
   try {
     await cms.deleteRedirect(id);
@@ -227,15 +227,15 @@ export async function getCloudinaryStatusAction() {
 }
 
 export async function getSystemStatusAction() {
-  const unauthorized = await requireAdminAction();
+  const unauthorized = await requireAdminAction("dashboard");
   if (unauthorized) return unauthorized;
   const { isDatabaseConfigured } = await import("@/lib/db/config");
-  const { getAdminAuthConfig } = await import("@/lib/auth/config");
+  const { getSessionSecret } = await import("@/lib/auth/config");
   return {
     ok: true as const,
     database: isDatabaseConfigured(),
     cloudinary: isCloudinaryConfigured(),
-    adminAuth: Boolean(getAdminAuthConfig()),
+    adminAuth: Boolean(getSessionSecret()),
     environment: process.env.NODE_ENV === "production" ? "production" : "development",
     version: "0.1.0",
   };

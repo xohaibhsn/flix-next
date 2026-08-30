@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { ADMIN_SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-token";
+import { ADMIN_SESSION_COOKIE } from "@/lib/auth/session-token";
+import { resolveAdminFromToken } from "@/lib/auth/session";
 import { resolveSafeRedirectUrl } from "@/lib/cms/redirects";
 import { cms } from "@/lib/cms/repository";
 import { applySecurityHeaders } from "@/lib/security/headers";
@@ -40,7 +41,8 @@ async function cmsRedirect(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const session = verifySessionToken(request.cookies.get(ADMIN_SESSION_COOKIE)?.value);
+  const needsAdmin = isSidhuPage(pathname) || isSidhuApi(pathname);
+  const session = needsAdmin ? await resolveAdminFromToken(request.cookies.get(ADMIN_SESSION_COOKIE)?.value) : null;
 
   if (isSidhuApi(pathname) && !session) {
     return applySecurityHeaders(
@@ -65,7 +67,9 @@ export async function proxy(request: NextRequest) {
   const redirected = await cmsRedirect(request);
   if (redirected) return applySecurityHeaders(redirected, pathname, request);
 
-  return applySecurityHeaders(NextResponse.next(), pathname, request);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-sidhu-path", pathname);
+  return applySecurityHeaders(NextResponse.next({ request: { headers: requestHeaders } }), pathname, request);
 }
 
 export const config = {

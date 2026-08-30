@@ -2,16 +2,41 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getAdminAuthConfig } from "@/lib/auth/config";
+import { getAdminAuthConfig, getSessionSecret } from "@/lib/auth/config";
 import { safeEqual } from "@/lib/auth/crypto";
 import {
   checkLoginRateLimit,
   clearLoginRateLimit,
   recordFailedLogin,
 } from "@/lib/auth/rate-limit";
+import {
+  type AdminRole,
+  firstAllowedPath,
+  isAdminRole,
+  parsePermissions,
+} from "@/lib/auth/permissions";
+import { hashPassword, passwordPolicyError, verifyPassword, verifyPasswordDummy } from "@/lib/auth/password";
+import {
+  createAdminUser,
+  deleteAdminUser,
+  getAdminUserById,
+  getAdminUserByUsername,
+  listAdminUsers,
+  markAdminLogin,
+  updateAdminPassword,
+  updateAdminUser,
+  usernameError,
+} from "@/lib/auth/admin-users";
+import { requireAdminActor } from "@/lib/auth/guards";
 import { clearAdminSession, createAdminSession, getAdminSession } from "@/lib/auth/session";
+import { isDatabaseConfigured } from "@/lib/db/config";
 
 export type LoginState = {
+  error?: string;
+};
+
+export type FormState = {
+  ok?: boolean;
   error?: string;
 };
 
@@ -30,7 +55,7 @@ function clientIp(headerStore: Headers) {
 export async function loginAction(_prev: LoginState, formData: FormData): Promise<LoginState> {
   const existing = await getAdminSession();
   if (existing) {
-    redirect("/sidhu/");
+    redirect(firstAllowedPath(existing.role, existing.permissions));
   }
 
   const headerStore = await headers();
@@ -42,25 +67,173 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
 
   const username = String(formData.get("username") ?? "");
   const password = String(formData.get("password") ?? "");
-  const config = getAdminAuthConfig();
-
-  if (!config) {
+  if (!getSessionSecret()) {
     return { error: NOT_CONFIGURED };
   }
 
-  const usernameOk = safeEqual(username, config.username);
+  if (isDatabaseConfigured()) {
+    const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");
+    await bootstrapAdminUsersIfNeeded();
+    const user = await getAdminUserByUsername(username);
+    if (!user) {
+      await verifyPasswordDummy(password);
+      await recordFailedLogin(ip);
+      return { error: INVALID_LOGIN };
+    }
+    const passwordOk = await verifyPassword(password, user.passwordHash);
+    if (!user.active || !passwordOk) {
+      await recordFailedLogin(ip);
+      return { error: INVALID_LOGIN };
+    }
+    await clearLoginRateLimit(ip);
+    await markAdminLogin(user.id);
+    await createAdminSession({ id: user.id, username: user.username, sessionVersion: user.sessionVersion });
+    redirect(firstAllowedPath(user.role, user.permissions));
+  }
+
+  const config = getAdminAuthConfig();
+  if (!config) {
+    return { error: NOT_CONFIGURED };
+  }
+  const usernameOk = safeEqual(username.toLowerCase(), config.username);
   const passwordOk = safeEqual(password, config.password);
   if (!usernameOk || !passwordOk) {
     await recordFailedLogin(ip);
     return { error: INVALID_LOGIN };
   }
-
   await clearLoginRateLimit(ip);
-  await createAdminSession(config.username);
-  redirect("/sidhu/");
+  await createAdminSession({ id: "env-admin", username: config.username, sessionVersion: 1 });
+  redirect(firstAllowedPath("super_admin", []));
 }
 
 export async function logoutAction() {
   await clearAdminSession();
   redirect("/sidhu/login/");
 }
+
+export async function changeOwnPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireAdminActor();
+  if (!actor.ok) return { error: actor.error };
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const nextPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+  if (nextPassword !== confirmPassword) return { error: "New password and confirmation do not match." };
+  const policy = passwordPolicyError(nextPassword);
+  if (policy) return { error: policy };
+
+  if (!isDatabaseConfigured()) {
+    return { error: "Password changes require the MySQL admin user store." };
+  }
+  const user = await getAdminUserById(actor.user.id);
+  if (!user) return { error: "Account not found." };
+  const matches = await verifyPassword(currentPassword, user.passwordHash);
+  if (!matches) return { error: "Current password is incorrect." };
+  const passwordHash = await hashPassword(nextPassword);
+  await updateAdminPassword(user.id, passwordHash);
+  await clearAdminSession();
+  redirect("/sidhu/login/?updated=1");
+}
+
+export async function listUsersAction() {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return actor;
+  if (!isDatabaseConfigured()) return { ok: false as const, error: "User management requires MySQL." };
+  return { ok: true as const, users: await listAdminUsers() };
+}
+
+export async function createUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return { error: actor.error };
+  if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
+  const username = String(formData.get("username") ?? "");
+  const displayName = String(formData.get("displayName") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+  const roleRaw = String(formData.get("role") ?? "custom");
+  if (password !== confirm) return { error: "Password and confirmation do not match." };
+  const nameError = usernameError(username);
+  if (nameError) return { error: nameError };
+  const policy = passwordPolicyError(password);
+  if (policy) return { error: policy };
+  if (!isAdminRole(roleRaw)) return { error: "Choose a valid role." };
+  if (roleRaw === "super_admin" && actor.user.role !== "super_admin") {
+    return { error: "Only Super Admin can create another Super Admin." };
+  }
+  const permissions = parsePermissions(formData.getAll("permissions").map(String));
+  try {
+    await createAdminUser({
+      username,
+      displayName,
+      passwordHash: await hashPassword(password),
+      role: roleRaw as AdminRole,
+      permissions,
+      createdBy: actor.user.id,
+    });
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not create user." };
+  }
+}
+
+export async function updateUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return { error: actor.error };
+  if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
+  const id = String(formData.get("id") ?? "");
+  const displayName = String(formData.get("displayName") ?? "");
+  const roleRaw = String(formData.get("role") ?? "custom");
+  if (!isAdminRole(roleRaw)) return { error: "Choose a valid role." };
+  if (roleRaw === "super_admin" && actor.user.role !== "super_admin") {
+    return { error: "Only Super Admin can assign Super Admin." };
+  }
+  const permissions = parsePermissions(formData.getAll("permissions").map(String));
+  try {
+    await updateAdminUser(id, { displayName, role: roleRaw as AdminRole, permissions });
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update user." };
+  }
+}
+
+export async function setUserActiveAction(id: string, active: boolean): Promise<FormState> {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return { error: actor.error };
+  if (actor.user.id === id && !active) return { error: "You cannot disable your own account." };
+  try {
+    await updateAdminUser(id, { active });
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not update user." };
+  }
+}
+
+export async function deleteUserAction(id: string): Promise<FormState> {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return { error: actor.error };
+  if (actor.user.role !== "super_admin") return { error: "Only Super Admin can delete users." };
+  try {
+    await deleteAdminUser(id, actor.user.id);
+    return { ok: true };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "Could not delete user." };
+  }
+}
+
+export async function resetUserPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const actor = await requireAdminActor("users_security");
+  if (!actor.ok) return { error: actor.error };
+  const id = String(formData.get("id") ?? "");
+  const password = String(formData.get("password") ?? "");
+  const confirm = String(formData.get("confirmPassword") ?? "");
+  if (password !== confirm) return { error: "Password and confirmation do not match." };
+  const policy = passwordPolicyError(password);
+  if (policy) return { error: policy };
+  const target = await getAdminUserById(id);
+  if (!target) return { error: "User not found." };
+  if (target.role === "super_admin" && actor.user.role !== "super_admin") {
+    return { error: "You cannot reset a Super Admin password." };
+  }
+  await updateAdminPassword(id, await hashPassword(password));
+  return { ok: true };
+}
+

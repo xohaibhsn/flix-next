@@ -26,7 +26,7 @@ function revalidateMedia() {
 }
 
 export async function GET() {
-  const unauthorized = await requireAdminApi();
+  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
   if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
   const [settings, posts] = await Promise.all([cms.getSettings(), cms.listPosts()]);
@@ -42,7 +42,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAdminApi();
+  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
   if (unauthorized) return unauthorized;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const unauthorized = await requireAdminApi();
+  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
   if (unauthorized) return unauthorized;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);

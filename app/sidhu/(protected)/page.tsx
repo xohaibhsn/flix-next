@@ -2,15 +2,30 @@ import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { cms } from "@/lib/cms/repository";
 import { getCloudinaryStatusAction, getSystemStatusAction } from "@/lib/cms/actions";
+import { getAdminSession } from "@/lib/auth/session";
+import { hasPermission, type Permission } from "@/lib/auth/permissions";
 
 export const dynamic = "force-dynamic";
 
+const SHORTCUTS: Array<{ href: string; label: string; permission: Permission; primary?: boolean }> = [
+  { href: "/sidhu/pages/home/", label: "Edit Home", permission: "pages", primary: true },
+  { href: "/sidhu/blog/new/", label: "New blog post", permission: "blog" },
+  { href: "/sidhu/media/", label: "Media", permission: "media" },
+  { href: "/sidhu/seo/", label: "SEO", permission: "seo" },
+  { href: "/sidhu/redirects/", label: "Redirects", permission: "redirects" },
+  { href: "/sidhu/settings/", label: "Site Settings", permission: "site_settings" },
+];
+
 export default async function SidhuDashboardPage() {
-  const [stats, cloud, system] = await Promise.all([
+  const [stats, cloud, system, session] = await Promise.all([
     cms.dashboardStats(),
     getCloudinaryStatusAction(),
     getSystemStatusAction(),
+    getAdminSession(),
   ]);
+  const shortcuts = SHORTCUTS.filter(
+    (item) => session && hasPermission(session.role, session.permissions, item.permission),
+  );
   const status = system.ok
     ? system
     : {
@@ -66,24 +81,19 @@ export default async function SidhuDashboardPage() {
         </dl>
       </div>
       <div className="mt-6 flex flex-wrap gap-3">
-        <Link href="/sidhu/pages/home/" className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white">
-          Edit Home
-        </Link>
-        <Link href="/sidhu/blog/new/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          New blog post
-        </Link>
-        <Link href="/sidhu/media/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          Media
-        </Link>
-        <Link href="/sidhu/seo/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          SEO
-        </Link>
-        <Link href="/sidhu/redirects/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          Redirects
-        </Link>
-        <Link href="/sidhu/settings/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
-          Site Settings
-        </Link>
+        {shortcuts.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={
+              item.primary
+                ? "rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white"
+                : "rounded-md border border-line bg-white px-4 py-2 text-sm"
+            }
+          >
+            {item.label}
+          </Link>
+        ))}
         <Link href="/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
           View website
         </Link>
