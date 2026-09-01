@@ -63,13 +63,19 @@ export function hasPermission(role: AdminRole, custom: Permission[], permission:
   return permissionsForRole(role, custom).includes(permission);
 }
 
-export function permissionForSidhuPath(pathname: string): Permission | null {
+export function hasAnyPermission(role: AdminRole, custom: Permission[], needed: Permission | Permission[]) {
+  const list = Array.isArray(needed) ? needed : [needed];
+  return list.some((permission) => hasPermission(role, custom, permission));
+}
+
+export function permissionForSidhuPath(pathname: string): Permission | Permission[] | null {
   const path = pathname.endsWith("/") && pathname !== "/" ? pathname : `${pathname}/`;
   if (path === "/sidhu/login/" || path.startsWith("/sidhu/account/") || path.startsWith("/sidhu/access-denied/")) {
     return null;
   }
   if (path.startsWith("/sidhu/users/") || path.startsWith("/sidhu/security/")) return "users_security";
-  if (path.startsWith("/sidhu/pages/")) return "pages";
+  if (path.startsWith("/sidhu/pages/")) return ["pages", "seo"];
+  if (path === "/sidhu/blog/") return ["blog", "seo"];
   if (path.startsWith("/sidhu/blog/")) return "blog";
   if (path.startsWith("/sidhu/faqs/")) return "faqs";
   if (path.startsWith("/sidhu/pricing/")) return "pricing";

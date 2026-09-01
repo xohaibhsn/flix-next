@@ -593,6 +593,7 @@ export function defaultSettings(): SiteSettings {
       blog: defaultPageSeo("Blog", "Guides and updates from THE FLIX IPTV.", "/blog/"),
     },
     siteCustomJsonLd: "",
+    customHeadCode: "",
   };
 }
 

@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
 
 const PUBLIC_PATHS = [
   "/",
@@ -83,6 +84,16 @@ export function revalidateBlog(slug?: string) {
     revalidatePath(`/blog/${slug}/`);
   }
   revalidatePath("/sitemap.xml");
+}
+
+export function revalidatePageSeo(key: PageSeoKey) {
+  revalidatePath("/", "layout");
+  const meta = PAGE_SEO_META[key];
+  for (const path of meta.publicPaths) revalidatePath(path);
+  revalidatePath(meta.editorHref);
+  revalidatePath("/sitemap.xml");
+  revalidatePath("/sidhu/seo");
+  revalidatePath("/sidhu/seo/");
 }
 
 export function revalidateCategory(slug?: string) {

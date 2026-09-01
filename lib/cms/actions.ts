@@ -2,17 +2,20 @@
 
 import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
-import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidateSidhuCms } from "@/lib/cms/revalidate";
+import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidatePageSeo, revalidateSidhuCms } from "@/lib/cms/revalidate";
 import type {
   BlogCategory,
   BlogPost,
   CmsPage,
   FaqItem,
+  PageSeo,
   PricingPlan,
   RedirectRule,
   SiteSettings,
 } from "@/lib/cms/types";
 import { normalizeJsonLdInput } from "@/lib/cms/json-ld-input";
+import { headCodePolicyError, sanitizeCustomHeadCode } from "@/lib/cms/head-code";
+import { isPageSeoKey, PAGE_SEO_META } from "@/lib/cms/page-seo";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
 
 import { publicErrorMessage } from "@/lib/security/errors";
@@ -33,36 +36,22 @@ export async function savePageAction(page: CmsPage) {
   }
 }
 
-const PAGE_SEO_LABELS: Record<keyof SiteSettings["pageSeo"], string> = {
-  home: "Welcome / Home",
-  subscriptions: "IPTV Subscription",
-  contact: "Contact",
-  blog: "Blog listing",
-};
-
-function normalizeIncomingSeo(settings: SiteSettings) {
-  const pageSeo = { ...settings.pageSeo };
-  for (const key of Object.keys(PAGE_SEO_LABELS) as Array<keyof SiteSettings["pageSeo"]>) {
-    const result = normalizeJsonLdInput(pageSeo[key].customJsonLd);
-    if (!result.ok) {
-      return { ok: false as const, error: `${PAGE_SEO_LABELS[key]}: ${result.error}` };
-    }
-    pageSeo[key] = { ...pageSeo[key], customJsonLd: result.stored };
-  }
-  const site = normalizeJsonLdInput(settings.siteCustomJsonLd);
-  if (!site.ok) return { ok: false as const, error: `Site-wide schema: ${site.error}` };
-  return { ok: true as const, pageSeo, siteCustomJsonLd: site.stored };
-}
-
 export async function saveSettingsAction(settings: SiteSettings) {
   const unauthorized = await requireAdminAction("site_settings");
   if (unauthorized) return unauthorized;
   try {
     const current = await cms.getSettings();
+    const customHeadCode =
+      typeof settings.customHeadCode === "string"
+        ? sanitizeCustomHeadCode(settings.customHeadCode)
+        : sanitizeCustomHeadCode(current.customHeadCode);
+    const headError = headCodePolicyError(customHeadCode);
+    if (headError) return { ok: false as const, error: headError };
     const saved = await cms.saveSettings({
       ...settings,
       pageSeo: current.pageSeo,
       siteCustomJsonLd: current.siteCustomJsonLd,
+      customHeadCode,
     });
     revalidateAfterSettingsSave();
     return { ok: true as const, settings: saved };
@@ -75,18 +64,39 @@ export async function saveSeoSettingsAction(settings: SiteSettings) {
   const unauthorized = await requireAdminAction("seo");
   if (unauthorized) return unauthorized;
   try {
-    const normalized = normalizeIncomingSeo(settings);
-    if (!normalized.ok) return { ok: false as const, error: normalized.error };
+    const site = normalizeJsonLdInput(settings.siteCustomJsonLd);
+    if (!site.ok) return { ok: false as const, error: `Site-wide schema: ${site.error}` };
     const current = await cms.getSettings();
     const saved = await cms.saveSettings({
       ...current,
-      pageSeo: normalized.pageSeo,
-      siteCustomJsonLd: normalized.siteCustomJsonLd,
+      siteCustomJsonLd: site.stored,
     });
     revalidateAfterSettingsSave();
     return { ok: true as const, settings: saved };
   } catch (error) {
     return fail(error, "Could not save SEO settings.");
+  }
+}
+
+export async function savePageSeoAction(key: string, seo: PageSeo) {
+  const unauthorized = await requireAdminAction("seo");
+  if (unauthorized) return unauthorized;
+  if (!isPageSeoKey(key)) return { ok: false as const, error: "Unknown page." };
+  try {
+    const jsonLd = normalizeJsonLdInput(seo.customJsonLd);
+    if (!jsonLd.ok) return { ok: false as const, error: `${PAGE_SEO_META[key].label}: ${jsonLd.error}` };
+    const current = await cms.getSettings();
+    const saved = await cms.saveSettings({
+      ...current,
+      pageSeo: {
+        ...current.pageSeo,
+        [key]: { ...seo, customJsonLd: jsonLd.stored },
+      },
+    });
+    revalidatePageSeo(key);
+    return { ok: true as const, settings: saved };
+  } catch (error) {
+    return fail(error, "Could not save page SEO.");
   }
 }
 

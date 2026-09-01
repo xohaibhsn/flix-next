@@ -28,6 +28,7 @@ import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import { sanitizeHtml } from "@/lib/cms/html";
 import { sanitizeJsonLdField } from "@/lib/cms/json-ld-input";
+import { sanitizeCustomHeadCode } from "@/lib/cms/head-code";
 import { sanitizeHttpUrl } from "@/lib/cms/contact";
 import {
   isReservedRedirectSource,
@@ -182,6 +183,7 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
       blog: sanitizePageSeo(source.pageSeo?.blog, fallback.pageSeo.blog),
     },
     siteCustomJsonLd: sanitizeJsonLdField(source.siteCustomJsonLd),
+    customHeadCode: sanitizeCustomHeadCode(source.customHeadCode),
   };
 
   const telegramUrl =

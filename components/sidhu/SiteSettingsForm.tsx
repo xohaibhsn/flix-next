@@ -163,6 +163,29 @@ export function SiteSettingsForm({
         setSocial={setSocial}
       />
 
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h2 className="font-semibold">Custom Head Code / SEO Scripts</h2>
+        <p className="mt-1 text-sm text-muted">
+          Add trusted verification, analytics, advertising, or SEO-related code that should appear in the public
+          website &lt;head&gt;.
+        </p>
+        <p className="mt-2 text-xs text-amber-800">
+          Code entered here is inserted into the public website &lt;head&gt;. Only add trusted verification,
+          analytics, or tracking code.
+        </p>
+        <div className="mt-4">
+          <Field label="Head markup" hint="Paste meta, link, or script tags. This is not executed on the server. Leave empty to render nothing.">
+            <TextArea
+              value={settings.customHeadCode || ""}
+              onChange={(event) => setSettings({ ...settings, customHeadCode: event.target.value })}
+              spellCheck={false}
+              className="min-h-40 font-mono text-xs leading-relaxed"
+              placeholder={'<meta name="example-verification" content="your-token">'}
+            />
+          </Field>
+        </div>
+      </section>
+
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <button
         type="button"

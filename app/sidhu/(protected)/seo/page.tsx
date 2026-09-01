@@ -1,22 +1,17 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoForm } from "@/components/sidhu/SeoForm";
-import { getCloudinaryStatusAction } from "@/lib/cms/actions";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
 
 export default async function SidhuSeoPage() {
-  const [settings, assets, cloud] = await Promise.all([
-    cms.getSettings(),
-    cms.listMedia(),
-    getCloudinaryStatusAction(),
-  ]);
+  const settings = await cms.getSettings();
   return (
     <AdminShell
       title="SEO"
-      subtitle="Per-page titles, descriptions, robots, Open Graph, sitemap include, and custom JSON-LD. Organization schema is automatic on Home only. Blog posts have their own SEO panel."
+      subtitle="Overview of page metadata plus site-wide custom JSON-LD. Edit page SEO inside each page editor. Blog posts have their own SEO panel."
     >
-      <SeoForm settings={settings} assets={assets} configured={cloud.configured} />
+      <SeoForm settings={settings} />
     </AdminShell>
   );
 }

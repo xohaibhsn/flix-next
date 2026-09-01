@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
+import { CustomHeadCode } from "@/components/seo/CustomHeadCode";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
@@ -42,6 +43,7 @@ export async function SiteShell({
 
   return (
     <>
+      <CustomHeadCode html={settings.customHeadCode || ""} />
       {showOrganization ? <JsonLd data={organizationJsonLd(settings)} /> : null}
       <JsonLd data={websiteJsonLd(settings)} />
       <StoredJsonLd raw={settings.siteCustomJsonLd || ""} />

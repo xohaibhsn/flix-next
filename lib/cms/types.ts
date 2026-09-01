@@ -346,6 +346,7 @@ export type SiteSettings = {
     blog: PageSeo;
   };
   siteCustomJsonLd: string;
+  customHeadCode: string;
 };
 
 export type PricingPlan = {
