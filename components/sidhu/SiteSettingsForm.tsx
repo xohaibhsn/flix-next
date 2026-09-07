@@ -347,10 +347,12 @@ function ContactAndChromeSettings({
             <TextInput value={settings.footerCopyright} onChange={(event) => setSettings({ ...settings, footerCopyright: event.target.value })} />
           </Field>
         </div>
-        <h3 className="mt-6 text-sm font-semibold">Quick links</h3>
+        <h3 className="mt-6 text-sm font-semibold">Company links</h3>
         <NavEditor items={settings.footerQuickLinks} onChange={(footerQuickLinks) => setSettings({ ...settings, footerQuickLinks })} />
         <h3 className="mt-6 text-sm font-semibold">Support links</h3>
         <NavEditor items={settings.footerSupportLinks} onChange={(footerSupportLinks) => setSettings({ ...settings, footerSupportLinks })} />
+        <h3 className="mt-6 text-sm font-semibold">Legal links</h3>
+        <NavEditor items={settings.footerLegalLinks || []} onChange={(footerLegalLinks) => setSettings({ ...settings, footerLegalLinks })} />
         <PaymentImagesEditor
           settings={settings}
           setSettings={setSettings}

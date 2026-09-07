@@ -332,6 +332,7 @@ export type SiteSettings = {
   footerCopyright: string;
   footerQuickLinks: NavLink[];
   footerSupportLinks: NavLink[];
+  footerLegalLinks: NavLink[];
   footerPaymentImages: MediaRef[];
   branding: {
     logo: MediaRef | null;
@@ -344,6 +345,12 @@ export type SiteSettings = {
     subscriptions: PageSeo;
     contact: PageSeo;
     blog: PageSeo;
+    about: PageSeo;
+    terms: PageSeo;
+    refund: PageSeo;
+    privacy: PageSeo;
+    cookie: PageSeo;
+    copyright: PageSeo;
   };
   siteCustomJsonLd: string;
   customHeadCode: string;

@@ -1,3 +1,9 @@
+import {
+  createCompanyCmsPages,
+  companyPageSeoDefaults,
+  DEFAULT_ABOUT_FOOTER_LINK,
+  DEFAULT_LEGAL_FOOTER_LINKS,
+} from "@/lib/cms/company-pages";
 import { assertProfessionalSeedCopy } from "@/lib/cms/dev-copy";
 import { defaultPageSeo } from "@/lib/seo";
 import type {
@@ -529,6 +535,7 @@ export function defaultPages(): CmsPage[] {
       cmsEnabled: true,
       sections: createContactSections(),
     },
+    ...createCompanyCmsPages(),
   ];
 }
 
@@ -569,12 +576,14 @@ export function defaultSettings(): SiteSettings {
       nav("fq-iptv", "IPTV Subscription", "/iptv-subscriptions-uk/"),
       nav("fq-blog", "Blog", "/blog/"),
       nav("fq-contact", "Contact", "/contact/"),
+      DEFAULT_ABOUT_FOOTER_LINK,
     ],
     footerSupportLinks: [
       nav("fs-contact", "Contact", "/contact/"),
       nav("fs-faq", "FAQ", "/welcome/#faq"),
       nav("fs-plans", "Plans", "/iptv-subscriptions-uk/"),
     ],
+    footerLegalLinks: DEFAULT_LEGAL_FOOTER_LINKS,
     footerPaymentImages: [],
     branding: {
       logo: null,
@@ -591,6 +600,7 @@ export function defaultSettings(): SiteSettings {
       ),
       contact: defaultPageSeo("Contact", "Contact Flix IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
       blog: defaultPageSeo("Blog", "Guides and updates from Flix IPTV.", "/blog/"),
+      ...companyPageSeoDefaults(),
     },
     siteCustomJsonLd: "",
     customHeadCode: "",

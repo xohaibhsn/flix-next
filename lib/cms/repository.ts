@@ -1,6 +1,7 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
+import { companyPageBySlug, mergeMissingCompanyPages } from "@/lib/cms/company-pages";
 import { applyPublicCopyCleanupToPages } from "@/lib/cms/public-copy-cleanup";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { applySeoLongformToPages } from "@/lib/cms/seo-longform";
@@ -34,13 +35,17 @@ export class LocalJsonRepository implements CmsRepository {
     const raw = Array.isArray(file.pages) ? file.pages : defaultPages();
     const defaults = defaultPages();
     const pages = raw.map((page) => {
-      if (page.slug === "/iptv-subscriptions-uk/" && (!page.sections || page.sections.length === 0)) {
+      if (
+        (page.slug === "/iptv-subscriptions-uk/" || companyPageBySlug(page.slug)) &&
+        (!page.sections || page.sections.length === 0)
+      ) {
         const fallback = defaults.find((item) => item.slug === page.slug);
         if (fallback) return { ...page, cmsEnabled: true, sections: fallback.sections };
       }
       return page;
     });
-    const longform = applySeoLongformToPages(pages.map((page) => sanitizePage(page)));
+    const merged = mergeMissingCompanyPages(pages);
+    const longform = applySeoLongformToPages(merged.pages.map((page) => sanitizePage(page)));
     const cleaned = applyPublicCopyCleanupToPages(longform.pages);
     if (longform.changed || cleaned.changed) {
       await writeJsonFile(PAGES_FILE, { pages: cleaned.pages } satisfies PagesFile);

@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { SectionRenderer } from "@/components/cms/SectionRenderer";
 import { cms } from "@/lib/cms/repository";
+import { createCompanyPageSections, companyPageBySlug } from "@/lib/cms/company-pages";
 import { createContactSections, createHomeSections, createSubscriptionSections } from "@/lib/cms/defaults";
 import type { CmsSection } from "@/lib/cms/types";
 import { publicPageUrl } from "@/lib/site-url";
@@ -8,6 +9,8 @@ import { publicPageUrl } from "@/lib/site-url";
 function fallbackSections(slug: string): CmsSection[] {
   if (slug === "/iptv-subscriptions-uk/") return createSubscriptionSections();
   if (slug === "/contact/") return createContactSections();
+  const company = companyPageBySlug(slug);
+  if (company) return createCompanyPageSections(company);
   return createHomeSections();
 }
 

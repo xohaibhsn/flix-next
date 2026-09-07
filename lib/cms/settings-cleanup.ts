@@ -1,5 +1,6 @@
 import { rewriteBrandDisplay } from "@/lib/cms/brand";
 import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
+import { PAGE_SEO_KEYS } from "@/lib/cms/page-seo";
 import type { PageSeo, SiteSettings } from "@/lib/cms/types";
 
 export const KNOWN_TEST_TAGLINE = "Your Entertainment Testt";
@@ -60,7 +61,7 @@ export function applyPublicCopyCleanupToSettings(settings: SiteSettings): { sett
   }
 
   const pageSeo = { ...next.pageSeo };
-  for (const key of ["home", "subscriptions", "contact", "blog"] as const) {
+  for (const key of PAGE_SEO_KEYS) {
     const result = rewritePageSeo(pageSeo[key]);
     if (!result.changed) continue;
     pageSeo[key] = result.seo;

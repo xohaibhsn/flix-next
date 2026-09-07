@@ -26,12 +26,13 @@ export function Footer({
   const phoneHref = publicPhoneHref(settings);
   const quick = settings.footerQuickLinks.filter((item) => item.visible);
   const support = settings.footerSupportLinks.filter((item) => item.visible);
+  const legal = (settings.footerLegalLinks || []).filter((item) => item.visible);
   const socials = publicSocialLinks(settings);
   const year = new Date().getFullYear();
 
   return (
     <footer className="bg-[#08090d] text-white">
-      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+      <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 lg:px-8">
         <div>
           <Logo imageUrl={branding?.imageUrl} alt={branding?.alt} />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-white/60">
@@ -53,7 +54,7 @@ export function Footer({
           ) : null}
         </div>
         <div>
-          <h2 className="text-sm font-bold tracking-wide uppercase">Quick Links</h2>
+          <h2 className="text-sm font-bold tracking-wide uppercase">Company</h2>
           <ul className="mt-4 space-y-2 text-sm text-white/65">
             {quick.map((item) => (
               <li key={item.id}>
@@ -91,6 +92,20 @@ export function Footer({
             ) : null}
           </ul>
         </div>
+        {legal.length ? (
+          <div>
+            <h2 className="text-sm font-bold tracking-wide uppercase">Legal</h2>
+            <ul className="mt-4 space-y-2 text-sm text-white/65">
+              {legal.map((item) => (
+                <li key={item.id}>
+                  <Link href={item.href} className="hover:text-white">
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div>
           <h2 className="text-sm font-bold tracking-wide uppercase">Contact Us</h2>
           <ul className="mt-4 space-y-3 text-sm text-white/65">

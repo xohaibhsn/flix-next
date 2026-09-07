@@ -26,6 +26,12 @@ import type {
 } from "@/lib/cms/types";
 import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
+import {
+  COMPANY_PAGE_SEO_KEYS,
+  DEFAULT_ABOUT_FOOTER_LINK,
+  DEFAULT_LEGAL_FOOTER_LINKS,
+  mergeMissingNavLinks,
+} from "@/lib/cms/company-pages";
 import { sanitizeHtml } from "@/lib/cms/html";
 import { sanitizeJsonLdField } from "@/lib/cms/json-ld-input";
 import { sanitizeCustomHeadCode } from "@/lib/cms/head-code";
@@ -165,8 +171,15 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
     headerCtaHref: sanitizeHref(source.headerCtaHref),
     footerIntro: sanitizeText(source.footerIntro, 400),
     footerCopyright: sanitizeText(source.footerCopyright, 160),
-    footerQuickLinks: sanitizeNavList(source.footerQuickLinks, fallback.footerQuickLinks),
+    footerQuickLinks: mergeMissingNavLinks(
+      sanitizeNavList(source.footerQuickLinks, fallback.footerQuickLinks),
+      [DEFAULT_ABOUT_FOOTER_LINK],
+    ).links,
     footerSupportLinks: sanitizeNavList(source.footerSupportLinks, fallback.footerSupportLinks),
+    footerLegalLinks: mergeMissingNavLinks(
+      sanitizeNavList(source.footerLegalLinks, fallback.footerLegalLinks),
+      DEFAULT_LEGAL_FOOTER_LINKS,
+    ).links,
     footerPaymentImages: Array.isArray(source.footerPaymentImages)
       ? source.footerPaymentImages.map(sanitizeMediaRef).filter((item): item is NonNullable<typeof item> => Boolean(item))
       : [],
@@ -181,7 +194,13 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
       subscriptions: sanitizePageSeo(source.pageSeo?.subscriptions, fallback.pageSeo.subscriptions),
       contact: sanitizePageSeo(source.pageSeo?.contact, fallback.pageSeo.contact),
       blog: sanitizePageSeo(source.pageSeo?.blog, fallback.pageSeo.blog),
-    },
+      ...Object.fromEntries(
+        COMPANY_PAGE_SEO_KEYS.map((key) => [
+          key,
+          sanitizePageSeo(source.pageSeo?.[key], fallback.pageSeo[key]),
+        ]),
+      ),
+    } as SiteSettings["pageSeo"],
     siteCustomJsonLd: sanitizeJsonLdField(source.siteCustomJsonLd),
     customHeadCode: sanitizeCustomHeadCode(source.customHeadCode),
   };

@@ -1,5 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
+import { COMPANY_PAGES } from "@/lib/cms/company-pages";
 
 const PUBLIC_PATHS = [
   "/",
@@ -11,6 +12,7 @@ const PUBLIC_PATHS = [
   "/blog/",
   "/iptv-subscriptions-uk",
   "/iptv-subscriptions-uk/",
+  ...COMPANY_PAGES.flatMap((page) => [page.slug.replace(/\/$/, ""), page.slug]),
 ];
 
 const SIDHU_PATHS = [
@@ -24,6 +26,10 @@ const SIDHU_PATHS = [
   "/sidhu/pages/subscriptions/",
   "/sidhu/pages/contact",
   "/sidhu/pages/contact/",
+  ...COMPANY_PAGES.flatMap((page) => [
+    `/sidhu/pages/${page.adminParam}`,
+    `/sidhu/pages/${page.adminParam}/`,
+  ]),
   "/sidhu/blog",
   "/sidhu/blog/",
   "/sidhu/pricing",

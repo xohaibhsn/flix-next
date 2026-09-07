@@ -1,4 +1,4 @@
-import { getSiteOrigin } from "@/lib/site-url";
+import { getSiteOrigin, absoluteUrl } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
 import { publicEmail, publicPhone, publicSameAs, publicWhatsAppProfileUrl } from "@/lib/cms/public-contact";
 import { resolveOpenGraphImageFromSettings } from "@/lib/cms/open-graph";
@@ -26,6 +26,34 @@ export function websiteJsonLd(settings: SiteSettings) {
     name: settings.siteName,
     url: getSiteOrigin(),
     description: settings.tagline,
+  };
+}
+
+export function webPageJsonLd(settings: SiteSettings, name: string, path: string, description?: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name,
+    url: absoluteUrl(path),
+    description: description || undefined,
+    isPartOf: {
+      "@type": "WebSite",
+      name: settings.siteName,
+      url: getSiteOrigin(),
+    },
+  };
+}
+
+export function breadcrumbListJsonLd(items: Array<{ name: string; path: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
   };
 }
 

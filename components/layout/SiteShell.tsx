@@ -6,8 +6,9 @@ import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { CustomHeadCode } from "@/components/seo/CustomHeadCode";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { cms } from "@/lib/cms/repository";
-import { organizationJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
+import { breadcrumbListJsonLd, organizationJsonLd, webPageJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
+import { companyPageBySeoKey, isCompanyPageSeoKey } from "@/lib/cms/company-pages";
 import { publicWhatsAppSalesUrl, publicWhatsAppVisitUrl } from "@/lib/cms/public-contact";
 import { isSalesCtaLabel } from "@/lib/cms/whatsapp-messages";
 import type { LogoBranding } from "@/components/layout/Logo";
@@ -46,6 +47,26 @@ export async function SiteShell({
       <CustomHeadCode html={settings.customHeadCode || ""} />
       {showOrganization ? <JsonLd data={organizationJsonLd(settings)} /> : null}
       <JsonLd data={websiteJsonLd(settings)} />
+      {pageSeoKey && isCompanyPageSeoKey(pageSeoKey)
+        ? (() => {
+            const page = companyPageBySeoKey(pageSeoKey);
+            if (!page) return null;
+            const seo = settings.pageSeo[pageSeoKey];
+            return (
+              <>
+                <JsonLd
+                  data={webPageJsonLd(settings, seo.title || page.name, page.slug, seo.description)}
+                />
+                <JsonLd
+                  data={breadcrumbListJsonLd([
+                    { name: "Home", path: "/welcome/" },
+                    { name: page.name, path: page.slug },
+                  ])}
+                />
+              </>
+            );
+          })()
+        : null}
       <StoredJsonLd raw={settings.siteCustomJsonLd || ""} />
       {pageSeoKey ? <StoredJsonLd raw={settings.pageSeo[pageSeoKey].customJsonLd || ""} /> : null}
       <Header

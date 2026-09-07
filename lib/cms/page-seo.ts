@@ -1,6 +1,7 @@
+import { COMPANY_PAGE_SEO_KEYS, companyPageSeoMeta } from "@/lib/cms/company-pages";
 import type { SiteSettings } from "@/lib/cms/types";
 
-export const PAGE_SEO_KEYS = ["home", "subscriptions", "contact", "blog"] as const;
+export const PAGE_SEO_KEYS = ["home", "subscriptions", "contact", "blog", ...COMPANY_PAGE_SEO_KEYS] as const;
 export type PageSeoKey = (typeof PAGE_SEO_KEYS)[number];
 
 export const PAGE_SEO_META: Record<
@@ -27,6 +28,7 @@ export const PAGE_SEO_META: Record<
     editorHref: "/sidhu/blog/",
     publicPaths: ["/blog", "/blog/"],
   },
+  ...companyPageSeoMeta(),
 };
 
 export function isPageSeoKey(value: string): value is PageSeoKey {
