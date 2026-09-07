@@ -33,7 +33,7 @@ export const plans: Plan[] = [
     price: "69.99",
     period: "/ year",
     featured: true,
-    note: "Just $5.83 / month (demo)",
+    note: "Just £5.83 / month (demo)",
     features: PLAN_FEATURES,
   },
   {

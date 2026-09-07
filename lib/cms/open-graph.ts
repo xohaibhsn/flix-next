@@ -37,7 +37,7 @@ export function cloudinarySocialDeliveryUrl(secureUrl: string) {
 export function resolveOpenGraphImage(
   pageImage: MediaRef | null | undefined,
   siteDefaultOg: MediaRef | null | undefined,
-  alt = "THE FLIX IPTV",
+  alt = "Flix IPTV",
 ): ResolvedSocialImage {
   const chosen = pageImage?.secureUrl ? pageImage : siteDefaultOg?.secureUrl ? siteDefaultOg : null;
   if (chosen) {

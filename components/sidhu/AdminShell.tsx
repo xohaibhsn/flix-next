@@ -62,7 +62,7 @@ export function AdminShell({
       <aside className="hidden w-64 shrink-0 flex-col bg-[#0c0e14] text-white lg:flex">
         <div className="border-b border-white/10 px-5 py-5">
           <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
-          <p className="mt-1 text-sm font-bold">THE FLIX CMS</p>
+          <p className="mt-1 text-sm font-bold">Flix IPTV CMS</p>
           <p className="mt-1 text-[11px] text-white/45">
             {session ? session.displayName || session.username : "Protected admin session"}
           </p>

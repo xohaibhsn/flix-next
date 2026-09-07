@@ -21,7 +21,7 @@ export function Logo({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imageUrl}
-          alt={alt || siteConfig.shortName}
+          alt={alt || siteConfig.name}
           className="h-10 w-auto max-w-[180px] object-contain"
         />
       </Link>

@@ -16,7 +16,7 @@ export type DeviceShowcaseContent = {
 };
 
 const FALLBACK: DeviceShowcaseContent = {
-  brand: "THE FLIX",
+  brand: "Flix IPTV",
   eyebrow: "Featured",
   title: "City Lights",
   meta: "4K · Drama · 2026",

@@ -4,6 +4,7 @@ import { Container } from "@/components/ui/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import type { PricingData, SiteSettings } from "@/lib/cms/types";
 import { createDefaultSectionData } from "@/lib/cms/defaults";
+import { formatGbpPrice, PRICE_CURRENCY_CODE } from "@/lib/cms/currency";
 import { publicWhatsAppPlanUrl } from "@/lib/cms/public-contact";
 
 export function Pricing({
@@ -45,7 +46,9 @@ export function Pricing({
                 ) : null}
                 <h3 className="text-center text-lg font-bold text-ink">{plan.name}</h3>
                 <p className="mt-4 text-center">
-                  <span className="text-4xl font-extrabold text-brand">${plan.price}</span>
+                  <span className="text-4xl font-extrabold text-brand" data-price-currency={PRICE_CURRENCY_CODE}>
+                    {formatGbpPrice(plan.price)}
+                  </span>
                   <span className="text-sm text-muted">{plan.duration}</span>
                 </p>
                 <p className="mt-1 h-4" />

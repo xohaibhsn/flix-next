@@ -147,7 +147,7 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
   const source = input && typeof input === "object" ? input : fallback;
   const whatsapp = sanitizeText(source.whatsapp, 40).replace(/[^\d]/g, "");
   const next: SiteSettings = {
-    siteName: sanitizeText(source.siteName, 80) || "THE FLIX IPTV",
+    siteName: sanitizeText(source.siteName, 80) || "Flix IPTV",
     tagline: sanitizeText(source.tagline, 160),
     email: sanitizeText(source.email, 120),
     phone: sanitizeText(source.phone, 60),

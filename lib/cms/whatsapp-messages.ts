@@ -1,13 +1,12 @@
-export const WHATSAPP_SALES_MESSAGE =
-  "Hi, I am interested in The Flix streaming service. Please help me choose a suitable plan and send me the payment details.";
+import { formatGbpPrice } from "@/lib/cms/currency";
 
-export const WHATSAPP_VISIT_MESSAGE = "Hi, I am visiting The Flix website and would like some help.";
+export const WHATSAPP_SALES_MESSAGE =
+  "Hi, I am interested in Flix IPTV. Please help me choose a suitable plan and send me the payment details.";
+
+export const WHATSAPP_VISIT_MESSAGE = "Hi, I am visiting the Flix IPTV website and would like some help.";
 
 function formatPlanPrice(price: string) {
-  const trimmed = price.trim();
-  if (!trimmed) return "";
-  if (/^[£$€]/.test(trimmed)) return trimmed;
-  return `$${trimmed}`;
+  return formatGbpPrice(price);
 }
 
 function formatPlanPeriod(duration: string) {

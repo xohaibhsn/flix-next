@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { deletePlanAction, savePlanAction } from "@/lib/cms/actions";
+import { savePlanAction, deletePlanAction } from "@/lib/cms/actions";
+import { formatGbpPrice } from "@/lib/cms/currency";
 import { createId } from "@/lib/cms/ids";
 import type { PricingPlan } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
@@ -88,7 +89,7 @@ export function PricingManager({ initialPlans }: { initialPlans: PricingPlan[] }
                     {plan.name} {plan.popular ? <span className="text-xs text-brand">Popular</span> : null}
                   </td>
                   <td className="px-4 py-3">
-                    {plan.price} {plan.duration}
+                    {formatGbpPrice(plan.price)} {plan.duration}
                   </td>
                   <td className="px-4 py-3">{plan.active ? "Active" : "Hidden"}</td>
                   <td className="px-4 py-3">
@@ -119,7 +120,7 @@ export function PricingManager({ initialPlans }: { initialPlans: PricingPlan[] }
             <Field label="Slug">
               <TextInput value={editing.slug} onChange={(event) => setEditing({ ...editing, slug: event.target.value })} />
             </Field>
-            <Field label="Price">
+            <Field label="Price" hint="Amount only. Public pages display this in pounds (£).">
               <TextInput value={editing.price} onChange={(event) => setEditing({ ...editing, price: event.target.value })} />
             </Field>
             <Field label="Duration">

@@ -63,7 +63,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
           { id: "hero-t2", icon: "ShieldCheck", label: "7-Day Guarantee" },
           { id: "hero-t3", icon: "Clock3", label: "WhatsApp Support" },
         ],
-        showcaseBrand: "THE FLIX",
+        showcaseBrand: "Flix IPTV",
         showcaseEyebrow: "Featured",
         showcaseTitle: "City Lights",
         showcaseMeta: "4K · Drama · 2026",
@@ -306,7 +306,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
       };
     case "page-hero":
       return {
-        eyebrow: "The Flix",
+        eyebrow: "Flix IPTV",
         heading: "Page title",
         highlight: "",
         description: "Short supporting text for this page.",
@@ -440,7 +440,7 @@ export function createSubscriptionSections(): CmsSection[] {
   benefits.label = "Benefits";
   benefits.data = {
     eyebrow: "",
-    heading: "Why subscribers choose The Flix",
+    heading: "Why subscribers choose Flix IPTV",
     description: "Enjoy reliable streaming, flexible plans, easy setup, and WhatsApp support.",
     cards: [
       { id: "ben-1", icon: "Tv", title: "Live sports & news", description: "Follow leagues, breaking news, and international channels without juggling apps." },
@@ -486,7 +486,7 @@ export function createContactSections(): CmsSection[] {
   hero.data = {
     eyebrow: "Support",
     heading: "Contact",
-    highlight: "The Flix",
+    highlight: "Flix IPTV",
     description: "For subscriptions, payment details, setup and support, contact us directly on WhatsApp.",
   };
   const info = createSection("contact-info", 2);
@@ -534,13 +534,13 @@ export function defaultPages(): CmsPage[] {
 
 export function defaultSettings(): SiteSettings {
   return {
-    siteName: "THE FLIX IPTV",
+    siteName: "Flix IPTV",
     tagline: "Your Entertainment. Your Way.",
     email: "support@theflixiptv.com",
     phone: "",
     whatsapp: "",
     whatsappDisplay: "",
-    whatsappMessage: "Hi The Flix, I need help with my IPTV plan.",
+    whatsappMessage: "Hi Flix IPTV, I need help with my IPTV plan.",
     whatsappEnabled: false,
     hours: "24/7 support",
     location: "Available worldwide",
@@ -578,19 +578,19 @@ export function defaultSettings(): SiteSettings {
     footerPaymentImages: [],
     branding: {
       logo: null,
-      logoAlt: "THE FLIX IPTV",
+      logoAlt: "Flix IPTV",
       favicon: null,
       defaultOgImage: null,
     },
     pageSeo: {
-      home: defaultPageSeo("Welcome", "Stream live TV, movies, and series with THE FLIX IPTV.", "/welcome/"),
+      home: defaultPageSeo("Welcome", "Stream live TV, movies, and series with Flix IPTV.", "/welcome/"),
       subscriptions: defaultPageSeo(
         "IPTV Subscriptions UK",
-        "IPTV plans, devices, and FAQs for THE FLIX IPTV.",
+        "IPTV plans, devices, and FAQs for Flix IPTV.",
         "/iptv-subscriptions-uk/",
       ),
-      contact: defaultPageSeo("Contact", "Contact THE FLIX IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
-      blog: defaultPageSeo("Blog", "Guides and updates from THE FLIX IPTV.", "/blog/"),
+      contact: defaultPageSeo("Contact", "Contact Flix IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
+      blog: defaultPageSeo("Blog", "Guides and updates from Flix IPTV.", "/blog/"),
     },
     siteCustomJsonLd: "",
     customHeadCode: "",
@@ -672,7 +672,7 @@ export function defaultBlogCategories(): BlogCategory[] {
     { id: "cat-setup", name: "Setup", slug: "setup", description: "Device and playlist setup guides.", active: true, createdAt: now, updatedAt: now },
     { id: "cat-devices", name: "Devices", slug: "devices", description: "Smart TVs, Firestick, and apps.", active: true, createdAt: now, updatedAt: now },
     { id: "cat-quality", name: "Quality", slug: "quality", description: "Streaming quality and bandwidth.", active: true, createdAt: now, updatedAt: now },
-    { id: "cat-guides", name: "Guides", slug: "guides", description: "Getting started with The Flix.", active: true, createdAt: now, updatedAt: now },
+    { id: "cat-guides", name: "Guides", slug: "guides", description: "Getting started with Flix IPTV.", active: true, createdAt: now, updatedAt: now },
   ];
 }
 

@@ -40,7 +40,7 @@ function hasFlag(name: string) {
 }
 
 function help() {
-  console.log(`WordPress → The Flix CMS importer
+  console.log(`WordPress → Flix IPTV CMS importer
 
 Usage:
   npx tsx tools/import-wordpress.ts --sql tmp/wordpress/backup.sql

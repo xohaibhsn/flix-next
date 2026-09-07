@@ -8,7 +8,7 @@ export async function generateMetadata() {
   return pageSeoMetadata(
     "contact",
     "Contact",
-    "Contact THE FLIX IPTV support by WhatsApp, email, or form.",
+    "Contact Flix IPTV support by WhatsApp, email, or form.",
     "/contact/",
   );
 }

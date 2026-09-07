@@ -1,3 +1,4 @@
+import { rewriteBrandDisplay } from "@/lib/cms/brand";
 import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import type { PageSeo, SiteSettings } from "@/lib/cms/types";
 
@@ -12,10 +13,10 @@ export function withKnownTestTaglineReplaced(settings: SiteSettings): { settings
 }
 
 function rewritePageSeo(seo: PageSeo): { seo: PageSeo; changed: boolean } {
-  const title = rewriteDemoCopy(seo.title);
-  const description = rewriteDemoCopy(seo.description);
-  const ogTitle = rewriteDemoCopy(seo.ogTitle);
-  const ogDescription = rewriteDemoCopy(seo.ogDescription);
+  const title = rewriteBrandDisplay(rewriteDemoCopy(seo.title));
+  const description = rewriteBrandDisplay(rewriteDemoCopy(seo.description));
+  const ogTitle = rewriteBrandDisplay(rewriteDemoCopy(seo.ogTitle));
+  const ogDescription = rewriteBrandDisplay(rewriteDemoCopy(seo.ogDescription));
   const changed =
     title !== seo.title ||
     description !== seo.description ||
@@ -30,7 +31,27 @@ export function applyPublicCopyCleanupToSettings(settings: SiteSettings): { sett
   let next = tagged.settings;
   let changed = tagged.changed;
 
-  const footerIntro = rewriteDemoCopy(next.footerIntro);
+  const siteName = rewriteBrandDisplay(next.siteName);
+  const logoAlt = rewriteBrandDisplay(next.branding.logoAlt);
+  const whatsappMessage = rewriteBrandDisplay(next.whatsappMessage);
+  const footerCopyright = rewriteBrandDisplay(next.footerCopyright);
+  if (
+    siteName !== next.siteName ||
+    logoAlt !== next.branding.logoAlt ||
+    whatsappMessage !== next.whatsappMessage ||
+    footerCopyright !== next.footerCopyright
+  ) {
+    next = {
+      ...next,
+      siteName,
+      whatsappMessage,
+      footerCopyright,
+      branding: { ...next.branding, logoAlt },
+    };
+    changed = true;
+  }
+
+  const footerIntro = rewriteBrandDisplay(rewriteDemoCopy(next.footerIntro));
   const hours = rewriteDemoCopy(next.hours);
   const location = rewriteDemoCopy(next.location);
   if (footerIntro !== next.footerIntro || hours !== next.hours || location !== next.location) {

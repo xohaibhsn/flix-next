@@ -1,4 +1,5 @@
 import type { BlogPost, CmsPage, CmsSection, FaqItem, HowItWorksData, PricingPlan } from "@/lib/cms/types";
+import { rewriteBrandDisplay } from "@/lib/cms/brand";
 import { isLegacyHowItWorks, ORDER_PROCESS_HOW_IT_WORKS } from "@/lib/cms/order-process";
 
 const EXACT_REPLACEMENTS: Array<[string, string]> = [
@@ -292,7 +293,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Contact THE FLIX IPTV support by WhatsApp, email, or form.",
-    "Contact THE FLIX IPTV on WhatsApp for plans, payment details, and setup.",
+    "Contact Flix IPTV on WhatsApp for plans, payment details, and setup.",
   ],
   [
     "A local demo guide covering the usual Firestick apps, playlist steps, and what to check if the stream will not load.",
@@ -362,7 +363,7 @@ export function rewriteDemoCopy(value: string) {
 
 function rewriteUnknown(value: unknown): { value: unknown; changed: boolean } {
   if (typeof value === "string") {
-    const next = rewriteDemoCopy(value);
+    const next = rewriteBrandDisplay(rewriteDemoCopy(value));
     return { value: next, changed: next !== value };
   }
   if (Array.isArray(value)) {

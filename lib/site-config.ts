@@ -1,8 +1,8 @@
 import type { NavItem } from "@/types/content";
 
 export const siteConfig = {
-  name: "THE FLIX IPTV",
-  shortName: "THE FLIX",
+  name: "Flix IPTV",
+  shortName: "Flix",
   tagline: "Your Entertainment. Your Way.",
   description:
     "UK streaming for Firestick, Fire TV, Smart TV and Android TV. Message us on WhatsApp to get set up.",

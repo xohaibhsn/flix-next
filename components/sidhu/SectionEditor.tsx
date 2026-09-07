@@ -572,7 +572,7 @@ function PricingFields({ data, onChange }: { data: PricingData; onChange: (data:
                 }
               />
             </Field>
-            <Field label="Price">
+            <Field label="Price" hint="Amount only. Public cards show pounds (£).">
               <TextInput
                 value={plan.price}
                 onChange={(event) =>

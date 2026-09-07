@@ -8,7 +8,7 @@ export async function generateMetadata() {
   return pageSeoMetadata(
     "subscriptions",
     "IPTV Subscriptions UK",
-    "IPTV plans, devices, and FAQs for THE FLIX IPTV.",
+    "IPTV plans, devices, and FAQs for Flix IPTV.",
     "/iptv-subscriptions-uk/",
   );
 }

@@ -10,7 +10,7 @@ import type { BlogPost } from "@/lib/cms/types";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return pageSeoMetadata("blog", "Blog", "Guides and updates from THE FLIX IPTV.", "/blog/");
+  return pageSeoMetadata("blog", "Blog", "Guides and updates from Flix IPTV.", "/blog/");
 }
 
 function formatDate(value: string | null) {
@@ -59,9 +59,9 @@ export default async function BlogPage() {
     <SiteShell pageSeoKey="blog">
       <PageHero
         eyebrow="Guides"
-        title="The Flix"
+        title="Flix IPTV"
         accent="Blog"
-        description="Setup help, device guides, and streaming notes from THE FLIX IPTV."
+        description="Setup help, device guides, and streaming notes from Flix IPTV."
       />
       <section className="bg-paper py-16">
         <Container>
