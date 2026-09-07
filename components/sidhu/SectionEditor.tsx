@@ -977,10 +977,16 @@ function RichContentFields({
 }) {
   return (
     <div className="space-y-4">
-      <Field label="Eyebrow / small label">
+      <Field
+        label="Eyebrow / small label"
+        hint="Stored in the CMS but not shown on the public page. Article headings come from the content below."
+      >
         <TextInput value={data.eyebrow} onChange={(event) => onChange({ ...data, eyebrow: event.target.value })} />
       </Field>
-      <Field label="Main heading">
+      <Field
+        label="Main heading"
+        hint="Stored in the CMS but not shown on the public page. Use H2–H4 headings inside the article."
+      >
         <TextInput value={data.heading} onChange={(event) => onChange({ ...data, heading: event.target.value })} />
       </Field>
       <Field label="Content width">

@@ -70,21 +70,15 @@ export function RichContentBlock({
   return (
     <section className="bg-white py-16">
       <Container className={width}>
-        {data.eyebrow ? (
-          <p className="text-xs font-bold tracking-[0.18em] text-brand uppercase">{data.eyebrow}</p>
-        ) : null}
-        {data.heading ? (
-          <h2 className={`text-3xl font-extrabold text-ink ${data.eyebrow ? "mt-3" : ""}`}>{data.heading}</h2>
-        ) : null}
         {data.scrollable ? (
           <div
-            className={`rounded-xl border border-line bg-white p-5 shadow-sm sm:p-7 ${data.heading || data.eyebrow ? "mt-6" : ""} ${RICH_SCROLL_HEIGHT[data.scrollHeight] || RICH_SCROLL_HEIGHT.standard}`}
+            className={`rounded-xl border border-line bg-white p-5 shadow-sm sm:p-7 ${RICH_SCROLL_HEIGHT[data.scrollHeight] || RICH_SCROLL_HEIGHT.standard}`}
             tabIndex={0}
           >
             {body}
           </div>
         ) : (
-          <div className={data.heading || data.eyebrow ? "mt-6" : ""}>{body}</div>
+          body
         )}
         {showCta ? (
           <ButtonLink href={ctaHref} className="mt-8">
