@@ -94,7 +94,7 @@ export function Footer({
         </div>
         {legal.length ? (
           <div>
-            <h2 className="text-sm font-bold tracking-wide uppercase">Legal</h2>
+            <h2 className="text-sm font-bold tracking-wide uppercase">Policies & Terms</h2>
             <ul className="mt-4 space-y-2 text-sm text-white/65">
               {legal.map((item) => (
                 <li key={item.id}>
