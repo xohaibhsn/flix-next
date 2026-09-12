@@ -165,6 +165,14 @@ export function companyPageBySlug(slug: string) {
   return COMPANY_PAGES.find((page) => page.slug === slug);
 }
 
+export function companyPageById(id: string) {
+  return COMPANY_PAGES.find((page) => page.id === id);
+}
+
+export function isCompanyPageId(id: string) {
+  return COMPANY_PAGES.some((page) => page.id === id);
+}
+
 export function companyPageBySeoKey(key: CompanyPageSeoKey) {
   return COMPANY_PAGES.find((page) => page.seoKey === key);
 }
@@ -276,7 +284,7 @@ const ABOUT_HTML = `<p>Flix IPTV is a UK-focused streaming subscription. The aim
 <p>People still search for IPTV. We describe the same practical need in plainer language: a streaming subscription for British households that want television on Firestick, Fire TV, Smart TV, Android TV, mobile, tablet or laptop, subject to the plan they choose.</p>
 <h2>Who We Are</h2>
 <p>We operate this website and the subscription service described on it. We do not publish a made-up company history, office tour, or customer count. What we can say is how the service works and how you can reach us.</p>
-<p>If you are comparing streaming packages for a UK home, this page is an introduction. Plan details and prices are listed on the <a href="/iptv-subscriptions-uk/">IPTV Subscription</a> page.</p>
+<p>If you are comparing streaming packages for a UK home, this page is an introduction. Plan details and prices are listed on the <a href="/iptv-subscription-uk/">IPTV Subscription</a> page.</p>
 <h2>What We Offer</h2>
 <p>Flix IPTV offers streaming packages for live television and on-demand entertainment. Compatibility, picture quality and the number of devices you can use depend on the plan you choose and the hardware you already own.</p>
 <ul>

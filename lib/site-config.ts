@@ -14,20 +14,20 @@ export const siteConfig = {
   location: "Available worldwide",
   nav: [
     { label: "Home", href: "/" },
-    { label: "IPTV Subscription", href: "/iptv-subscriptions-uk/" },
+    { label: "IPTV Subscription", href: "/iptv-subscription-uk/" },
     { label: "Blog", href: "/blog/" },
     { label: "Contact", href: "/contact/" },
   ] satisfies NavItem[],
   footerQuickLinks: [
     { label: "Home", href: "/" },
-    { label: "IPTV Subscription", href: "/iptv-subscriptions-uk/" },
+    { label: "IPTV Subscription", href: "/iptv-subscription-uk/" },
     { label: "Welcome", href: "/welcome/" },
     { label: "Blog", href: "/blog/" },
   ] satisfies NavItem[],
   footerSupportLinks: [
     { label: "Contact", href: "/contact/" },
     { label: "FAQ", href: "/#faq" },
-    { label: "Plans", href: "/iptv-subscriptions-uk/" },
+    { label: "Plans", href: "/iptv-subscription-uk/" },
   ] satisfies NavItem[],
   socials: [
     { label: "Facebook", href: "#", short: "f" },

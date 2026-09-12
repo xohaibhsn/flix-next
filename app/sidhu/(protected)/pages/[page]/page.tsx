@@ -22,25 +22,25 @@ export default async function SidhuCompanyPageBuilder({
   if (!definition) notFound();
 
   const [page, faqs, assets, settings, cloud] = await Promise.all([
-    cms.getPageBySlug(definition.slug),
+    cms.getPageById(definition.id),
     cms.listFaqs(),
     cms.listMedia(),
     cms.getSettings(),
     getCloudinaryStatusAction(),
   ]);
-  const resolved = page ?? defaultPages().find((item) => item.slug === definition.slug);
+  const resolved = page ?? defaultPages().find((item) => item.id === definition.id);
   if (!resolved) notFound();
 
   return (
     <AdminShell
       title={definition.name}
-      subtitle={`Section builder for ${definition.slug}. SEO settings are on this page when you have SEO access.`}
+      subtitle={`Section builder for ${resolved.slug}. SEO settings are on this page when you have SEO access.`}
     >
       <div className="space-y-6">
         <HomeBuilder
           page={resolved}
           title={`${definition.name} page builder`}
-          hint={`Saving updates the live ${definition.name} page at ${definition.slug} after a refresh.`}
+          hint={`Saving updates the live ${definition.name} page at ${resolved.slug} after a refresh.`}
           faqs={faqs}
           assets={assets}
         />

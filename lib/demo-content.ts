@@ -76,19 +76,19 @@ export const services: ServiceCard[] = [
   {
     title: "Live TV",
     text: "News, sports, entertainment, and international channels from around the world — all in one guide.",
-    href: "/iptv-subscriptions-uk/",
+    href: "/iptv-subscription-uk/",
     tone: "red",
   },
   {
     title: "Movies & Series",
     text: "A massive on-demand library with the latest releases, classics, and binge-worthy series in HD & 4K.",
-    href: "/iptv-subscriptions-uk/",
+    href: "/iptv-subscription-uk/",
     tone: "purple",
   },
   {
     title: "Favorites",
     text: "Save the channels and shows you love. Pick up right where you left off on any device.",
-    href: "/iptv-subscriptions-uk/",
+    href: "/iptv-subscription-uk/",
     tone: "green",
   },
 ];
@@ -174,7 +174,7 @@ export const subscriptionPage = {
   title: "IPTV Subscriptions",
   titleAccent: "Built for Everyday Watching",
   intro:
-    "This page is the local stand-in for /iptv-subscriptions-uk/. Full WordPress SEO copy will be imported later. For now you get the same Flix layout, demo plans, and structured content blocks.",
+    "This page is the local stand-in for /iptv-subscription-uk/. Full WordPress SEO copy will be imported later. For now you get the same Flix layout, demo plans, and structured content blocks.",
   benefits: [
     {
       title: "Live sports & news",

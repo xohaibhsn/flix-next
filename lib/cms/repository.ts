@@ -1,10 +1,17 @@
 import type { CmsPage, MediaAsset, MediaFile, PagesFile, SiteSettings } from "@/lib/cms/types";
 import type { CatalogRepository } from "@/lib/cms/catalog";
 import { defaultPages, defaultSettings } from "@/lib/cms/defaults";
-import { companyPageBySlug, mergeMissingCompanyPages } from "@/lib/cms/company-pages";
+import { companyPageById, companyPageBySlug, mergeMissingCompanyPages } from "@/lib/cms/company-pages";
 import { applyPublicCopyCleanupToPages } from "@/lib/cms/public-copy-cleanup";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { applySeoLongformToPages } from "@/lib/cms/seo-longform";
+import { SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
+import { withSlash } from "@/lib/cms/redirects";
+import { duplicateSlugError } from "@/lib/cms/slug-change";
+import {
+  migrateSubscriptionPageRecord,
+  remapPageStructuredHrefs,
+} from "@/lib/cms/subscription-url-migrate";
 import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import { MysqlCatalogRepository } from "@/lib/cms/mysql-catalog";
@@ -34,20 +41,29 @@ export class LocalJsonRepository implements CmsRepository {
     const file = await readJsonFile<PagesFile>(PAGES_FILE, { pages: defaultPages() });
     const raw = Array.isArray(file.pages) ? file.pages : defaultPages();
     const defaults = defaultPages();
+    let migratedChanged = false;
     const pages = raw.map((page) => {
+      const migrated = migrateSubscriptionPageRecord(page);
+      const hrefs = remapPageStructuredHrefs(migrated.page);
+      if (migrated.changed || hrefs.changed) migratedChanged = true;
+      const next = hrefs.page;
       if (
-        (page.slug === "/iptv-subscriptions-uk/" || companyPageBySlug(page.slug)) &&
-        (!page.sections || page.sections.length === 0)
+        (next.id === SUBSCRIPTION_PAGE_ID ||
+          next.slug === SUBSCRIPTION_SLUG ||
+          next.slug === SUBSCRIPTION_SLUG_LEGACY ||
+          companyPageBySlug(next.slug) ||
+          companyPageById(next.id)) &&
+        (!next.sections || next.sections.length === 0)
       ) {
-        const fallback = defaults.find((item) => item.slug === page.slug);
-        if (fallback) return { ...page, cmsEnabled: true, sections: fallback.sections };
+        const fallback = defaults.find((item) => item.id === next.id) ?? defaults.find((item) => item.slug === next.slug);
+        if (fallback) return { ...next, cmsEnabled: true, sections: fallback.sections };
       }
-      return page;
+      return next;
     });
     const merged = mergeMissingCompanyPages(pages);
     const longform = applySeoLongformToPages(merged.pages.map((page) => sanitizePage(page)));
     const cleaned = applyPublicCopyCleanupToPages(longform.pages);
-    if (longform.changed || cleaned.changed) {
+    if (migratedChanged || longform.changed || cleaned.changed) {
       await writeJsonFile(PAGES_FILE, { pages: cleaned.pages } satisfies PagesFile);
     }
     return cleaned.pages;
@@ -60,12 +76,15 @@ export class LocalJsonRepository implements CmsRepository {
 
   async getPageBySlug(slug: string) {
     const pages = await this.listPages();
-    return pages.find((page) => page.slug === slug) ?? null;
+    return pages.find((page) => withSlash(page.slug) === withSlash(slug)) ?? null;
   }
 
   async savePage(page: CmsPage) {
     const safe = sanitizePage(page);
     const pages = await this.listPages();
+    if (pages.some((item) => item.id !== safe.id && withSlash(item.slug) === withSlash(safe.slug))) {
+      throw duplicateSlugError();
+    }
     const next = pages.some((item) => item.id === safe.id)
       ? pages.map((item) => (item.id === safe.id ? safe : item))
       : [...pages, safe];

@@ -11,12 +11,15 @@ import {
   seedCmsIfEmpty,
   seedExtendedIfEmpty,
   seedManagedRedirectsIfNeeded,
+  migrateSubscriptionPageSlugIfNeeded,
   seedSeoLongformIfNeeded,
   cleanupKnownTestTaglineIfNeeded,
 } from "@/lib/cms/mysql-migrate";
 import type { CmsPage, CmsSection, MediaAsset, SectionType, SiteSettings } from "@/lib/cms/types";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
+import { withSlash } from "@/lib/cms/redirects";
+import { duplicateSlugError, mysqlDuplicateError } from "@/lib/cms/slug-change";
 import { isProductionBuildPhase } from "@/lib/db/config";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
 
@@ -115,6 +118,7 @@ export class MysqlCmsRepository {
         await seedCmsIfEmpty();
         await seedExtendedIfEmpty();
         await seedManagedRedirectsIfNeeded();
+        await migrateSubscriptionPageSlugIfNeeded();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
         const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");
@@ -154,9 +158,11 @@ export class MysqlCmsRepository {
   async getPageBySlug(slug: string) {
     await this.ensureReady();
     const pool = getDbPool();
+    const want = withSlash(slug);
+    const slugs = want === "/" ? ["/"] : [want, want.replace(/\/$/, "")];
     const [pages] = await pool.query<PageRow[]>(
-      "SELECT id, name, slug, status, cms_enabled FROM pages WHERE slug = ? LIMIT 1",
-      [slug],
+      `SELECT id, name, slug, status, cms_enabled FROM pages WHERE slug IN (${slugs.map(() => "?").join(", ")}) LIMIT 1`,
+      slugs,
     );
     const page = pages[0];
     if (!page) return null;
@@ -173,35 +179,40 @@ export class MysqlCmsRepository {
   async savePage(page: CmsPage) {
     await this.ensureReady();
     const safe = sanitizePage(page);
-    await withTransaction(async (conn) => {
-      await conn.execute(
-        `INSERT INTO pages (id, name, slug, status, cms_enabled)
-         VALUES (?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           name = VALUES(name),
-           slug = VALUES(slug),
-           status = VALUES(status),
-           cms_enabled = VALUES(cms_enabled)`,
-        [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
-      );
-      await conn.execute("DELETE FROM page_sections WHERE page_id = ?", [safe.id]);
-      for (const section of safe.sections) {
+    try {
+      await withTransaction(async (conn) => {
         await conn.execute(
-          `INSERT INTO page_sections
-            (id, page_id, section_type, label, sort_order, visible, section_data)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [
-            section.id,
-            safe.id,
-            section.type,
-            section.label,
-            section.order,
-            section.visible ? 1 : 0,
-            JSON.stringify(section.data),
-          ],
+          `INSERT INTO pages (id, name, slug, status, cms_enabled)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name = VALUES(name),
+             slug = VALUES(slug),
+             status = VALUES(status),
+             cms_enabled = VALUES(cms_enabled)`,
+          [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
         );
-      }
-    });
+        await conn.execute("DELETE FROM page_sections WHERE page_id = ?", [safe.id]);
+        for (const section of safe.sections) {
+          await conn.execute(
+            `INSERT INTO page_sections
+              (id, page_id, section_type, label, sort_order, visible, section_data)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              section.id,
+              safe.id,
+              section.type,
+              section.label,
+              section.order,
+              section.visible ? 1 : 0,
+              JSON.stringify(section.data),
+            ],
+          );
+        }
+      });
+    } catch (error) {
+      if (mysqlDuplicateError(error)) throw duplicateSlugError();
+      throw error;
+    }
     return safe;
   }
 

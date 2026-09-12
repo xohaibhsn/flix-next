@@ -6,6 +6,7 @@ import { requireAdminSession } from "@/lib/auth/guards";
 import { adminHasPermission } from "@/lib/auth/session";
 import { defaultPages } from "@/lib/cms/defaults";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { SUBSCRIPTION_PAGE_ID } from "@/lib/cms/page-paths";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
@@ -13,19 +14,19 @@ export const dynamic = "force-dynamic";
 export default async function SidhuSubscriptionsBuilderPage() {
   const user = await requireAdminSession();
   const [page, faqs, assets, settings, cloud] = await Promise.all([
-    cms.getPageBySlug("/iptv-subscriptions-uk/"),
+    cms.getPageById(SUBSCRIPTION_PAGE_ID),
     cms.listFaqs(),
     cms.listMedia(),
     cms.getSettings(),
     getCloudinaryStatusAction(),
   ]);
-  const resolved = page ?? defaultPages().find((item) => item.slug === "/iptv-subscriptions-uk/");
+  const resolved = page ?? defaultPages().find((item) => item.id === SUBSCRIPTION_PAGE_ID);
   if (!resolved) notFound();
 
   return (
     <AdminShell
       title="IPTV Subscription"
-      subtitle="Same section builder as Home. Saving updates /iptv-subscriptions-uk/."
+      subtitle={`Same section builder as Home. Saving updates ${resolved.slug}.`}
     >
       <div className="space-y-6">
         <HomeBuilder

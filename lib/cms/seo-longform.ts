@@ -147,6 +147,7 @@ export const SUBSCRIPTION_SEO_LONGFORM = subscriptionData();
 
 type PageSpec = {
   slug: string;
+  pageId?: string;
   id: string;
   label: string;
   preferredIds: string[];
@@ -162,7 +163,8 @@ const SPECS: PageSpec[] = [
     data: HOME_SEO_LONGFORM,
   },
   {
-    slug: "/iptv-subscriptions-uk/",
+    slug: "/iptv-subscription-uk/",
+    pageId: "page-subscriptions",
     id: SEO_LONGFORM_SUB_ID,
     label: "Rich Content / Long Description",
     preferredIds: [SEO_LONGFORM_SUB_ID, "sec-sub-longform"],
@@ -239,7 +241,7 @@ function fillRichContent(section: CmsSection, spec: PageSpec): CmsSection {
 }
 
 export function applySeoLongformToPage(page: CmsPage): { page: CmsPage; changed: boolean } {
-  const spec = SPECS.find((item) => item.slug === page.slug);
+  const spec = SPECS.find((item) => item.pageId === page.id || item.slug === page.slug);
   if (!spec) return finishSeoLongformPage(page, false);
 
   let sections = [...page.sections].sort((a, b) => a.order - b.order);

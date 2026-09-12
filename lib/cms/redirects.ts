@@ -8,6 +8,16 @@ function clip(value: unknown, max = 500) {
   return value.replace(/\0/g, "").slice(0, max).trim();
 }
 
+export const REDIRECT_ERRORS = {
+  empty: "Source and destination cannot be empty.",
+  self: "Source and destination cannot be the same.",
+  duplicate: "This source URL already has a redirect.",
+  loop: "Redirect loop detected.",
+  reserved: "That source path is reserved.",
+  unsafe: "That destination URL is not allowed.",
+  unknownDest: "Destination does not match an existing local page.",
+} as const;
+
 export function withSlash(path: string) {
   if (!path || path === "/") return "/";
   return path.endsWith("/") ? path : `${path}/`;
@@ -68,10 +78,8 @@ export function isSelfRedirect(sourcePath: string, destination: string, origin?:
   }
   try {
     const url = new URL(destination, origin || "https://theflixiptv.com");
-    if (origin) {
-      const from = new URL(origin);
-      if (url.origin === from.origin && withSlash(url.pathname) === source) return true;
-    }
+    const from = new URL(origin || "https://theflixiptv.com");
+    if (url.origin === from.origin && withSlash(url.pathname) === source) return true;
     return false;
   } catch {
     return true;

@@ -1,18 +1,9 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
-import { companyPageBySlug } from "@/lib/cms/company-pages";
+import { editorHrefForPageId } from "@/lib/cms/page-paths";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
-
-function editHref(slug: string) {
-  if (slug === "/") return "/sidhu/pages/home/";
-  if (slug === "/iptv-subscriptions-uk/") return "/sidhu/pages/subscriptions/";
-  if (slug === "/contact/") return "/sidhu/pages/contact/";
-  const company = companyPageBySlug(slug);
-  if (company) return `/sidhu/pages/${company.adminParam}/`;
-  return null;
-}
 
 export default async function SidhuPagesPage() {
   const pages = await cms.listPages();
@@ -31,7 +22,7 @@ export default async function SidhuPagesPage() {
           </thead>
           <tbody>
             {pages.map((page) => {
-              const href = editHref(page.slug);
+              const href = editorHrefForPageId(page.id);
               return (
                 <tr key={page.id} className="border-t border-line">
                   <td className="px-4 py-3 font-medium">{page.name}</td>

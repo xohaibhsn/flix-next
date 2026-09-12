@@ -14,8 +14,8 @@ import {
 const PAGE_ROUTE_HINTS: Array<{ slugs: string[]; route: string; label: string }> = [
   { slugs: ["welcome", "home", "index", "the-flix"], route: "/welcome/", label: "Home" },
   {
-    slugs: ["iptv-subscriptions-uk", "iptv-subscription", "iptv-subscriptions", "subscriptions", "pricing"],
-    route: "/iptv-subscriptions-uk/",
+    slugs: ["iptv-subscription-uk", "iptv-subscriptions-uk", "iptv-subscription", "iptv-subscriptions", "subscriptions", "pricing"],
+    route: "/iptv-subscription-uk/",
     label: "IPTV Subscription",
   },
   { slugs: ["contact", "contact-us", "contact-the-flix"], route: "/contact/", label: "Contact" },

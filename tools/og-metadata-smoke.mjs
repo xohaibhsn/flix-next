@@ -1,7 +1,7 @@
 const DEFAULT_BASE = process.env.OG_SMOKE_BASE || "http://localhost:3012";
 const ROUTES = process.argv.slice(2).length
   ? process.argv.slice(2)
-  : ["/", "/welcome/", "/iptv-subscriptions-uk/", "/contact/", "/blog/"];
+  : ["/", "/welcome/", "/iptv-subscription-uk/", "/contact/", "/blog/"];
 
 function metas(html, key) {
   const re = new RegExp(

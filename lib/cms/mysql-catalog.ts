@@ -13,7 +13,8 @@ import {
   sanitizePost,
   sanitizeRedirect,
 } from "@/lib/cms/validation";
-import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
+import { ClientError } from "@/lib/security/errors";
+import { isReservedRedirectSource, isSelfRedirect, REDIRECT_ERRORS, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
 import type {
   BlogCategory,
@@ -368,20 +369,20 @@ export class MysqlCatalogRepository implements CatalogRepository {
     await this.ready();
     const safe = sanitizeRedirect(rule);
     if (!safe.sourcePath || isReservedRedirectSource(safe.sourcePath)) {
-      throw new Error("That source path is reserved.");
+      throw new ClientError(REDIRECT_ERRORS.reserved);
     }
     if (isSelfRedirect(safe.sourcePath, sanitizeRedirectDestination(rule.destinationPath))) {
-      throw new Error("Source and destination cannot be the same.");
+      throw new ClientError(REDIRECT_ERRORS.self);
     }
     const existing = await this.listRedirects();
     if (wouldCreateRedirectLoop(safe, existing)) {
-      throw new Error("That redirect would create a loop.");
+      throw new ClientError(REDIRECT_ERRORS.loop);
     }
     const [dupes] = await getDbPool().query<RedirectRow[]>(
       "SELECT id FROM redirects WHERE source_path = ? AND id <> ? AND is_active = 1 LIMIT 1",
       [safe.sourcePath, safe.id],
     );
-    if (dupes[0] && safe.active) throw new Error("An active redirect already uses that source path.");
+    if (dupes[0] && safe.active) throw new ClientError(REDIRECT_ERRORS.duplicate);
     await getDbPool().execute(
       `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
        VALUES (?, ?, ?, ?, ?)

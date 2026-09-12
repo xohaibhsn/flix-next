@@ -43,6 +43,7 @@ import {
   sanitizeRedirectDestination,
 } from "@/lib/cms/redirects";
 import { slugify } from "@/lib/cms/slug";
+import { lockedSlugForPageId, normalizePageSlug } from "@/lib/cms/page-paths";
 
 const SECTION_TYPES: SectionType[] = [
   "hero",
@@ -138,10 +139,15 @@ export function sanitizePage(input: CmsPage): CmsPage {
     .sort((a, b) => a.order - b.order)
     .map((section, index) => ({ ...section, order: index + 1 }));
 
+  const id = sanitizeText(input.id, 80);
+  const parsed = normalizePageSlug(input.slug);
+  const locked = lockedSlugForPageId(id);
+  const slug = locked || (parsed.ok ? parsed.slug : sanitizeText(input.slug, 120) || "/");
+
   return {
-    id: sanitizeText(input.id, 80),
+    id,
     name: sanitizeText(input.name, 80) || "Untitled",
-    slug: sanitizeText(input.slug, 120) || "/",
+    slug,
     status: input.status === "draft" ? "draft" : "published",
     cmsEnabled: Boolean(input.cmsEnabled),
     sections: normalized,

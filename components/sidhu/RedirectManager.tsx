@@ -3,6 +3,15 @@
 import { useState } from "react";
 import { deleteRedirectAction, saveRedirectAction } from "@/lib/cms/actions";
 import { createId } from "@/lib/cms/ids";
+import { isKnownLocalDestination } from "@/lib/cms/page-paths";
+import {
+  isDangerousUrl,
+  isReservedRedirectSource,
+  isSelfRedirect,
+  REDIRECT_ERRORS,
+  withSlash,
+  wouldCreateRedirectLoop,
+} from "@/lib/cms/redirects";
 import type { RedirectRule } from "@/lib/cms/types";
 import { Banner, Field, TextInput } from "@/components/sidhu/fields";
 
@@ -19,11 +28,35 @@ function blank(): RedirectRule {
   };
 }
 
-export function RedirectManager({ initialRules }: { initialRules: RedirectRule[] }) {
+function clientRedirectError(rule: RedirectRule, rules: RedirectRule[], known: Set<string>) {
+  const source = rule.sourcePath.trim();
+  const destination = rule.destinationPath.trim();
+  if (!source || !destination) return REDIRECT_ERRORS.empty;
+  if (isDangerousUrl(destination) || destination.startsWith("//")) return REDIRECT_ERRORS.unsafe;
+  if (isReservedRedirectSource(source)) return REDIRECT_ERRORS.reserved;
+  if (isSelfRedirect(source, destination)) return REDIRECT_ERRORS.self;
+  if (rules.some((item) => item.id !== rule.id && item.active && rule.active && withSlash(item.sourcePath) === withSlash(source))) {
+    return REDIRECT_ERRORS.duplicate;
+  }
+  if (wouldCreateRedirectLoop(rule, rules)) return REDIRECT_ERRORS.loop;
+  if (rule.active && destination.startsWith("/") && !destination.startsWith("//") && !isKnownLocalDestination(destination, known)) {
+    return REDIRECT_ERRORS.unknownDest;
+  }
+  return null;
+}
+
+export function RedirectManager({
+  initialRules,
+  knownDestinations,
+}: {
+  initialRules: RedirectRule[];
+  knownDestinations: string[];
+}) {
   const [rules, setRules] = useState(initialRules);
   const [editing, setEditing] = useState<RedirectRule | null>(null);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const known = new Set(knownDestinations);
 
   function upsert(rule: RedirectRule) {
     setRules((current) =>
@@ -34,6 +67,11 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
   }
 
   async function save(rule: RedirectRule) {
+    const localError = clientRedirectError(rule, rules, known);
+    if (localError) {
+      setMessage({ tone: "error", text: localError });
+      return false;
+    }
     const result = await saveRedirectAction(rule);
     if (!result.ok) {
       setMessage({ tone: "error", text: result.error });
@@ -67,7 +105,7 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
       <Banner tone="info">
         All public redirects live here, including `/` → `/welcome/`. Disable or delete a rule to stop it.
         If the root redirect is off, `/` shows the same Home CMS as `/welcome/`. `/sidhu` and `/api` cannot
-        be used as sources.
+        be used as sources. Source and destination cannot be the same.
       </Banner>
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <button type="button" className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white" onClick={() => setEditing(blank())}>
@@ -123,7 +161,7 @@ export function RedirectManager({ initialRules }: { initialRules: RedirectRule[]
           <Field label="Source path" hint="Including `/`. Trailing slashes are normalized.">
             <TextInput value={editing.sourcePath} onChange={(event) => setEditing({ ...editing, sourcePath: event.target.value })} />
           </Field>
-          <Field label="Destination" hint="Internal path or http(s) URL.">
+          <Field label="Destination" hint="Internal path of an existing page, or an http(s) URL.">
             <TextInput value={editing.destinationPath} onChange={(event) => setEditing({ ...editing, destinationPath: event.target.value })} />
           </Field>
           <Field label="Status">

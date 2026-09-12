@@ -2,7 +2,7 @@
 
 import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
-import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidatePageSeo, revalidateSidhuCms } from "@/lib/cms/revalidate";
+import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidatePageSeo, revalidatePublicSlug, revalidateSidhuCms } from "@/lib/cms/revalidate";
 import type {
   BlogCategory,
   BlogPost,
@@ -17,8 +17,16 @@ import { normalizeJsonLdInput } from "@/lib/cms/json-ld-input";
 import { headCodePolicyError, sanitizeCustomHeadCode } from "@/lib/cms/head-code";
 import { isPageSeoKey, PAGE_SEO_META } from "@/lib/cms/page-seo";
 import { isCloudinaryConfigured } from "@/lib/cloudinary";
-
-import { publicErrorMessage } from "@/lib/security/errors";
+import {
+  isKnownLocalDestination,
+  knownLocalDestinations,
+  lockedSlugForPageId,
+  pathsForSlug,
+  validateCmsPageSlug,
+} from "@/lib/cms/page-paths";
+import { applyPageSlugChange } from "@/lib/cms/slug-change";
+import { isDangerousUrl, isReservedRedirectSource, REDIRECT_ERRORS, withSlash } from "@/lib/cms/redirects";
+import { ClientError, publicErrorMessage } from "@/lib/security/errors";
 
 function fail(error: unknown, fallback: string) {
   return { ok: false as const, error: publicErrorMessage(error, fallback) };
@@ -28,7 +36,25 @@ export async function savePageAction(page: CmsPage) {
   const unauthorized = await requireAdminAction("pages");
   if (unauthorized) return unauthorized;
   try {
-    const saved = await cms.savePage(page);
+    const current = await cms.getPageById(page.id);
+    if (!current) throw new ClientError("Page not found.");
+    const [pages, posts, categories] = await Promise.all([
+      cms.listPages(),
+      cms.listPosts(),
+      cms.listCategories(),
+    ]);
+    const locked = lockedSlugForPageId(current.id);
+    const requestedSlug = locked ?? page.slug;
+    const validated = validateCmsPageSlug(requestedSlug, current, pages, posts, categories);
+    if (!validated.ok) throw new ClientError(validated.error);
+    const nextPage = { ...page, id: current.id, slug: validated.slug };
+    const saved = await cms.savePage(nextPage);
+    if (withSlash(current.slug) !== withSlash(saved.slug)) {
+      await applyPageSlugChange(cms, current, saved);
+      for (const path of [...pathsForSlug(current.slug), ...pathsForSlug(saved.slug)]) {
+        revalidatePublicSlug(path);
+      }
+    }
     revalidateSidhuCms();
     return { ok: true as const, page: saved };
   } catch (error) {
@@ -203,6 +229,27 @@ export async function saveRedirectAction(rule: RedirectRule) {
   const unauthorized = await requireAdminAction("redirects");
   if (unauthorized) return unauthorized;
   try {
+    const source = (rule.sourcePath || "").trim();
+    const destination = (rule.destinationPath || "").trim();
+    if (!source || !destination) throw new ClientError(REDIRECT_ERRORS.empty);
+    if (isDangerousUrl(destination) || destination.startsWith("//")) {
+      throw new ClientError(REDIRECT_ERRORS.unsafe);
+    }
+    if (isReservedRedirectSource(source)) throw new ClientError(REDIRECT_ERRORS.reserved);
+    if (!destination.startsWith("/") && !/^https?:\/\//i.test(destination)) {
+      throw new ClientError(REDIRECT_ERRORS.unsafe);
+    }
+    if (rule.active && destination.startsWith("/") && !destination.startsWith("//")) {
+      const [pages, posts, categories] = await Promise.all([
+        cms.listPages(),
+        cms.listPosts(),
+        cms.listCategories(),
+      ]);
+      const known = knownLocalDestinations(pages, posts, categories);
+      if (!isKnownLocalDestination(destination, known)) {
+        throw new ClientError(REDIRECT_ERRORS.unknownDest);
+      }
+    }
     const saved = await cms.saveRedirect(rule);
     revalidateSidhuCms();
     return { ok: true as const, rule: saved };

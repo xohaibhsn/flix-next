@@ -7,6 +7,7 @@ import {
 } from "@/lib/cms/defaults";
 import { applyPublicCopyCleanupToFaq, applyPublicCopyCleanupToPlan, applyPublicCopyCleanupToPost } from "@/lib/cms/public-copy-cleanup";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/lib/cms/managed-redirects";
+import { applySubscriptionRedirectMigration } from "@/lib/cms/subscription-url-migrate";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import {
   sanitizeCategory,
@@ -16,7 +17,8 @@ import {
   sanitizePost,
   sanitizeRedirect,
 } from "@/lib/cms/validation";
-import { isReservedRedirectSource, isSelfRedirect, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
+import { ClientError } from "@/lib/security/errors";
+import { isReservedRedirectSource, isSelfRedirect, REDIRECT_ERRORS, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
 import type {
   BlogCategory,
   BlogPost,
@@ -174,7 +176,9 @@ export class JsonCatalogRepository implements CatalogRepository {
     const items = await readJsonFile<RedirectRule[]>(REDIRECTS_FILE, []);
     const list = Array.isArray(items) ? items : [];
     const seeded = await ensureJsonManagedRedirects(list);
-    return seeded.map(sanitizeRedirect);
+    const migrated = applySubscriptionRedirectMigration(seeded);
+    if (migrated.changed) await saveList(REDIRECTS_FILE, migrated.rules);
+    return migrated.rules.map(sanitizeRedirect);
   }
   async listActiveRedirects() {
     const items = await this.listRedirects();
@@ -183,17 +187,17 @@ export class JsonCatalogRepository implements CatalogRepository {
   async saveRedirect(rule: RedirectRule) {
     const safe = sanitizeRedirect(rule);
     if (!safe.sourcePath || isReservedRedirectSource(safe.sourcePath)) {
-      throw new Error("That source path is reserved.");
+      throw new ClientError(REDIRECT_ERRORS.reserved);
     }
     if (isSelfRedirect(safe.sourcePath, sanitizeRedirectDestination(rule.destinationPath))) {
-      throw new Error("Source and destination cannot be the same.");
+      throw new ClientError(REDIRECT_ERRORS.self);
     }
     const items = await this.listRedirects();
     if (wouldCreateRedirectLoop(safe, items)) {
-      throw new Error("That redirect would create a loop.");
+      throw new ClientError(REDIRECT_ERRORS.loop);
     }
     if (items.some((item) => item.sourcePath === safe.sourcePath && item.id !== safe.id && item.active && safe.active)) {
-      throw new Error("An active redirect already uses that source path.");
+      throw new ClientError(REDIRECT_ERRORS.duplicate);
     }
     const next = items.some((item) => item.id === safe.id)
       ? items.map((item) => (item.id === safe.id ? safe : item))

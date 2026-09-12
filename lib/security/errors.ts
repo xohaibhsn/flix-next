@@ -1,4 +1,12 @@
+export class ClientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ClientError";
+  }
+}
+
 export function publicErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ClientError && error.message) return error.message;
   if (process.env.NODE_ENV !== "production" && error instanceof Error && error.message) {
     return error.message;
   }

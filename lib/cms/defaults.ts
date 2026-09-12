@@ -61,9 +61,9 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
         description:
           "Live TV, films and series on the devices you already use at home — Firestick, Smart TV, phone, tablet and laptop. Message us on WhatsApp to get set up.",
         primaryLabel: "Get Started",
-        primaryHref: "/iptv-subscriptions-uk/",
+        primaryHref: "/iptv-subscription-uk/",
         secondaryLabel: "View Plans",
-        secondaryHref: "/iptv-subscriptions-uk/",
+        secondaryHref: "/iptv-subscription-uk/",
         trustItems: [
           { id: "hero-t1", icon: "Zap", label: "Simple Setup" },
           { id: "hero-t2", icon: "ShieldCheck", label: "7-Day Guarantee" },
@@ -112,7 +112,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             description:
               "News, sports, entertainment, and international channels from around the world — all in one guide.",
             linkLabel: "Explore",
-            linkHref: "/iptv-subscriptions-uk/",
+            linkHref: "/iptv-subscription-uk/",
             tone: "red",
           },
           {
@@ -122,7 +122,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             description:
               "Films and series on demand, including recent titles and classics, in HD and 4K where compatible.",
             linkLabel: "Explore",
-            linkHref: "/iptv-subscriptions-uk/",
+            linkHref: "/iptv-subscription-uk/",
             tone: "purple",
           },
           {
@@ -132,7 +132,7 @@ export function createDefaultSectionData(type: SectionType): CmsSection["data"] 
             description:
               "Save the channels and shows you love. Pick up right where you left off on any device.",
             linkLabel: "Explore",
-            linkHref: "/iptv-subscriptions-uk/",
+            linkHref: "/iptv-subscription-uk/",
             tone: "green",
           },
         ],
@@ -522,7 +522,7 @@ export function defaultPages(): CmsPage[] {
     {
       id: "page-subscriptions",
       name: "IPTV Subscription",
-      slug: "/iptv-subscriptions-uk/",
+      slug: "/iptv-subscription-uk/",
       status: "published",
       cmsEnabled: true,
       sections: createSubscriptionSections(),
@@ -562,18 +562,18 @@ export function defaultSettings(): SiteSettings {
     },
     headerNav: [
       nav("nav-home", "Home", "/welcome/"),
-      nav("nav-iptv", "IPTV Subscription", "/iptv-subscriptions-uk/"),
+      nav("nav-iptv", "IPTV Subscription", "/iptv-subscription-uk/"),
       nav("nav-blog", "Blog", "/blog/"),
       nav("nav-contact", "Contact", "/contact/"),
     ],
     headerCtaLabel: "Get Started",
-    headerCtaHref: "/iptv-subscriptions-uk/",
+    headerCtaHref: "/iptv-subscription-uk/",
     footerIntro:
       "Premium IPTV with live channels, movies, and series on every device. Reliable streams. Honest pricing.",
     footerCopyright: "All rights reserved.",
     footerQuickLinks: [
       nav("fq-home", "Home", "/welcome/"),
-      nav("fq-iptv", "IPTV Subscription", "/iptv-subscriptions-uk/"),
+      nav("fq-iptv", "IPTV Subscription", "/iptv-subscription-uk/"),
       nav("fq-blog", "Blog", "/blog/"),
       nav("fq-contact", "Contact", "/contact/"),
       DEFAULT_ABOUT_FOOTER_LINK,
@@ -581,7 +581,7 @@ export function defaultSettings(): SiteSettings {
     footerSupportLinks: [
       nav("fs-contact", "Contact", "/contact/"),
       nav("fs-faq", "FAQ", "/welcome/#faq"),
-      nav("fs-plans", "Plans", "/iptv-subscriptions-uk/"),
+      nav("fs-plans", "Plans", "/iptv-subscription-uk/"),
     ],
     footerLegalLinks: DEFAULT_LEGAL_FOOTER_LINKS,
     footerPaymentImages: [],
@@ -596,7 +596,7 @@ export function defaultSettings(): SiteSettings {
       subscriptions: defaultPageSeo(
         "IPTV Subscriptions UK",
         "IPTV plans, devices, and FAQs for Flix IPTV.",
-        "/iptv-subscriptions-uk/",
+        "/iptv-subscription-uk/",
       ),
       contact: defaultPageSeo("Contact", "Contact Flix IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
       blog: defaultPageSeo("Blog", "Guides and updates from Flix IPTV.", "/blog/"),

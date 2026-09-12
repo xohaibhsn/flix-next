@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { savePageAction } from "@/lib/cms/actions";
 import { createSection } from "@/lib/cms/defaults";
 import { createId } from "@/lib/cms/ids";
+import { isPageSlugEditable } from "@/lib/cms/page-paths";
 import { SUPPORTED_SECTION_TYPES } from "@/lib/cms/section-registry";
 import type { CmsPage, CmsSection, FaqItem, MediaAsset, SectionType } from "@/lib/cms/types";
 import { SectionEditor } from "@/components/sidhu/SectionEditor";
-import { Banner } from "@/components/sidhu/fields";
+import { Banner, Field, TextInput } from "@/components/sidhu/fields";
 
 export function HomeBuilder({
   page: initialPage,
@@ -35,6 +36,7 @@ export function HomeBuilder({
   );
   const selected = sections.find((section) => section.id === selectedId) ?? null;
   const dirty = JSON.stringify(page) !== JSON.stringify(saved);
+  const slugEditable = isPageSlugEditable(page.id);
 
   function updateSections(next: CmsSection[]) {
     setPage({
@@ -98,6 +100,26 @@ export function HomeBuilder({
         </div>
       </div>
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+
+      <div className="rounded-xl border border-line bg-white p-4">
+        <Field
+          label="Page URL / Slug"
+          hint={
+            slugEditable
+              ? "Public URL for this page. Changing it redirects the old URL automatically."
+              : "This page URL is fixed."
+          }
+        >
+          <TextInput
+            value={page.slug}
+            onChange={(event) => setPage({ ...page, slug: event.target.value })}
+            readOnly={!slugEditable}
+            disabled={!slugEditable}
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </Field>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
         <div className="space-y-3">

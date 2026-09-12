@@ -1,4 +1,5 @@
 import { COMPANY_PAGE_SEO_KEYS, companyPageSeoMeta } from "@/lib/cms/company-pages";
+import { SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY, pathsForSlug } from "@/lib/cms/page-paths";
 import type { SiteSettings } from "@/lib/cms/types";
 
 export const PAGE_SEO_KEYS = ["home", "subscriptions", "contact", "blog", ...COMPANY_PAGE_SEO_KEYS] as const;
@@ -16,7 +17,7 @@ export const PAGE_SEO_META: Record<
   subscriptions: {
     label: "IPTV Subscription",
     editorHref: "/sidhu/pages/subscriptions/",
-    publicPaths: ["/iptv-subscriptions-uk", "/iptv-subscriptions-uk/"],
+    publicPaths: [...pathsForSlug(SUBSCRIPTION_SLUG), ...pathsForSlug(SUBSCRIPTION_SLUG_LEGACY)],
   },
   contact: {
     label: "Contact",

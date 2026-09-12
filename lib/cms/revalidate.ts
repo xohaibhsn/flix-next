@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
 import { COMPANY_PAGES } from "@/lib/cms/company-pages";
+import { SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY, pathsForSlug } from "@/lib/cms/page-paths";
 
 const PUBLIC_PATHS = [
   "/",
@@ -10,8 +11,8 @@ const PUBLIC_PATHS = [
   "/contact/",
   "/blog",
   "/blog/",
-  "/iptv-subscriptions-uk",
-  "/iptv-subscriptions-uk/",
+  ...pathsForSlug(SUBSCRIPTION_SLUG),
+  ...pathsForSlug(SUBSCRIPTION_SLUG_LEGACY),
   ...COMPANY_PAGES.flatMap((page) => [page.slug.replace(/\/$/, ""), page.slug]),
 ];
 
@@ -51,6 +52,13 @@ const SIDHU_PATHS = [
   "/sidhu/account",
   "/sidhu/account/",
 ];
+
+export function revalidatePublicSlug(slug: string) {
+  for (const path of pathsForSlug(slug)) {
+    revalidatePath(path);
+  }
+  revalidatePath("/sitemap.xml");
+}
 
 export function revalidatePublicSite() {
   revalidatePath("/", "layout");

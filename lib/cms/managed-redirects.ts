@@ -21,14 +21,14 @@ export const MANAGED_REDIRECTS: ManagedRedirectSeed[] = [
   {
     id: "redir-iptv-subscription",
     sourcePath: "/iptv-subscription/",
-    destinationPath: "/iptv-subscriptions-uk/",
+    destinationPath: "/iptv-subscription-uk/",
     statusCode: 301,
     active: true,
   },
   {
     id: "redir-iptv-subscriptions",
     sourcePath: "/iptv-subscriptions/",
-    destinationPath: "/iptv-subscriptions-uk/",
+    destinationPath: "/iptv-subscription-uk/",
     statusCode: 301,
     active: true,
   },

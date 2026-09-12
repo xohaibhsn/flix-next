@@ -25,11 +25,15 @@ export async function SiteShell({
   overlayHeader = false,
   showOrganization = false,
   pageSeoKey,
+  publicPath,
+  pageTitle,
 }: {
   children: ReactNode;
   overlayHeader?: boolean;
   showOrganization?: boolean;
   pageSeoKey?: keyof SiteSettings["pageSeo"];
+  publicPath?: string;
+  pageTitle?: string;
 }) {
   await connection();
   const settings = await cms.getSettings();
@@ -41,26 +45,28 @@ export async function SiteShell({
   const salesWhatsApp = publicWhatsAppSalesUrl(settings);
   const headerCtaHref =
     salesWhatsApp && isSalesCtaLabel(settings.headerCtaLabel) ? salesWhatsApp : settings.headerCtaHref;
+  const company = pageSeoKey && isCompanyPageSeoKey(pageSeoKey) ? companyPageBySeoKey(pageSeoKey) : null;
+  const schemaPath = publicPath || company?.slug || "";
+  const schemaName = pageTitle || company?.name || "";
+  const showWebPage = Boolean(schemaPath && (company || pageSeoKey === "subscriptions"));
 
   return (
     <>
       <CustomHeadCode html={settings.customHeadCode || ""} />
       {showOrganization ? <JsonLd data={organizationJsonLd(settings)} /> : null}
       <JsonLd data={websiteJsonLd(settings)} />
-      {pageSeoKey && isCompanyPageSeoKey(pageSeoKey)
+      {showWebPage
         ? (() => {
-            const page = companyPageBySeoKey(pageSeoKey);
-            if (!page) return null;
-            const seo = settings.pageSeo[pageSeoKey];
+            const seo = pageSeoKey ? settings.pageSeo[pageSeoKey] : null;
             return (
               <>
                 <JsonLd
-                  data={webPageJsonLd(settings, seo.title || page.name, page.slug, seo.description)}
+                  data={webPageJsonLd(settings, seo?.title || schemaName, schemaPath, seo?.description)}
                 />
                 <JsonLd
                   data={breadcrumbListJsonLd([
                     { name: "Home", path: "/welcome/" },
-                    { name: page.name, path: page.slug },
+                    { name: schemaName || "Page", path: schemaPath },
                   ])}
                 />
               </>

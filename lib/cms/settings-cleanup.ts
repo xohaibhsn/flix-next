@@ -1,6 +1,7 @@
 import { rewriteBrandDisplay } from "@/lib/cms/brand";
 import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { PAGE_SEO_KEYS } from "@/lib/cms/page-seo";
+import { remapSettingsForSubscriptionUrl } from "@/lib/cms/subscription-url-migrate";
 import type { PageSeo, SiteSettings } from "@/lib/cms/types";
 
 export const KNOWN_TEST_TAGLINE = "Your Entertainment Testt";
@@ -69,5 +70,6 @@ export function applyPublicCopyCleanupToSettings(settings: SiteSettings): { sett
   }
 
   if (changed) next = { ...next, pageSeo };
-  return { settings: next, changed };
+  const remapped = remapSettingsForSubscriptionUrl(next);
+  return { settings: remapped.settings, changed: changed || remapped.changed };
 }
