@@ -11,6 +11,8 @@ const PUBLIC_PATHS = [
   "/contact/",
   "/blog",
   "/blog/",
+  "/blogs",
+  "/blogs/",
   ...pathsForSlug(SUBSCRIPTION_SLUG),
   ...pathsForSlug(SUBSCRIPTION_SLUG_LEGACY),
   ...COMPANY_PAGES.flatMap((page) => [page.slug.replace(/\/$/, ""), page.slug]),
@@ -92,6 +94,8 @@ export function revalidateSidhuCms() {
 export function revalidateBlog(slug?: string) {
   revalidatePath("/blog");
   revalidatePath("/blog/");
+  revalidatePath("/blogs");
+  revalidatePath("/blogs/");
   revalidatePath("/category", "layout");
   if (slug) {
     revalidatePath(`/blog/${slug}`);

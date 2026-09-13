@@ -54,7 +54,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   };
 
   add("/welcome/", "home", "weekly", 1);
-  add("/blog/", "blog", "weekly", 0.8);
+  add("/blogs/", "blog", "weekly", 0.8);
 
   for (const page of pages) {
     if (page.status !== "published") continue;

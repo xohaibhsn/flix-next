@@ -15,14 +15,14 @@ export const siteConfig = {
   nav: [
     { label: "Home", href: "/" },
     { label: "IPTV Subscription", href: "/iptv-subscription-uk/" },
-    { label: "Blog", href: "/blog/" },
+    { label: "Blog", href: "/blogs/" },
     { label: "Contact", href: "/contact/" },
   ] satisfies NavItem[],
   footerQuickLinks: [
     { label: "Home", href: "/" },
     { label: "IPTV Subscription", href: "/iptv-subscription-uk/" },
     { label: "Welcome", href: "/welcome/" },
-    { label: "Blog", href: "/blog/" },
+    { label: "Blog", href: "/blogs/" },
   ] satisfies NavItem[],
   footerSupportLinks: [
     { label: "Contact", href: "/contact/" },

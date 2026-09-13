@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const post = await cms.getPostBySlug(slug);
   if (!post || post.status !== "published") {
-    return pageMetadata("Post not found", "This article is not published.", "/blog/");
+    return pageMetadata("Post not found", "This article is not published.", "/blogs/");
   }
   return postSeoMetadata(post);
 }
@@ -61,7 +61,7 @@ export default async function BlogPostPage({ params }: Props) {
             className="prose-cms mt-8 text-[15px] leading-relaxed text-ink/80"
             dangerouslySetInnerHTML={{ __html: renderCmsHtml(post.content) }}
           />
-          <Link href="/blog/" className="mt-10 inline-block text-sm font-semibold text-brand hover:underline">
+          <Link href="/blogs/" className="mt-10 inline-block text-sm font-semibold text-brand hover:underline">
             Back to blog
           </Link>
         </Container>

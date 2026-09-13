@@ -17,6 +17,7 @@ import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { remapStructuredHrefs, SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
 import { applySubscriptionRedirectMigration, remapSettingsForSubscriptionUrl } from "@/lib/cms/subscription-url-migrate";
+import { applyBlogIndexRedirectMigration, remapSettingsForBlogIndex } from "@/lib/cms/blog-index-migrate";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
@@ -646,6 +647,67 @@ export async function migrateSubscriptionPageSlugIfNeeded() {
   if (!settingRows[0]) return;
   const current = sanitizeSettings(parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()));
   const remapped = remapSettingsForSubscriptionUrl(current);
+  if (!remapped.changed) return;
+  await pool.execute(
+    `INSERT INTO site_settings (setting_key, setting_value)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [SITE_SETTINGS_KEY, JSON.stringify(remapped.settings)],
+  );
+}
+
+async function persistRedirectDiff(currentRules: RedirectRule[], nextRules: RedirectRule[]) {
+  const pool = getDbPool();
+  for (const rule of nextRules) {
+    const before = currentRules.find((item) => item.id === rule.id);
+    if (before && JSON.stringify(before) === JSON.stringify(rule)) continue;
+    await pool.execute(
+      `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         source_path = VALUES(source_path),
+         destination_path = VALUES(destination_path),
+         status_code = VALUES(status_code),
+         is_active = VALUES(is_active)`,
+      [rule.id, rule.sourcePath, rule.destinationPath, rule.statusCode, rule.active ? 1 : 0],
+    );
+  }
+}
+
+export async function migrateBlogIndexIfNeeded() {
+  const pool = getDbPool();
+  const [redirectRows] = await pool.query<
+    Array<
+      RowDataPacket & {
+        id: string;
+        source_path: string;
+        destination_path: string;
+        status_code: number;
+        is_active: number;
+        created_at: unknown;
+        updated_at: unknown;
+      }
+    >
+  >("SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects");
+  const currentRules: RedirectRule[] = redirectRows.map((row) => ({
+    id: row.id,
+    sourcePath: row.source_path,
+    destinationPath: row.destination_path,
+    statusCode: row.status_code === 302 || row.status_code === 307 || row.status_code === 308 ? row.status_code : 301,
+    active: Boolean(row.is_active),
+    createdAt: String(row.created_at || ""),
+    updatedAt: String(row.updated_at || ""),
+  }));
+  const migrated = applyBlogIndexRedirectMigration(currentRules);
+  if (migrated.changed) await persistRedirectDiff(currentRules, migrated.rules);
+
+  const [settingRows] = await pool.query<Array<RowDataPacket & { setting_value: unknown }>>(
+    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+    [SITE_SETTINGS_KEY],
+  );
+  if (!settingRows[0]) return;
+  const current = sanitizeSettings(parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()));
+  const remapped = remapSettingsForBlogIndex(current);
   if (!remapped.changed) return;
   await pool.execute(
     `INSERT INTO site_settings (setting_key, setting_value)

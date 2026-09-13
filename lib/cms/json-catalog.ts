@@ -8,6 +8,7 @@ import {
 import { applyPublicCopyCleanupToFaq, applyPublicCopyCleanupToPlan, applyPublicCopyCleanupToPost } from "@/lib/cms/public-copy-cleanup";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/lib/cms/managed-redirects";
 import { applySubscriptionRedirectMigration } from "@/lib/cms/subscription-url-migrate";
+import { applyBlogIndexRedirectMigration } from "@/lib/cms/blog-index-migrate";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import {
   sanitizeCategory,
@@ -176,9 +177,10 @@ export class JsonCatalogRepository implements CatalogRepository {
     const items = await readJsonFile<RedirectRule[]>(REDIRECTS_FILE, []);
     const list = Array.isArray(items) ? items : [];
     const seeded = await ensureJsonManagedRedirects(list);
-    const migrated = applySubscriptionRedirectMigration(seeded);
-    if (migrated.changed) await saveList(REDIRECTS_FILE, migrated.rules);
-    return migrated.rules.map(sanitizeRedirect);
+    const subscription = applySubscriptionRedirectMigration(seeded);
+    const blog = applyBlogIndexRedirectMigration(subscription.rules);
+    if (subscription.changed || blog.changed) await saveList(REDIRECTS_FILE, blog.rules);
+    return blog.rules.map(sanitizeRedirect);
   }
   async listActiveRedirects() {
     const items = await this.listRedirects();
