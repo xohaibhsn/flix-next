@@ -81,7 +81,6 @@ export function isReservedPageSlug(slug: string) {
   if (path === "/sidhu/" || path.startsWith("/sidhu/")) return true;
   if (path === "/api/" || path.startsWith("/api/")) return true;
   if (path === "/blog/" || path.startsWith("/blog/")) return true;
-  if (path === "/blogs/" || path.startsWith("/blogs/")) return true;
   if (path === "/category/" || path.startsWith("/category/")) return true;
   if (path === "/welcome/" || path === "/welcome") return true;
   if (path === "/_next/" || path.startsWith("/_next/")) return true;
@@ -137,7 +136,7 @@ export function knownLocalDestinations(
   posts: Array<Pick<BlogPost, "slug" | "status">> = [],
   categories: Array<Pick<BlogCategory, "slug" | "active">> = [],
 ) {
-  const known = new Set<string>(["/", "/welcome/", "/contact/", "/blogs/"]);
+  const known = new Set<string>(["/", "/welcome/", "/contact/", "/blog/"]);
   for (const page of pages) {
     if (page.status === "draft") continue;
     known.add(withSlash(page.slug));

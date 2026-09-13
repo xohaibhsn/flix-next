@@ -32,13 +32,6 @@ export const MANAGED_REDIRECTS: ManagedRedirectSeed[] = [
     statusCode: 301,
     active: true,
   },
-  {
-    id: "redir-blog-index",
-    sourcePath: "/blog/",
-    destinationPath: "/blogs/",
-    statusCode: 301,
-    active: true,
-  },
 ];
 
 export function toRedirectRule(seed: ManagedRedirectSeed, now = new Date().toISOString()): RedirectRule {

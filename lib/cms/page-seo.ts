@@ -27,7 +27,7 @@ export const PAGE_SEO_META: Record<
   blog: {
     label: "Blog listing",
     editorHref: "/sidhu/blog/",
-    publicPaths: ["/blogs", "/blogs/", "/blog", "/blog/"],
+    publicPaths: ["/blog", "/blog/"],
   },
   ...companyPageSeoMeta(),
 };

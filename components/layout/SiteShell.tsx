@@ -48,7 +48,7 @@ export async function SiteShell({
   const company = pageSeoKey && isCompanyPageSeoKey(pageSeoKey) ? companyPageBySeoKey(pageSeoKey) : null;
   const schemaPath = publicPath || company?.slug || "";
   const schemaName = pageTitle || company?.name || "";
-  const showWebPage = Boolean(schemaPath && (company || pageSeoKey === "subscriptions" || pageSeoKey === "blog"));
+  const showWebPage = Boolean(schemaPath && (company || pageSeoKey === "subscriptions"));
 
   return (
     <>

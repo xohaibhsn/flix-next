@@ -563,7 +563,7 @@ export function defaultSettings(): SiteSettings {
     headerNav: [
       nav("nav-home", "Home", "/welcome/"),
       nav("nav-iptv", "IPTV Subscription", "/iptv-subscription-uk/"),
-      nav("nav-blog", "Blog", "/blogs/"),
+      nav("nav-blog", "Blog", "/blog/"),
       nav("nav-contact", "Contact", "/contact/"),
     ],
     headerCtaLabel: "Get Started",
@@ -574,7 +574,7 @@ export function defaultSettings(): SiteSettings {
     footerQuickLinks: [
       nav("fq-home", "Home", "/welcome/"),
       nav("fq-iptv", "IPTV Subscription", "/iptv-subscription-uk/"),
-      nav("fq-blog", "Blog", "/blogs/"),
+      nav("fq-blog", "Blog", "/blog/"),
       nav("fq-contact", "Contact", "/contact/"),
       DEFAULT_ABOUT_FOOTER_LINK,
     ],
@@ -599,7 +599,7 @@ export function defaultSettings(): SiteSettings {
         "/iptv-subscription-uk/",
       ),
       contact: defaultPageSeo("Contact", "Contact Flix IPTV on WhatsApp for plans, payment details, and setup.", "/contact/"),
-      blog: defaultPageSeo("Blog", "Guides and updates from Flix IPTV.", "/blogs/"),
+      blog: defaultPageSeo("Blog", "Guides and updates from Flix IPTV.", "/blog/"),
       ...companyPageSeoDefaults(),
     },
     siteCustomJsonLd: "",

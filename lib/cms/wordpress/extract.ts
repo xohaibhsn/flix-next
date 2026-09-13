@@ -19,7 +19,7 @@ const PAGE_ROUTE_HINTS: Array<{ slugs: string[]; route: string; label: string }>
     label: "IPTV Subscription",
   },
   { slugs: ["contact", "contact-us", "contact-the-flix"], route: "/contact/", label: "Contact" },
-  { slugs: ["blog", "blogs", "news", "articles"], route: "/blogs/", label: "Blog index" },
+  { slugs: ["blog", "news", "articles"], route: "/blog/", label: "Blog index" },
 ];
 
 const YOAST_KEYS = {

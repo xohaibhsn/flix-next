@@ -3,7 +3,6 @@ import { connection } from "next/server";
 import { PageHero } from "@/components/layout/PageHero";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { Container } from "@/components/ui/Container";
-import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index-migrate";
 import { cms } from "@/lib/cms/repository";
 import { pageSeoMetadata } from "@/lib/metadata";
 import type { BlogPost } from "@/lib/cms/types";
@@ -11,7 +10,7 @@ import type { BlogPost } from "@/lib/cms/types";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
-  return pageSeoMetadata("blog", "Blog", "Guides and updates from Flix IPTV.", BLOG_INDEX_SLUG);
+  return pageSeoMetadata("blog", "Blog", "Guides and updates from Flix IPTV.", "/blog/");
 }
 
 function formatDate(value: string | null) {
@@ -49,7 +48,7 @@ function PostCard({ post, category }: { post: BlogPost; category: string }) {
   );
 }
 
-export default async function BlogIndexPage() {
+export default async function BlogPage() {
   await connection();
   const [posts, categories] = await Promise.all([cms.listPosts(), cms.listCategories()]);
   const published = posts.filter((post) => post.status === "published");
@@ -57,7 +56,7 @@ export default async function BlogIndexPage() {
     categories.find((category) => category.id === id)?.name || "Guides";
 
   return (
-    <SiteShell pageSeoKey="blog" publicPath={BLOG_INDEX_SLUG} pageTitle="Blog">
+    <SiteShell pageSeoKey="blog">
       <PageHero
         eyebrow="Guides"
         title="Flix IPTV"

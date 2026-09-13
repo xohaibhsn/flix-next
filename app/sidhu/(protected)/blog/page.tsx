@@ -18,7 +18,7 @@ export default async function SidhuBlogPage() {
     getCloudinaryStatusAction(),
   ]);
   return (
-    <AdminShell title="Blog" subtitle="Draft, publish, and organise posts. Public listing is /blogs/; posts stay /blog/[slug]/.">
+    <AdminShell title="Blog" subtitle="Draft, publish, and organise posts. Public routes stay /blog/ and /blog/[slug]/. Listing SEO is below.">
       <div className="space-y-6">
         <BlogList posts={posts} categories={categories} />
         {adminHasPermission(user, "seo") ? (

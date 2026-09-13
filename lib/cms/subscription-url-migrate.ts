@@ -7,7 +7,7 @@ import {
   remapStructuredHrefs,
   seoKeyForPageId,
 } from "@/lib/cms/page-paths";
-import { withSlash } from "@/lib/cms/redirects";
+import { isSelfRedirect, withSlash } from "@/lib/cms/redirects";
 import { nextCanonicalForSlugChange, remapSettingsHrefs } from "@/lib/cms/slug-change";
 import type { CmsPage, RedirectRule, SiteSettings } from "@/lib/cms/types";
 
@@ -46,6 +46,10 @@ export function applySubscriptionRedirectMigration(rules: RedirectRule[]): { rul
   const next = rules.map((rule) => {
     let updated = rule;
     const source = withSlash(rule.sourcePath);
+    if (rule.active && source === "/blogs/" && isSelfRedirect(rule.sourcePath, rule.destinationPath)) {
+      changed = true;
+      updated = { ...updated, active: false, updatedAt: now };
+    }
     if (
       updated.destinationPath.startsWith("/") &&
       !updated.destinationPath.startsWith("//") &&
