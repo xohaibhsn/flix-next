@@ -12,6 +12,7 @@ import {
   seedExtendedIfEmpty,
   seedManagedRedirectsIfNeeded,
   migrateSubscriptionPageSlugIfNeeded,
+  ensureBlogIndexRedirect,
   seedSeoLongformIfNeeded,
   cleanupKnownTestTaglineIfNeeded,
 } from "@/lib/cms/mysql-migrate";
@@ -119,6 +120,7 @@ export class MysqlCmsRepository {
         await migrateSubscriptionPageSlugIfNeeded();
         await seedExtendedIfEmpty();
         await seedManagedRedirectsIfNeeded();
+        await ensureBlogIndexRedirect();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
         const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");

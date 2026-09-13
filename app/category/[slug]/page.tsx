@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const category = (await cms.listCategories()).find((item) => item.slug === slug && item.active);
-  if (!category) return pageMetadata("Category not found", "", "/blog/");
+  if (!category) return pageMetadata("Category not found", "", "/blogs/");
   return pageMetadata(category.name, category.description || `Posts in ${category.name}.`, `/category/${category.slug}/`);
 }
 

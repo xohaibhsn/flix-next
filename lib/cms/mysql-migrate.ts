@@ -13,6 +13,7 @@ import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
 import { resolveDefaultPageSeed } from "@/lib/cms/page-seed";
+import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { mysqlDuplicateError } from "@/lib/cms/slug-change";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
@@ -661,4 +662,60 @@ export async function migrateSubscriptionPageSlugIfNeeded() {
      ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
     [SITE_SETTINGS_KEY, JSON.stringify(remapped.settings)],
   );
+}
+
+export async function ensureBlogIndexRedirect() {
+  try {
+    const pool = getDbPool();
+    const [redirectRows] = await pool.query<
+      Array<
+        RowDataPacket & {
+          id: string;
+          source_path: string;
+          destination_path: string;
+          status_code: number;
+          is_active: number;
+          created_at: unknown;
+          updated_at: unknown;
+        }
+      >
+    >("SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects");
+    const currentRules: RedirectRule[] = redirectRows.map((row) => ({
+      id: row.id,
+      sourcePath: row.source_path,
+      destinationPath: row.destination_path,
+      statusCode: row.status_code === 302 || row.status_code === 307 || row.status_code === 308 ? row.status_code : 301,
+      active: Boolean(row.is_active),
+      createdAt: String(row.created_at || ""),
+      updatedAt: String(row.updated_at || ""),
+    }));
+    const migrated = applyBlogIndexRedirectUpsert(currentRules);
+    if (!migrated.changed) return;
+    for (const rule of migrated.rules) {
+      const before = currentRules.find((item) => item.id === rule.id);
+      if (before && JSON.stringify(before) === JSON.stringify(rule)) continue;
+      try {
+        await pool.execute(
+          `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             source_path = VALUES(source_path),
+             destination_path = VALUES(destination_path),
+             status_code = VALUES(status_code),
+             is_active = VALUES(is_active)`,
+          [rule.id, rule.sourcePath, rule.destinationPath, rule.statusCode, rule.active ? 1 : 0],
+        );
+      } catch (error) {
+        if (!mysqlDuplicateError(error)) throw error;
+        await pool.execute(
+          `UPDATE redirects
+           SET destination_path = ?, status_code = ?, is_active = ?
+           WHERE source_path = ?`,
+          [rule.destinationPath, rule.statusCode, rule.active ? 1 : 0, rule.sourcePath],
+        );
+      }
+    }
+  } catch (error) {
+    console.error("[cms] blog index redirect was not applied:", error instanceof Error ? error.message : error);
+  }
 }
