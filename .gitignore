@@ -49,6 +49,10 @@ Desktop.ini
 /data/redirect-seeds.json
 /data/wordpress/
 
+# Local JSON catalog cache. Production uses MySQL; this file is written on first
+# JSON-mode read from defaultBlogCategories() and is not required at runtime.
+/data/blog-categories.json
+
 # WordPress backups / incoming dumps — never commit
 /tmp/
 /migrations/incoming/
