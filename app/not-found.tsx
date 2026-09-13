@@ -9,7 +9,7 @@ export default function NotFound() {
           <p className="text-sm font-semibold tracking-wide text-brand uppercase">404</p>
           <h1 className="mt-3 text-4xl font-extrabold text-white">Page not found</h1>
           <p className="mt-4 text-sm text-white/70">
-            This local route does not exist yet. Try Home, Subscriptions, Blog, or Contact.
+            That page is not available. Try Home, Subscriptions, Blog, or Contact.
           </p>
           <Link
             href="/"
