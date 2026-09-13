@@ -1,3 +1,4 @@
+import { blogPostUrl } from "@/lib/cms/blog-paths";
 import { getSiteOrigin, absoluteUrl } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
 import { publicEmail, publicPhone, publicSameAs, publicWhatsAppProfileUrl } from "@/lib/cms/public-contact";
@@ -75,10 +76,12 @@ export function faqPageJsonLd(data: FaqData) {
 }
 
 export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
-  const origin = getSiteOrigin();
+  const url = blogPostUrl(post.slug);
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
+    "@id": url,
+    url,
     headline: post.seoTitle || post.title,
     description: post.seoDescription || post.excerpt,
     datePublished: post.publishedAt || post.createdAt,
@@ -95,7 +98,7 @@ export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
         ? { "@type": "ImageObject", url: settings.branding.logo.secureUrl }
         : undefined,
     },
-    mainEntityOfPage: `${origin}/blog/${post.slug}/`,
+    mainEntityOfPage: url,
   };
 }
 

@@ -49,12 +49,17 @@ test("disables a /blogs/ self-redirect so the listing can return 200", () => {
 });
 
 test("/blogs/ is a known local redirect destination and /blog/ listing is not required", () => {
-  const known = knownLocalDestinations([], [], []);
+  const known = knownLocalDestinations(
+    [],
+    [{ slug: "how-to-watch-iptv-on-firestick", status: "published" }],
+    [],
+  );
   assert.equal(known.has(BLOG_INDEX_SLUG), true);
+  assert.equal(known.has("/blogs/how-to-watch-iptv-on-firestick/"), true);
   assert.equal(known.has("/blog/how-to-watch-iptv-on-firestick/"), false);
 });
 
-test("nav remap rewrites exact /blog/ only", () => {
+test("nav remap rewrites listing and post URLs", () => {
   const settings = defaultSettings();
   settings.headerNav = [
     { id: "nav-blog", label: "Blog", href: "/blog/", visible: true },
@@ -62,5 +67,5 @@ test("nav remap rewrites exact /blog/ only", () => {
   ];
   const remapped = remapSettingsForBlogIndex(settings);
   assert.equal(remapped.settings.headerNav[0]?.href, BLOG_INDEX_SLUG);
-  assert.equal(remapped.settings.headerNav[1]?.href, "/blog/how-to-watch-iptv-on-firestick/");
+  assert.equal(remapped.settings.headerNav[1]?.href, "/blogs/how-to-watch-iptv-on-firestick/");
 });

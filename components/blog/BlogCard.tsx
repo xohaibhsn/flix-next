@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { BlogPost } from "@/types/content";
+import { blogPostPath } from "@/lib/cms/blog-paths";
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-GB", {
@@ -16,7 +17,7 @@ export function BlogCard({ post }: { post: BlogPost }) {
         {post.category}
       </p>
       <h2 className="mt-3 text-xl font-bold text-ink">
-        <Link href={`/blog/${post.slug}/`} className="hover:text-brand">
+        <Link href={blogPostPath(post.slug)} className="hover:text-brand">
           {post.title}
         </Link>
       </h2>
@@ -25,7 +26,7 @@ export function BlogCard({ post }: { post: BlogPost }) {
       </time>
       <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">{post.excerpt}</p>
       <Link
-        href={`/blog/${post.slug}/`}
+        href={blogPostPath(post.slug)}
         className="mt-5 text-sm font-semibold text-brand hover:underline"
       >
         Read more

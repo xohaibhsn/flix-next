@@ -4,6 +4,7 @@ import { PageHero } from "@/components/layout/PageHero";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { Container } from "@/components/ui/Container";
 import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index";
+import { blogPostPath } from "@/lib/cms/blog-paths";
 import { cms } from "@/lib/cms/repository";
 import { pageSeoMetadata } from "@/lib/metadata";
 import type { BlogPost } from "@/lib/cms/types";
@@ -31,7 +32,7 @@ function PostCard({ post, category }: { post: BlogPost; category: string }) {
       <div className="flex flex-1 flex-col p-6">
         <p className="text-xs font-bold tracking-wide text-brand uppercase">{category}</p>
         <h2 className="mt-3 text-xl font-bold text-ink">
-          <Link href={`/blog/${post.slug}/`} className="hover:text-brand">
+          <Link href={blogPostPath(post.slug)} className="hover:text-brand">
             {post.title}
           </Link>
         </h2>
@@ -41,7 +42,7 @@ function PostCard({ post, category }: { post: BlogPost; category: string }) {
           </time>
         ) : null}
         <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">{post.excerpt}</p>
-        <Link href={`/blog/${post.slug}/`} className="mt-5 text-sm font-semibold text-brand hover:underline">
+        <Link href={blogPostPath(post.slug)} className="mt-5 text-sm font-semibold text-brand hover:underline">
           Read more
         </Link>
       </div>

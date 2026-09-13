@@ -6,6 +6,7 @@ import { siteConfig } from "@/lib/site-config";
 import { seoToMetadata } from "@/lib/seo";
 import { getSiteOrigin } from "@/lib/site-url";
 import { resolveOpenGraphImageFromSettings, socialImageMeta } from "@/lib/cms/open-graph";
+import { resolveBlogPostCanonical } from "@/lib/cms/blog-paths";
 import type { BlogPost, SiteSettings } from "@/lib/cms/types";
 
 export async function getSiteMetadata(): Promise<Metadata> {
@@ -76,12 +77,13 @@ export async function pageSeoMetadata(
 export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
   await connection();
   const settings = await cms.getSettings();
+  const canonical = resolveBlogPostCanonical(post);
   return seoToMetadata(
     {
       title: post.seoTitle || post.title,
       description: post.seoDescription || post.excerpt,
       focusKeyword: post.focusKeyword,
-      canonicalUrl: post.canonicalUrl || `/blog/${post.slug}/`,
+      canonicalUrl: canonical,
       robotsIndex: post.robotsIndex,
       robotsFollow: post.robotsFollow,
       ogTitle: post.ogTitle,
@@ -93,6 +95,6 @@ export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
     settings,
     post.title,
     post.excerpt,
-    `/blog/${post.slug}/`,
+    canonical,
   );
 }

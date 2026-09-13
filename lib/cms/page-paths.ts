@@ -1,4 +1,5 @@
 import { withSlash } from "@/lib/cms/redirects";
+import { blogPostPath, blogPostPathLegacy } from "@/lib/cms/blog-paths";
 import type { BlogCategory, BlogPost, CmsPage } from "@/lib/cms/types";
 import type { PageSeoKey } from "@/lib/cms/page-seo";
 
@@ -123,7 +124,7 @@ export function validateCmsPageSlug(
   if (taken) return { ok: false, error: "Another page already uses that URL." };
 
   const leaf = slug.replace(/^\/|\/$/g, "");
-  if (posts.some((post) => post.slug === leaf) && slug.startsWith("/blog/")) {
+  if (posts.some((post) => post.slug === leaf) && (slug === blogPostPath(leaf) || slug === blogPostPathLegacy(leaf))) {
     return { ok: false, error: "That URL collides with a blog post." };
   }
   if (categories.some((category) => category.slug === leaf) && slug.startsWith("/category/")) {
@@ -145,7 +146,7 @@ export function knownLocalDestinations(
   }
   for (const post of posts) {
     if (post.status !== "published") continue;
-    known.add(withSlash(`/blog/${post.slug}/`));
+    known.add(withSlash(blogPostPath(post.slug)));
   }
   for (const category of categories) {
     if (category.active === false) continue;

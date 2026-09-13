@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { savePostAction } from "@/lib/cms/actions";
 import { insertEditorImage } from "@/lib/cms/blog";
+import { blogPostPath } from "@/lib/cms/blog-paths";
 import { slugify } from "@/lib/cms/slug";
 import type { BlogCategory, BlogPost, MediaAsset } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
@@ -182,6 +183,16 @@ export function BlogEditor({
       <button type="button" disabled={saving} className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white" onClick={() => void save()}>
         {saving ? "Saving…" : "Save post"}
       </button>
+      {draft.status === "published" && draft.slug ? (
+        <a
+          href={blogPostPath(draft.slug)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-3 inline-flex rounded-md border border-line px-5 py-2.5 text-sm font-semibold text-ink"
+        >
+          View post
+        </a>
+      ) : null}
       {picker ? (
         <MediaPickerModal
           title="Insert in-article image"

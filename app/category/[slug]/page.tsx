@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { PageHero } from "@/components/layout/PageHero";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { Container } from "@/components/ui/Container";
+import { blogPostPath } from "@/lib/cms/blog-paths";
 import { cms } from "@/lib/cms/repository";
 import { pageMetadata } from "@/lib/metadata";
 import type { BlogPost } from "@/lib/cms/types";
@@ -23,7 +24,7 @@ function Card({ post }: { post: BlogPost }) {
   return (
     <article className="rounded-xl border border-line bg-white p-6 shadow-sm">
       <h2 className="text-xl font-bold text-ink">
-        <Link href={`/blog/${post.slug}/`} className="hover:text-brand">
+        <Link href={blogPostPath(post.slug)} className="hover:text-brand">
           {post.title}
         </Link>
       </h2>

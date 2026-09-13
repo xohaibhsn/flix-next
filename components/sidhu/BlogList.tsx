@@ -7,6 +7,7 @@ import { createId } from "@/lib/cms/ids";
 import { slugify } from "@/lib/cms/slug";
 import type { BlogCategory, BlogPost } from "@/lib/cms/types";
 import { Banner, Field, TextInput } from "@/components/sidhu/fields";
+import { blogPostPath } from "@/lib/cms/blog-paths";
 
 export function BlogList({
   posts,
@@ -90,6 +91,11 @@ export function BlogList({
                   <Link href={`/sidhu/blog/${post.id}/`} className="mr-3 font-semibold text-brand">
                     Edit
                   </Link>
+                  {post.status === "published" && post.slug ? (
+                    <Link href={blogPostPath(post.slug)} className="mr-3 font-semibold text-brand" target="_blank" rel="noopener noreferrer">
+                      View
+                    </Link>
+                  ) : null}
                   <button type="button" className="text-red-700" onClick={() => void remove(post.id)}>
                     Delete
                   </button>

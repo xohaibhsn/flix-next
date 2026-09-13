@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
 import { COMPANY_PAGES } from "@/lib/cms/company-pages";
+import { blogPostPath, blogPostPathLegacy } from "@/lib/cms/blog-paths";
 import { SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY, pathsForSlug } from "@/lib/cms/page-paths";
 
 const PUBLIC_PATHS = [
@@ -98,8 +99,10 @@ export function revalidateBlog(slug?: string) {
   revalidatePath("/blogs/");
   revalidatePath("/category", "layout");
   if (slug) {
-    revalidatePath(`/blog/${slug}`);
-    revalidatePath(`/blog/${slug}/`);
+    revalidatePath(blogPostPathLegacy(slug).replace(/\/$/, ""));
+    revalidatePath(blogPostPathLegacy(slug));
+    revalidatePath(blogPostPath(slug).replace(/\/$/, ""));
+    revalidatePath(blogPostPath(slug));
   }
   revalidatePath("/sitemap.xml");
 }

@@ -1,4 +1,5 @@
 import { isSelfCanonicalValue } from "@/lib/cms/page-paths";
+import { migratePublicBlogHref } from "@/lib/cms/blog-paths";
 import { isSelfRedirect, withSlash } from "@/lib/cms/redirects";
 import { nextCanonicalForSlugChange, remapSettingsHrefs } from "@/lib/cms/slug-change";
 import type { RedirectRule, SiteSettings } from "@/lib/cms/types";
@@ -9,6 +10,14 @@ export const BLOG_INDEX_REDIRECT_ID = "redir-blog-index";
 
 export function remapSettingsForBlogIndex(settings: SiteSettings): { settings: SiteSettings; changed: boolean } {
   let next = remapSettingsHrefs(settings, BLOG_INDEX_SLUG_LEGACY, BLOG_INDEX_SLUG);
+  next = {
+    ...next,
+    headerNav: next.headerNav.map((link) => ({ ...link, href: migratePublicBlogHref(link.href) })),
+    footerQuickLinks: next.footerQuickLinks.map((link) => ({ ...link, href: migratePublicBlogHref(link.href) })),
+    footerSupportLinks: next.footerSupportLinks.map((link) => ({ ...link, href: migratePublicBlogHref(link.href) })),
+    footerLegalLinks: next.footerLegalLinks.map((link) => ({ ...link, href: migratePublicBlogHref(link.href) })),
+    headerCtaHref: migratePublicBlogHref(next.headerCtaHref),
+  };
   const seo = next.pageSeo.blog;
   if (seo && isSelfCanonicalValue(seo.canonicalUrl, BLOG_INDEX_SLUG_LEGACY)) {
     const canonicalUrl = nextCanonicalForSlugChange(seo.canonicalUrl, BLOG_INDEX_SLUG_LEGACY, BLOG_INDEX_SLUG);

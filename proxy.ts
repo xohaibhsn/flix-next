@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { ADMIN_SESSION_COOKIE } from "@/lib/auth/session-token";
 import { resolveAdminFromToken } from "@/lib/auth/session";
+import { blogsPathFromLegacyBlogPath, isLegacyBlogPostPath } from "@/lib/cms/blog-paths";
 import { resolveSafeRedirectUrl } from "@/lib/cms/redirects";
 import { cms } from "@/lib/cms/repository";
 import { applySecurityHeaders } from "@/lib/security/headers";
@@ -66,6 +67,12 @@ export async function proxy(request: NextRequest) {
 
   const redirected = await cmsRedirect(request);
   if (redirected) return applySecurityHeaders(redirected, pathname, request);
+
+  if (isLegacyBlogPostPath(pathname)) {
+    const dest = request.nextUrl.clone();
+    dest.pathname = blogsPathFromLegacyBlogPath(pathname);
+    return applySecurityHeaders(NextResponse.redirect(dest, 301), pathname, request);
+  }
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-sidhu-path", pathname);
