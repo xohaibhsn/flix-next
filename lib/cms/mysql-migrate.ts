@@ -12,7 +12,9 @@ import {
 import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
+import { resolveDefaultPageSeed } from "@/lib/cms/page-seed";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
+import { mysqlDuplicateError } from "@/lib/cms/slug-change";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { remapStructuredHrefs, SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
@@ -311,19 +313,25 @@ export async function seedExtendedIfEmpty() {
     }
   }
 
+  const [pageRows] = await pool.query<Array<RowDataPacket & { id: string; slug: string }>>(
+    "SELECT id, slug FROM pages",
+  );
+  const existingPages = pageRows.map((row) => ({ id: String(row.id), slug: String(row.slug) }));
   const defaults = defaultPages();
   for (const page of defaults.filter((item) => item.slug !== "/")) {
-    const [rows] = await pool.query<Array<RowDataPacket & { id: string }>>(
-      "SELECT id FROM pages WHERE slug = ? LIMIT 1",
-      [page.slug],
-    );
-    const existingId = rows[0]?.id;
-    if (!existingId) {
+    const action = resolveDefaultPageSeed(page, existingPages);
+    if (action.type === "insert") {
       const safe = sanitizePage(page);
-      await pool.execute(
-        `INSERT INTO pages (id, name, slug, status, cms_enabled) VALUES (?, ?, ?, ?, ?)`,
-        [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
-      );
+      try {
+        await pool.execute(
+          `INSERT INTO pages (id, name, slug, status, cms_enabled) VALUES (?, ?, ?, ?, ?)`,
+          [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
+        );
+      } catch (error) {
+        if (!mysqlDuplicateError(error)) throw error;
+        continue;
+      }
+      existingPages.push({ id: safe.id, slug: safe.slug });
       for (const section of safe.sections) {
         await pool.execute(
           `INSERT INTO page_sections
@@ -342,12 +350,12 @@ export async function seedExtendedIfEmpty() {
       }
       continue;
     }
+    const existingId = action.existingId;
     const [sectionCount] = await pool.query<CountRow[]>(
       "SELECT COUNT(*) AS n FROM page_sections WHERE page_id = ?",
       [existingId],
     );
     if (Number(sectionCount[0]?.n ?? 0) > 0) continue;
-    await pool.execute("UPDATE pages SET cms_enabled = 1, name = ? WHERE id = ?", [page.name, existingId]);
     for (const section of sanitizePage({ ...page, id: existingId }).sections) {
       await pool.execute(
         `INSERT INTO page_sections

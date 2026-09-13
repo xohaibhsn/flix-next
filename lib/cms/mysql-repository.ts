@@ -116,9 +116,9 @@ export class MysqlCmsRepository {
       this.readyPromise = (async () => {
         await ensureCmsSchema();
         await seedCmsIfEmpty();
+        await migrateSubscriptionPageSlugIfNeeded();
         await seedExtendedIfEmpty();
         await seedManagedRedirectsIfNeeded();
-        await migrateSubscriptionPageSlugIfNeeded();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
         const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");

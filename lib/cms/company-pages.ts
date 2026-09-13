@@ -247,8 +247,8 @@ export function createCompanyCmsPages(): CmsPage[] {
 
 export function mergeMissingCompanyPages(pages: CmsPage[]): { pages: CmsPage[]; changed: boolean } {
   const extras = createCompanyCmsPages();
-  const slugs = new Set(pages.map((page) => page.slug));
-  const missing = extras.filter((page) => !slugs.has(page.slug));
+  const ids = new Set(pages.map((page) => page.id));
+  const missing = extras.filter((page) => !ids.has(page.id));
   if (!missing.length) return { pages, changed: false };
   return { pages: [...pages, ...missing], changed: true };
 }
