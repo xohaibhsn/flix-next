@@ -39,6 +39,25 @@ function robotsContent(index: boolean, follow: boolean) {
   };
 }
 
+export function brandedSocialTitle(title: string, siteName: string) {
+  const t = title.trim();
+  const brand = siteName.trim();
+  if (!t) return brand;
+  if (!brand) return t;
+  const suffix = ` | ${brand}`;
+  let next = t;
+  if (next.endsWith(suffix)) {
+    const without = next.slice(0, -suffix.length).trim();
+    if (without === brand || without.startsWith(`${brand} | `) || without.includes(brand)) {
+      next = without;
+    }
+  }
+  if (!next) return brand;
+  if (next === brand) return next;
+  if (next.endsWith(suffix) || next.startsWith(`${brand} | `) || next.includes(brand)) return next;
+  return `${next}${suffix}`;
+}
+
 export function seoToMetadata(
   seo: PageSeo,
   settings: SiteSettings,
@@ -61,7 +80,7 @@ export function seoToMetadata(
     robots: robotsContent(seo.robotsIndex, seo.robotsFollow),
     icons: siteIconMetadata(settings),
     openGraph: {
-      title: `${ogTitle} | ${settings.siteName}`,
+      title: brandedSocialTitle(ogTitle, settings.siteName),
       description: ogDescription,
       url: canonical,
       siteName: settings.siteName,

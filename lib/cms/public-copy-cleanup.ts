@@ -4,6 +4,58 @@ import { isLegacyHowItWorks, ORDER_PROCESS_HOW_IT_WORKS } from "@/lib/cms/order-
 
 const EXACT_REPLACEMENTS: Array<[string, string]> = [
   [
+    "/iptv-subscriptions-uk/",
+    "/iptv-subscription-uk/",
+  ],
+  [
+    "Get a premium IPTV subscription in the UK with HD & 4K channels, reliable streaming, 24/7 support and a free trial. Join Flix IPTV & start watching today.",
+    "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
+  ],
+  [
+    "Get a premium IPTV subscription in the UK with HD &amp; 4K channels, reliable streaming, 24/7 support and a free trial. Join Flix IPTV &amp; start watching today.",
+    "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
+  ],
+  [
+    "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
+    "We offer a 7-day money-back guarantee on eligible 1 Year plans and above. If the service is not suitable, contact us on WhatsApp within 7 days.",
+  ],
+  [
+    "A 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
+    "A 7-day money-back guarantee on eligible 1 Year plans and above. If the service is not suitable, contact us on WhatsApp within 7 days.",
+  ],
+  [
+    "<h2>7-Day Money Back Guarantee</h2>",
+    "<h2>7-day money-back guarantee on eligible 1 Year plans and above</h2>",
+  ],
+  [
+    "Choose a plan, message us on WhatsApp, then receive payment details and setup from our team. Try the service with confidence. If it is not suitable, contact us on WhatsApp within the applicable 7-day guarantee period.",
+    "Choose a plan, message us on WhatsApp, then receive payment details and setup from our team. Try the service with confidence. Eligible 1 Year plans and above include a 7-day money-back guarantee.",
+  ],
+  [
+    "A UK-focused streaming service with a 7-Day Money Back Guarantee if it is not the right fit.",
+    "A UK-focused streaming service with a 7-day money-back guarantee on eligible 1 Year plans and above.",
+  ],
+  [
+    "A 7-Day Money Back Guarantee if it is not the right fit",
+    "A 7-day money-back guarantee on eligible 1 Year plans and above",
+  ],
+  [
+    "A 7-Day Money Back Guarantee if the service is not suitable",
+    "A 7-day money-back guarantee on eligible 1 Year plans and above",
+  ],
+  [
+    "A 7-day money-back guarantee is available subject to the applicable refund terms and conditions",
+    "A 7-day money-back guarantee is available on eligible 1 Year plans and above, as described in the Refund Policy",
+  ],
+  [
+    "within the applicable 7-day guarantee period",
+    "within 7 days if you have an eligible 1 Year plan or above",
+  ],
+  [
+    "and a 7-Day Money Back Guarantee if the service is not suitable",
+    "and a 7-day money-back guarantee on eligible 1 Year plans and above",
+  ],
+  [
     "After payment, login details arrive by email. Real checkout is not connected yet.",
     "After you choose a plan, message us on WhatsApp for setup and account details.",
   ],
@@ -49,7 +101,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Refund and trial wording will come from the live policy later. For now this is demo FAQ copy only.",
-    "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
+    "We offer a 7-day money-back guarantee on eligible 1 Year plans and above. If the service is not suitable, contact us on WhatsApp within 7 days.",
   ],
   [
     "TiviMate, IPTV Smarters, GSE, VLC, Smart IPTV, and most MAG/Formuler apps work with a standard playlist. A setup guide will ship with real logins.",
@@ -89,7 +141,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Premium capacity and 99.9% uptime so your evening watch isn’t a buffering session.",
-    "A UK-focused streaming service with a 7-Day Money Back Guarantee if it is not the right fit.",
+    "A UK-focused streaming service with a 7-day money-back guarantee on eligible 1 Year plans and above.",
   ],
   [
     "A stable internet connection (10 Mbps+ recommended for HD, 25 Mbps for 4K) and any compatible device: Smart TV, Firestick, Android, iPhone, MAG box, or a computer.",
@@ -289,7 +341,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Get a premium IPTV subscription in the UK with HD & 4K channels, reliable streaming, 24/7 support and a free trial. Join The Flix IPTV and start watching today.",
-    "Streaming packages for UK homes on Firestick, Fire TV, Smart TV and Android TV. Payment details and setup are sent on WhatsApp.",
+    "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
   ],
   [
     "Contact THE FLIX IPTV support by WhatsApp, email, or form.",
@@ -350,6 +402,14 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   [
     "What this page is not",
     "Ready to start",
+  ],
+  [
+    "7-Day Money-Back Guarantee",
+    "7-day money-back guarantee on eligible 1 Year plans and above",
+  ],
+  [
+    "7-Day Money Back Guarantee",
+    "7-day money-back guarantee on eligible 1 Year plans and above",
   ],
 ];
 

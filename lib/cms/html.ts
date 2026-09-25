@@ -1,4 +1,5 @@
 import { migratePublicBlogHref } from "@/lib/cms/blog-paths";
+import { migratePublicSubscriptionHref } from "@/lib/cms/page-paths";
 import xss, { whiteList } from "xss";
 import type { IFilterXSSOptions } from "xss";
 
@@ -27,7 +28,7 @@ export function normalizeAnchorRel(rel: string, target: string, explicitNofollow
 }
 
 function rewriteAnchorOpenTag(attrs: string) {
-  const href = migratePublicBlogHref(readAttr(attrs, "href").trim());
+  const href = migratePublicSubscriptionHref(migratePublicBlogHref(readAttr(attrs, "href").trim()));
   if (!href) return `<a${attrs}>`;
   const title = readAttr(attrs, "title");
   const target = readAttr(attrs, "target") === "_blank" ? "_blank" : "";
@@ -90,7 +91,7 @@ const options: IFilterXSSOptions = {
       if (!src.startsWith("https://")) return "";
     }
     if (tag === "a" && name === "href") {
-      const href = migratePublicBlogHref(String(value || "").trim());
+      const href = migratePublicSubscriptionHref(migratePublicBlogHref(String(value || "").trim()));
       const ok =
         href.startsWith("/") ||
         href.startsWith("#") ||

@@ -176,6 +176,40 @@ export function remapLegacySubscriptionHref(href: string) {
   return remapNavHref(href, SUBSCRIPTION_SLUG_LEGACY, SUBSCRIPTION_SLUG);
 }
 
+export function migratePublicSubscriptionHref(href: string) {
+  const trimmed = String(href || "").trim();
+  if (!trimmed) return trimmed;
+
+  const splitHash = (value: string) => {
+    const hashIndex = value.indexOf("#");
+    if (hashIndex === -1) return { path: value, hash: "" };
+    return { path: value.slice(0, hashIndex), hash: value.slice(hashIndex) };
+  };
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      const host = url.hostname.replace(/^www\./, "");
+      if (host === "theflixiptv.com") {
+        url.pathname = remapLegacySubscriptionHref(url.pathname);
+        return url.toString();
+      }
+    } catch {
+      return trimmed;
+    }
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("/")) {
+    const { path, hash } = splitHash(trimmed);
+    const [pathname, ...queryParts] = path.split("?");
+    const query = queryParts.length ? `?${queryParts.join("?")}` : "";
+    return `${remapLegacySubscriptionHref(pathname)}${query}${hash}`;
+  }
+
+  return trimmed;
+}
+
 export function remapStructuredHrefs(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => remapStructuredHrefs(item));
   if (!value || typeof value !== "object") return value;

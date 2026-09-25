@@ -4,7 +4,7 @@ export const ORDER_PROCESS_HOW_IT_WORKS: HowItWorksData = {
   eyebrow: "",
   heading: "How to get started",
   description:
-    "Choose a plan, message us on WhatsApp, then receive payment details and setup from our team. Try the service with confidence. If it is not suitable, contact us on WhatsApp within the applicable 7-day guarantee period.",
+    "Choose a plan, message us on WhatsApp, then receive payment details and setup from our team. Try the service with confidence. Eligible 1 Year plans and above include a 7-day money-back guarantee.",
   steps: [
     {
       id: "hiw1",
