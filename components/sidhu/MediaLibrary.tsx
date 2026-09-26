@@ -2,7 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import type { MediaAsset } from "@/lib/cms/types";
-import { deleteSidhuImage, fetchSidhuMedia, uploadSidhuImage } from "@/lib/cms/media-client";
+import { deleteSidhuImage, fetchSidhuMedia, updateSidhuImageAlt, uploadSidhuImage } from "@/lib/cms/media-client";
+import { MEDIA_ALT_MAX } from "@/lib/cms/media-alt";
 import { MEDIA_UPLOAD, formatFileSize } from "@/lib/media-specs";
 import { Banner } from "@/components/sidhu/fields";
 
@@ -23,6 +24,7 @@ export function MediaLibrary({
   const [alt, setAlt] = useState("");
   const [folder, setFolder] = useState("theflix/site");
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
     const result = await fetchSidhuMedia();
@@ -58,6 +60,25 @@ export function MediaLibrary({
     }
   }
 
+  async function saveAlt(asset: LibraryAsset) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const next = await updateSidhuImageAlt(asset.id, altDrafts[asset.id] ?? asset.alt);
+      setAssets((current) => current.map((item) => (item.id === next.id ? { ...item, ...next, inUse: item.inUse } : item)));
+      setAltDrafts((current) => {
+        const next = { ...current };
+        delete next[asset.id];
+        return next;
+      });
+      setMessage({ tone: "ok", text: "Alt text saved. The Cloudinary file was not changed." });
+    } catch (error) {
+      setMessage({ tone: "error", text: error instanceof Error ? error.message : "Could not save alt text." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function remove(asset: LibraryAsset) {
     if (asset.inUse) {
       setMessage({
@@ -84,7 +105,7 @@ export function MediaLibrary({
       {!configured ? (
         <Banner tone="info">
           Cloudinary is not configured. Uploads and deletes stay disabled until the Cloudinary API key
-          and secret are set in server environment variables.
+          and secret are set in server environment variables. Existing alt text can still be edited.
         </Banner>
       ) : null}
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
@@ -115,10 +136,15 @@ export function MediaLibrary({
               <input
                 value={alt}
                 onChange={(event) => setAlt(event.target.value)}
+                maxLength={MEDIA_ALT_MAX}
                 className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
                 placeholder="Describe the image"
               />
             </label>
+            <p className="text-xs text-muted">
+              Describe the image briefly when it adds meaningful content. Leave blank for decorative images. Do not
+              keyword-stuff or repeat the same SEO phrase on every image.
+            </p>
             <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
               Cloudinary folder
               <select
@@ -149,7 +175,7 @@ export function MediaLibrary({
           assets.map((asset) => (
             <article key={asset.id} className="overflow-hidden rounded-xl border border-line bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset.secureUrl} alt={asset.alt || asset.originalFilename} className="h-40 w-full object-cover" />
+              <img src={asset.secureUrl} alt={asset.alt} className="h-40 w-full object-cover" />
               <div className="space-y-2 p-3">
                 <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
                 <p className="text-xs text-muted">
@@ -157,7 +183,32 @@ export function MediaLibrary({
                   {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
                   {asset.inUse ? " · in use" : ""}
                 </p>
+                <p className="text-xs text-muted">
+                  Alt: {asset.alt.trim() ? asset.alt : "Not set"}
+                </p>
+                <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
+                  Alt text
+                  <textarea
+                    value={altDrafts[asset.id] ?? asset.alt}
+                    onChange={(event) => setAltDrafts((current) => ({ ...current, [asset.id]: event.target.value }))}
+                    maxLength={MEDIA_ALT_MAX}
+                    rows={2}
+                    className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
+                    placeholder="Leave blank for decorative images"
+                  />
+                </label>
+                <p className="text-xs text-muted">
+                  Describe the image briefly when it adds meaningful content. Leave blank for decorative images.
+                </p>
                 <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="rounded border border-line px-2 py-1 text-xs"
+                    onClick={() => void saveAlt(asset)}
+                    disabled={busy}
+                  >
+                    Save alt
+                  </button>
                   <button
                     type="button"
                     className="rounded border border-line px-2 py-1 text-xs"

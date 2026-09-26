@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/guards";
+import { applyMediaAltUpdate, MEDIA_API_PERMISSIONS } from "@/lib/cms/media-alt";
 import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
 import { referencedMediaIds } from "@/lib/cms/media-refs";
@@ -26,7 +27,7 @@ function revalidateMedia() {
 }
 
 export async function GET() {
-  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
+  const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
   const [settings, posts] = await Promise.all([cms.getSettings(), cms.listPosts()]);
@@ -42,7 +43,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
+  const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
@@ -95,7 +96,7 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const unauthorized = await requireAdminApi(["media", "pages", "blog", "seo", "site_settings"]);
+  const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
@@ -129,4 +130,27 @@ export async function DELETE(request: Request) {
   } catch (error) {
     return jsonError(publicErrorMessage(error, "Cloudinary delete failed."), 502);
   }
+}
+
+export async function PATCH(request: Request) {
+  const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
+  if (unauthorized) return unauthorized;
+  if (!isSameOriginMutation(request)) {
+    return jsonError("Invalid request origin.", 403);
+  }
+  let body: { id?: string; alt?: unknown; publicId?: unknown; secureUrl?: unknown };
+  try {
+    body = (await request.json()) as { id?: string; alt?: unknown };
+  } catch {
+    return jsonError("Missing media id.");
+  }
+  const id = sanitizeText(body.id, 80);
+  if (!id) return jsonError("Missing media id.");
+  const asset = await cms.getMediaById(id);
+  const result = applyMediaAltUpdate(asset, body.alt);
+  if (!result.ok) return jsonError(result.error, result.status);
+  const saved = await cms.updateMediaAlt(id, result.alt);
+  if (!saved) return jsonError("That media item is not in the library.", 404);
+  revalidateMedia();
+  return NextResponse.json({ ok: true, asset: saved });
 }

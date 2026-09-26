@@ -9,6 +9,7 @@ import { cms } from "@/lib/cms/repository";
 import { blogPostingJsonLd } from "@/lib/cms/json-ld";
 import { pageMetadata, postSeoMetadata } from "@/lib/metadata";
 import { renderCmsHtml } from "@/lib/cms/html";
+import { contentImageAlt } from "@/lib/cms/media-alt";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -33,6 +34,8 @@ export default async function BlogPostPage({ params }: Props) {
   ]);
   if (!post || post.status !== "published") notFound();
   const category = categories.find((item) => item.id === post.categoryId);
+  const featuredMedia = post.featuredImage?.id ? await cms.getMediaById(post.featuredImage.id) : null;
+  const heroAlt = contentImageAlt(featuredMedia?.alt, post.title);
 
   return (
     <SiteShell>
@@ -44,7 +47,7 @@ export default async function BlogPostPage({ params }: Props) {
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={post.featuredImage.secureUrl}
-              alt={post.title}
+              alt={heroAlt}
               className="mb-8 w-full rounded-xl object-cover"
             />
           ) : null}

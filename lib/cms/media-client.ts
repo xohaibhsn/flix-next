@@ -17,6 +17,20 @@ export async function uploadSidhuImage(file: File, folder: string, alt = "") {
   return json.asset;
 }
 
+export async function updateSidhuImageAlt(id: string, alt: string) {
+  const response = await fetch("/api/sidhu/media", {
+    method: "PATCH",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, alt }),
+  });
+  const json = (await response.json()) as { ok: boolean; asset?: MediaAsset; error?: string };
+  if (!response.ok || !json.ok || !json.asset) {
+    throw new Error(json.error || "Could not save alt text.");
+  }
+  return json.asset;
+}
+
 export async function deleteSidhuImage(id: string) {
   const response = await fetch("/api/sidhu/media", {
     method: "DELETE",

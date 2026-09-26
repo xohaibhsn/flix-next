@@ -33,6 +33,7 @@ export interface CmsRepository {
   listMedia(): Promise<MediaAsset[]>;
   getMediaById(id: string): Promise<MediaAsset | null>;
   addMedia(asset: MediaAsset): Promise<MediaAsset>;
+  updateMediaAlt(id: string, alt: string): Promise<MediaAsset | null>;
   removeMedia(id: string): Promise<void>;
 }
 
@@ -123,6 +124,15 @@ export class LocalJsonRepository implements CmsRepository {
     const next = [asset, ...assets.filter((item) => item.id !== asset.id)];
     await writeJsonFile(MEDIA_FILE, { assets: next } satisfies MediaFile);
     return asset;
+  }
+
+  async updateMediaAlt(id: string, alt: string) {
+    const assets = await this.listMedia();
+    const current = assets.find((asset) => asset.id === id);
+    if (!current) return null;
+    const next = assets.map((asset) => (asset.id === id ? { ...asset, alt } : asset));
+    await writeJsonFile(MEDIA_FILE, { assets: next } satisfies MediaFile);
+    return { ...current, alt };
   }
 
   async removeMedia(id: string) {

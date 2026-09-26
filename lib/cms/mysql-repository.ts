@@ -275,6 +275,14 @@ export class MysqlCmsRepository {
     return asset;
   }
 
+  async updateMediaAlt(id: string, alt: string) {
+    await this.ensureReady();
+    const current = await this.getMediaById(id);
+    if (!current) return null;
+    await getDbPool().execute("UPDATE media_assets SET alt = ? WHERE id = ?", [alt, id]);
+    return { ...current, alt };
+  }
+
   async removeMedia(id: string) {
     await this.ensureReady();
     await getDbPool().execute("DELETE FROM media_assets WHERE id = ?", [id]);
@@ -291,6 +299,7 @@ type CmsOps = {
   listMedia: () => Promise<MediaAsset[]>;
   getMediaById: (id: string) => Promise<MediaAsset | null>;
   addMedia: (asset: MediaAsset) => Promise<MediaAsset>;
+  updateMediaAlt: (id: string, alt: string) => Promise<MediaAsset | null>;
   removeMedia: (id: string) => Promise<void>;
 };
 
@@ -338,6 +347,9 @@ export class MysqlWithBuildFallback implements CmsOps {
   }
   addMedia(asset: MediaAsset) {
     return this.run(() => this.mysql.addMedia(asset), () => this.json.addMedia(asset));
+  }
+  updateMediaAlt(id: string, alt: string) {
+    return this.run(() => this.mysql.updateMediaAlt(id, alt), () => this.json.updateMediaAlt(id, alt));
   }
   removeMedia(id: string) {
     return this.run(() => this.mysql.removeMedia(id), () => this.json.removeMedia(id));
