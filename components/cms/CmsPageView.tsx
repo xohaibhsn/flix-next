@@ -1,6 +1,7 @@
 import { connection } from "next/server";
 import { SectionRenderer } from "@/components/cms/SectionRenderer";
 import { cms } from "@/lib/cms/repository";
+import { getPublicPageBySlug, getPublicSettings } from "@/lib/cms/public-request-cache";
 import { createCompanyPageSections, companyPageById, companyPageBySlug } from "@/lib/cms/company-pages";
 import { createContactSections, createHomeSections, createSubscriptionSections } from "@/lib/cms/defaults";
 import { SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
@@ -20,8 +21,8 @@ function fallbackSections(slug: string, pageId?: string): CmsSection[] {
 export async function CmsPageView({ slug }: { slug: string }) {
   await connection();
   const [page, settings, plans, faqs] = await Promise.all([
-    cms.getPageBySlug(slug),
-    cms.getSettings(),
+    getPublicPageBySlug(slug),
+    getPublicSettings(),
     cms.listPlans(),
     cms.listFaqs(),
   ]);

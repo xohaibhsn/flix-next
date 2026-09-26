@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { cms } from "@/lib/cms/repository";
+import { getPublicSettings } from "@/lib/cms/public-request-cache";
 import { siteIconMetadata } from "@/lib/cms/favicon";
 import { siteConfig } from "@/lib/site-config";
 import { seoToMetadata } from "@/lib/seo";
@@ -11,7 +11,7 @@ import type { BlogPost, SiteSettings } from "@/lib/cms/types";
 
 export async function getSiteMetadata(): Promise<Metadata> {
   await connection();
-  const settings = await cms.getSettings();
+  const settings = await getPublicSettings();
   const image = resolveOpenGraphImageFromSettings(null, settings);
   const social = socialImageMeta(image);
   return {
@@ -36,7 +36,7 @@ export async function pageMetadata(
   path: string,
 ): Promise<Metadata> {
   await connection();
-  const settings = await cms.getSettings();
+  const settings = await getPublicSettings();
   const resolvedDescription = description || settings.tagline || siteConfig.description;
   const image = resolveOpenGraphImageFromSettings(null, settings, title);
   const social = socialImageMeta(image);
@@ -70,13 +70,13 @@ export async function pageSeoMetadata(
   path: string,
 ): Promise<Metadata> {
   await connection();
-  const settings = await cms.getSettings();
+  const settings = await getPublicSettings();
   return seoToMetadata(settings.pageSeo[key], settings, fallbackTitle, fallbackDescription, path);
 }
 
 export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
   await connection();
-  const settings = await cms.getSettings();
+  const settings = await getPublicSettings();
   const canonical = resolveBlogPostCanonical(post);
   return seoToMetadata(
     {

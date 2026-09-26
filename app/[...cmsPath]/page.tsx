@@ -4,7 +4,7 @@ import { SiteShell } from "@/components/layout/SiteShell";
 import { isCompanyPageId } from "@/lib/cms/company-pages";
 import { isReservedPageSlug, seoKeyForPageId } from "@/lib/cms/page-paths";
 import { withSlash } from "@/lib/cms/redirects";
-import { cms } from "@/lib/cms/repository";
+import { getPublicPageBySlug } from "@/lib/cms/public-request-cache";
 import { pageMetadata, pageSeoMetadata } from "@/lib/metadata";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: Props) {
   const { cmsPath } = await params;
   const slug = slugFromSegments(cmsPath);
   if (!slug || isReservedPageSlug(slug) || slug === "/" || slug === "/contact/") notFound();
-  const page = await cms.getPageBySlug(slug);
+  const page = await getPublicPageBySlug(slug);
   if (!page || page.status !== "published" || page.id === "page-home" || page.id === "page-contact") {
     notFound();
   }
@@ -34,7 +34,7 @@ export default async function CmsCatchAllPage({ params }: Props) {
   const slug = slugFromSegments(cmsPath);
   if (!slug || isReservedPageSlug(slug) || slug === "/" || slug === "/contact/") notFound();
 
-  const page = await cms.getPageBySlug(slug);
+  const page = await getPublicPageBySlug(slug);
   if (!page || page.status !== "published" || page.id === "page-home" || page.id === "page-contact") {
     notFound();
   }

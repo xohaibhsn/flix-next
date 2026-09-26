@@ -5,7 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
 import { CustomHeadCode } from "@/components/seo/CustomHeadCode";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { cms } from "@/lib/cms/repository";
+import { getPublicSettings } from "@/lib/cms/public-request-cache";
 import { breadcrumbListJsonLd, organizationJsonLd, webPageJsonLd, websiteJsonLd } from "@/lib/cms/json-ld";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
 import { companyPageBySeoKey, isCompanyPageSeoKey } from "@/lib/cms/company-pages";
@@ -36,7 +36,7 @@ export async function SiteShell({
   pageTitle?: string;
 }) {
   await connection();
-  const settings = await cms.getSettings();
+  const settings = await getPublicSettings();
   const branding: LogoBranding = {
     imageUrl: settings.branding.logo?.secureUrl ?? null,
     alt: settings.branding.logoAlt || settings.siteName,

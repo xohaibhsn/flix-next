@@ -6,6 +6,7 @@ import { SiteShell } from "@/components/layout/SiteShell";
 import { Container } from "@/components/ui/Container";
 import { blogPostPath } from "@/lib/cms/blog-paths";
 import { cms } from "@/lib/cms/repository";
+import { getPublicCategories } from "@/lib/cms/public-request-cache";
 import { pageMetadata } from "@/lib/metadata";
 import type { BlogPost } from "@/lib/cms/types";
 
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const category = (await cms.listCategories()).find((item) => item.slug === slug && item.active);
+  const category = (await getPublicCategories()).find((item) => item.slug === slug && item.active);
   if (!category) return pageMetadata("Category not found", "", "/blogs/");
   return pageMetadata(category.name, category.description || `Posts in ${category.name}.`, `/category/${category.slug}/`);
 }
@@ -36,7 +37,7 @@ function Card({ post }: { post: BlogPost }) {
 export default async function CategoryPage({ params }: Props) {
   await connection();
   const { slug } = await params;
-  const [categories, posts] = await Promise.all([cms.listCategories(), cms.listPosts()]);
+  const [categories, posts] = await Promise.all([getPublicCategories(), cms.listPosts()]);
   const category = categories.find((item) => item.slug === slug && item.active);
   if (!category) notFound();
   const items = posts.filter((post) => post.status === "published" && post.categoryId === category.id);
