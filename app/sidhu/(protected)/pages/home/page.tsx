@@ -33,6 +33,9 @@ export default async function SidhuHomeBuilderPage() {
             seo={settings.pageSeo.home}
             assets={assets}
             configured={cloud.configured}
+            settings={settings}
+            page={page}
+            fallbackTitle="Welcome"
           />
         ) : null}
       </div>

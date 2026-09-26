@@ -1,22 +1,31 @@
 "use client";
 
-import Link from "next/link";
 import { useRef, useState } from "react";
 import { saveSeoSettingsAction } from "@/lib/cms/actions";
-import type { SiteSettings } from "@/lib/cms/types";
+import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea } from "@/components/sidhu/fields";
+import { SeoOverviewTable } from "@/components/sidhu/SeoOverviewTable";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
-import { PAGE_SEO_KEYS, PAGE_SEO_META } from "@/lib/cms/page-seo";
+import { sidhuSeoOverviewRows } from "@/lib/cms/sidhu-seo-preview";
 
 const JSON_LD_HINT =
   "Paste JSON-LD or a <script type=\"application/ld+json\"> wrapper. Invalid JSON is rejected and the last valid value is kept. Leave empty to render nothing.";
 
-export function SeoForm({ settings: initial }: { settings: SiteSettings }) {
+export function SeoForm({
+  settings: initial,
+  posts,
+  categories,
+}: {
+  settings: SiteSettings;
+  posts: BlogPost[];
+  categories: BlogCategory[];
+}) {
   const [settings, setSettings] = useState(initial);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const savingLock = useRef(false);
+  const rows = sidhuSeoOverviewRows(settings, posts, categories);
 
   function validate() {
     const parsed = parseJsonLdInput(settings.siteCustomJsonLd || "");
@@ -61,29 +70,11 @@ export function SeoForm({ settings: initial }: { settings: SiteSettings }) {
       <section className="rounded-xl border border-line bg-white p-5">
         <h2 className="font-semibold">SEO Overview</h2>
         <p className="mt-1 text-sm text-muted">
-          Page metadata is edited in each page editor. Use the links below. Individual blog posts keep their SEO
-          fields in the post editor.
+          Current saved SEO state. Edit pages and posts from the links. Category rows are read-only in this phase.
         </p>
-        <div className="mt-4 divide-y divide-line rounded-lg border border-line">
-          {PAGE_SEO_KEYS.map((key) => {
-            const seo = settings.pageSeo[key];
-            const meta = PAGE_SEO_META[key];
-            return (
-              <article key={key} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <p className="font-semibold">{meta.label}</p>
-                  <p className="truncate text-sm">{seo.title || "No SEO title"}</p>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted">{seo.description || "No meta description"}</p>
-                </div>
-                <Link
-                  href={meta.editorHref}
-                  className="shrink-0 rounded-md bg-brand px-4 py-2 text-center text-sm font-semibold text-white"
-                >
-                  Edit SEO in Page
-                </Link>
-              </article>
-            );
-          })}
+        <p className="mt-2 text-sm text-muted">Advanced Category SEO controls coming in dedicated phase.</p>
+        <div className="mt-4">
+          <SeoOverviewTable rows={rows} />
         </div>
       </section>
 

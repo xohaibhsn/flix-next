@@ -5,13 +5,17 @@ import { cms } from "@/lib/cms/repository";
 export const dynamic = "force-dynamic";
 
 export default async function SidhuSeoPage() {
-  const settings = await cms.getSettings();
+  const [settings, posts, categories] = await Promise.all([
+    cms.getSettings(),
+    cms.listPosts(),
+    cms.listCategories(),
+  ]);
   return (
     <AdminShell
       title="SEO"
-      subtitle="Overview of page metadata plus site-wide custom JSON-LD. Edit page SEO inside each page editor. Blog posts have their own SEO panel."
+      subtitle="Overview of page, post, and category SEO. Edit page and post metadata in their editors. Site-wide custom JSON-LD is below."
     >
-      <SeoForm settings={settings} />
+      <SeoForm settings={settings} posts={posts} categories={categories} />
     </AdminShell>
   );
 }

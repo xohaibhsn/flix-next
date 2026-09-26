@@ -2,11 +2,16 @@
 
 import { useRef, useState } from "react";
 import { savePageSeoAction } from "@/lib/cms/actions";
-import type { MediaAsset, PageSeo } from "@/lib/cms/types";
+import type { CmsPage, MediaAsset, PageSeo, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
+import {
+  sidhuHeadingFromSections,
+  sidhuPreviewFromPageSeo,
+} from "@/lib/cms/sidhu-seo-preview";
 
 const JSON_LD_HINT =
   "Paste JSON-LD or a <script type=\"application/ld+json\"> wrapper. Invalid JSON is rejected and the last valid value is kept. Leave empty to render nothing.";
@@ -63,11 +68,19 @@ export function PageSeoPanel({
   seo: initialSeo,
   assets: initialAssets,
   configured,
+  settings,
+  page,
+  fallbackTitle,
+  fallbackDescription = "",
 }: {
   pageKey: PageSeoKey;
   seo: PageSeo;
   assets: MediaAsset[];
   configured: boolean;
+  settings: SiteSettings;
+  page?: CmsPage;
+  fallbackTitle: string;
+  fallbackDescription?: string;
 }) {
   const [seo, setSeo] = useState(initialSeo);
   const [assets, setAssets] = useState(initialAssets);
@@ -75,6 +88,15 @@ export function PageSeoPanel({
   const [saving, setSaving] = useState(false);
   const savingLock = useRef(false);
   const meta = PAGE_SEO_META[pageKey];
+  const preview = sidhuPreviewFromPageSeo(seo, {
+    key: pageKey,
+    fallbackTitle,
+    fallbackDescription,
+    siteName: settings.siteName,
+    siteTagline: settings.tagline,
+    defaultOgImage: settings.branding.defaultOgImage,
+    contentTitle: sidhuHeadingFromSections(page?.sections) || fallbackTitle,
+  });
 
   function notice(text: string, tone: "ok" | "error" | "info" = "info") {
     setMessage({ tone, text });
@@ -117,29 +139,34 @@ export function PageSeoPanel({
         </p>
       </div>
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <SeoPreview model={preview} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
-          <Field label="SEO title">
+          <Field label="SEO title" hint="Shown in search results. Leave blank only if the fallback title is intentional.">
             <TextInput value={seo.title} onChange={(event) => update({ title: event.target.value })} />
             <p className="mt-1 text-xs text-muted">{seo.title.length}/70</p>
           </Field>
-          <Field label="Meta description">
+          <Field label="Meta description" hint="Shown under the title in search results. Google may still shorten it.">
             <TextArea value={seo.description} onChange={(event) => update({ description: event.target.value })} />
             <p className="mt-1 text-xs text-muted">{seo.description.length}/160</p>
           </Field>
-          <Field label="Focus keyword">
+          <Field label="Focus keyword" hint="For your planning only. Google does not read this field directly.">
             <TextInput value={seo.focusKeyword} onChange={(event) => update({ focusKeyword: event.target.value })} />
           </Field>
-          <Field label="Canonical URL">
+          <Field label="Canonical URL" hint="Usually leave blank to use the page’s normal URL.">
             <TextInput value={seo.canonicalUrl} onChange={(event) => update({ canonicalUrl: event.target.value })} />
           </Field>
           <label className="block text-sm">
             <input type="checkbox" checked={seo.robotsIndex} onChange={(event) => update({ robotsIndex: event.target.checked })} /> Index
+            <span className="mt-1 block text-xs text-muted">Uncheck to ask search engines not to index this page.</span>
           </label>
           <label className="block text-sm">
             <input type="checkbox" checked={seo.robotsFollow} onChange={(event) => update({ robotsFollow: event.target.checked })} /> Follow
+            <span className="mt-1 block text-xs text-muted">Uncheck to ask search engines not to follow links on this page.</span>
           </label>
-          <Field label="OG title">
+        </div>
+        <div className="space-y-3">
+          <Field label="OG title" hint="Used when this page is shared on social platforms.">
             <TextInput value={seo.ogTitle} onChange={(event) => update({ ogTitle: event.target.value })} />
           </Field>
           <Field label="OG description">
@@ -152,13 +179,10 @@ export function PageSeoPanel({
               onChange={(event) => update({ sitemapInclude: event.target.checked })}
             />{" "}
             Include in sitemap
+            <span className="mt-1 block text-xs text-muted">
+              Disable only when you intentionally do not want this URL in the sitemap.
+            </span>
           </label>
-        </div>
-        <div className="rounded-md border border-line bg-paper p-4 text-sm">
-          <p className="text-xs text-muted">SERP preview</p>
-          <p className="mt-2 text-lg text-[#1a0dab]">{seo.title || "Title"}</p>
-          <p className="text-xs text-emerald-700">{seo.canonicalUrl || "/"}</p>
-          <p className="mt-2 text-muted">{seo.description || "Meta description"}</p>
         </div>
       </div>
       <JsonLdField
@@ -178,6 +202,7 @@ export function PageSeoPanel({
         onUploaded={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
         onNotice={notice}
       />
+      <p className="-mt-2 text-xs text-muted">Used when this page is shared on social platforms. Save SEO after choosing an image.</p>
       <button
         type="button"
         disabled={saving}

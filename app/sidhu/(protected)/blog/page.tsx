@@ -27,6 +27,9 @@ export default async function SidhuBlogPage() {
             seo={settings.pageSeo.blog}
             assets={assets}
             configured={cloud.configured}
+            settings={settings}
+            fallbackTitle="Blog"
+            fallbackDescription="Guides and updates from Flix IPTV."
           />
         ) : null}
       </div>

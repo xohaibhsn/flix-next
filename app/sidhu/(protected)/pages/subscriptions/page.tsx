@@ -42,6 +42,9 @@ export default async function SidhuSubscriptionsBuilderPage() {
             seo={settings.pageSeo.subscriptions}
             assets={assets}
             configured={cloud.configured}
+            settings={settings}
+            page={resolved}
+            fallbackTitle={resolved.name}
           />
         ) : null}
       </div>

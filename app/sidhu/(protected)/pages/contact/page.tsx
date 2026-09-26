@@ -41,6 +41,10 @@ export default async function SidhuContactBuilderPage() {
             seo={settings.pageSeo.contact}
             assets={assets}
             configured={cloud.configured}
+            settings={settings}
+            page={resolved}
+            fallbackTitle="Contact"
+            fallbackDescription="Contact Flix IPTV support by WhatsApp, email, or form."
           />
         ) : null}
       </div>

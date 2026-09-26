@@ -14,12 +14,14 @@ export default async function SidhuEditPostPage({ params }: { params: Promise<{ 
   let categories;
   let assets;
   let cloud;
+  let settings;
   try {
-    [post, categories, assets, cloud] = await Promise.all([
+    [post, categories, assets, cloud, settings] = await Promise.all([
       cms.getPostById(id),
       cms.listCategories(),
       cms.listMedia(),
       getCloudinaryStatusAction(),
+      cms.getSettings(),
     ]);
   } catch (error) {
     logServerError("sidhu:blog-edit", error);
@@ -28,7 +30,15 @@ export default async function SidhuEditPostPage({ params }: { params: Promise<{ 
   if (!post) notFound();
   return (
     <AdminShell title="Edit post" subtitle="TipTap content is stored as sanitized HTML.">
-      <BlogEditor post={post} categories={categories} assets={assets} configured={cloud.configured} />
+      <BlogEditor
+        post={post}
+        categories={categories}
+        assets={assets}
+        configured={cloud.configured}
+        siteName={settings.siteName}
+        siteTagline={settings.tagline}
+        defaultOgImage={settings.branding.defaultOgImage}
+      />
     </AdminShell>
   );
 }

@@ -50,6 +50,10 @@ export default async function SidhuCompanyPageBuilder({
             seo={settings.pageSeo[definition.seoKey]}
             assets={assets}
             configured={cloud.configured}
+            settings={settings}
+            page={resolved}
+            fallbackTitle={definition.seoTitle}
+            fallbackDescription={definition.seoDescription}
           />
         ) : null}
       </div>

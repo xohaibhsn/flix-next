@@ -6,22 +6,30 @@ import { savePostAction } from "@/lib/cms/actions";
 import { insertEditorImage } from "@/lib/cms/blog";
 import { blogPostPath } from "@/lib/cms/blog-paths";
 import { slugify } from "@/lib/cms/slug";
-import type { BlogCategory, BlogPost, MediaAsset } from "@/lib/cms/types";
+import type { BlogCategory, BlogPost, MediaAsset, MediaRef } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ClientRichTextEditor } from "@/components/sidhu/ClientRichTextEditor";
 import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
+import { SeoPreview } from "@/components/sidhu/SeoPreview";
+import { sidhuPreviewFromPost } from "@/lib/cms/sidhu-seo-preview";
 
 export function BlogEditor({
   post,
   categories,
   assets: initialAssets,
   configured,
+  siteName,
+  siteTagline = "",
+  defaultOgImage = null,
 }: {
   post: BlogPost;
   categories: BlogCategory[];
   assets: MediaAsset[];
   configured: boolean;
+  siteName: string;
+  siteTagline?: string;
+  defaultOgImage?: MediaRef | null;
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState(post);
@@ -29,6 +37,7 @@ export function BlogEditor({
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState(false);
+  const preview = sidhuPreviewFromPost(draft, { siteName, siteTagline, defaultOgImage });
 
   function notice(text: string, tone: "ok" | "error" | "info" = "info") {
     setMessage({ tone, text });
@@ -137,27 +146,29 @@ export function BlogEditor({
           />
           <section className="space-y-3 rounded-xl border border-line bg-white p-5">
             <h3 className="font-semibold">SEO</h3>
-            <Field label="SEO title">
+            <Field label="SEO title" hint="Shown in search results. Leave blank to use the post title.">
               <TextInput value={draft.seoTitle} onChange={(event) => setDraft({ ...draft, seoTitle: event.target.value })} />
               <p className="mt-1 text-xs text-muted">{draft.seoTitle.length}/70</p>
             </Field>
-            <Field label="Meta description">
+            <Field label="Meta description" hint="Shown under the title in search results. Google may still shorten it.">
               <TextArea value={draft.seoDescription} onChange={(event) => setDraft({ ...draft, seoDescription: event.target.value })} />
               <p className="mt-1 text-xs text-muted">{draft.seoDescription.length}/160</p>
             </Field>
-            <Field label="Focus keyword">
+            <Field label="Focus keyword" hint="For your planning only. Google does not read this field directly.">
               <TextInput value={draft.focusKeyword} onChange={(event) => setDraft({ ...draft, focusKeyword: event.target.value })} />
             </Field>
-            <Field label="Canonical URL">
+            <Field label="Canonical URL" hint="Usually leave blank to use the page’s normal URL.">
               <TextInput value={draft.canonicalUrl} onChange={(event) => setDraft({ ...draft, canonicalUrl: event.target.value })} />
             </Field>
             <label className="block text-sm">
               <input type="checkbox" checked={draft.robotsIndex} onChange={(event) => setDraft({ ...draft, robotsIndex: event.target.checked })} /> Index
+              <span className="mt-1 block text-xs text-muted">Uncheck to ask search engines not to index this page.</span>
             </label>
             <label className="block text-sm">
               <input type="checkbox" checked={draft.robotsFollow} onChange={(event) => setDraft({ ...draft, robotsFollow: event.target.checked })} /> Follow
+              <span className="mt-1 block text-xs text-muted">Uncheck to ask search engines not to follow links on this page.</span>
             </label>
-            <Field label="OG title">
+            <Field label="OG title" hint="Used when this page is shared on social platforms.">
               <TextInput value={draft.ogTitle} onChange={(event) => setDraft({ ...draft, ogTitle: event.target.value })} />
             </Field>
             <Field label="OG description">
@@ -165,6 +176,9 @@ export function BlogEditor({
             </Field>
             <label className="block text-sm">
               <input type="checkbox" checked={draft.sitemapInclude} onChange={(event) => setDraft({ ...draft, sitemapInclude: event.target.checked })} /> Include in sitemap
+              <span className="mt-1 block text-xs text-muted">
+                Disable only when you intentionally do not want this URL in the sitemap.
+              </span>
             </label>
           </section>
           <ImageField
@@ -178,8 +192,16 @@ export function BlogEditor({
             onUploaded={(asset) => setAssets((current) => [asset, ...current.filter((item) => item.id !== asset.id)])}
             onNotice={notice}
           />
+          <p className="-mt-2 px-1 text-xs text-muted">Used when this page is shared on social platforms. Save the post after choosing an image.</p>
         </aside>
       </div>
+      <section className="rounded-xl border border-line bg-white p-5">
+        <h3 className="font-semibold">SEO preview</h3>
+        <p className="mt-1 text-sm text-muted">Editor aid only. Saving still uses the SEO fields on the right.</p>
+        <div className="mt-4">
+          <SeoPreview model={preview} />
+        </div>
+      </section>
       <button type="button" disabled={saving} className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white" onClick={() => void save()}>
         {saving ? "Saving…" : "Save post"}
       </button>
