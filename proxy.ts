@@ -29,8 +29,7 @@ async function cmsRedirect(request: NextRequest) {
   const source = withSlash(pathname);
   if (isSidhuPage(pathname) || isSidhuApi(pathname)) return null;
   try {
-    const rules = await cms.listActiveRedirects();
-    const match = rules.find((rule) => withSlash(rule.sourcePath) === source);
+    const match = await cms.getActiveRedirectBySourcePath(source);
     if (!match) return null;
     const dest = resolveSafeRedirectUrl(match.destinationPath, request.url);
     if (!dest) return null;

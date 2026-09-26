@@ -14,7 +14,14 @@ import {
   sanitizeRedirect,
 } from "@/lib/cms/validation";
 import { ClientError } from "@/lib/security/errors";
-import { isReservedRedirectSource, isSelfRedirect, REDIRECT_ERRORS, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
+import {
+  isReservedRedirectSource,
+  isSelfRedirect,
+  REDIRECT_ERRORS,
+  sanitizeRedirectDestination,
+  withSlash,
+  wouldCreateRedirectLoop,
+} from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
 import type {
   BlogCategory,
@@ -98,6 +105,10 @@ type RedirectRow = RowDataPacket & {
   created_at: unknown;
   updated_at: unknown;
 };
+
+/** Parameterized exact public lookup. Uses UNIQUE(source_path); no schema change. */
+export const GET_ACTIVE_REDIRECT_BY_SOURCE_SQL =
+  "SELECT * FROM redirects WHERE source_path = ? AND is_active = 1 LIMIT 1";
 
 type MessageRow = RowDataPacket & {
   id: string;
@@ -364,6 +375,15 @@ export class MysqlCatalogRepository implements CatalogRepository {
   async listActiveRedirects() {
     const items = await this.listRedirects();
     return items.filter((item) => item.active);
+  }
+  async getActiveRedirectBySourcePath(sourcePath: string) {
+    await this.ready();
+    const source = withSlash(sourcePath);
+    const [rows] = await getDbPool().query<RedirectRow[]>(GET_ACTIVE_REDIRECT_BY_SOURCE_SQL, [source]);
+    const row = rows[0];
+    if (!row) return null;
+    const rule = mapRedirect(row);
+    return rule.active ? rule : null;
   }
   async saveRedirect(rule: RedirectRule) {
     await this.ready();

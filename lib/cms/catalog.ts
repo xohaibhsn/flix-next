@@ -25,6 +25,7 @@ export interface CatalogRepository {
   deletePost(id: string): Promise<void>;
   listRedirects(): Promise<RedirectRule[]>;
   listActiveRedirects(): Promise<RedirectRule[]>;
+  getActiveRedirectBySourcePath(sourcePath: string): Promise<RedirectRule | null>;
   saveRedirect(rule: RedirectRule): Promise<RedirectRule>;
   deleteRedirect(id: string): Promise<void>;
   listMessages(): Promise<ContactMessage[]>;

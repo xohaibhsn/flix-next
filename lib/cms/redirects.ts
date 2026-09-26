@@ -111,6 +111,12 @@ export function wouldCreateRedirectLoop(
   return true;
 }
 
+/** Exact public-path match used by proxy and local catalog adapters. */
+export function findActiveRedirectBySourcePath(rules: RedirectRule[], sourcePath: string): RedirectRule | null {
+  const source = withSlash(sourcePath);
+  return rules.find((rule) => rule.active && withSlash(rule.sourcePath) === source) ?? null;
+}
+
 export function resolveSafeRedirectUrl(destination: string, requestUrl: string) {
   if (!destination || isDangerousUrl(destination) || isProtectedCmsPath(destination)) return null;
   try {

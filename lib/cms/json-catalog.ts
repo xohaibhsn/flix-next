@@ -19,7 +19,14 @@ import {
   sanitizeRedirect,
 } from "@/lib/cms/validation";
 import { ClientError } from "@/lib/security/errors";
-import { isReservedRedirectSource, isSelfRedirect, REDIRECT_ERRORS, sanitizeRedirectDestination, wouldCreateRedirectLoop } from "@/lib/cms/redirects";
+import {
+  findActiveRedirectBySourcePath,
+  isReservedRedirectSource,
+  isSelfRedirect,
+  REDIRECT_ERRORS,
+  sanitizeRedirectDestination,
+  wouldCreateRedirectLoop,
+} from "@/lib/cms/redirects";
 import type {
   BlogCategory,
   BlogPost,
@@ -185,6 +192,10 @@ export class JsonCatalogRepository implements CatalogRepository {
   async listActiveRedirects() {
     const items = await this.listRedirects();
     return items.filter((item) => item.active);
+  }
+  async getActiveRedirectBySourcePath(sourcePath: string) {
+    const items = await this.listRedirects();
+    return findActiveRedirectBySourcePath(items, sourcePath);
   }
   async saveRedirect(rule: RedirectRule) {
     const safe = sanitizeRedirect(rule);
