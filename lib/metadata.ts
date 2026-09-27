@@ -6,6 +6,7 @@ import { siteConfig } from "@/lib/site-config";
 import { seoToMetadata } from "@/lib/seo";
 import { getSiteOrigin } from "@/lib/site-url";
 import { resolveOpenGraphImageFromSettings, socialImageMeta } from "@/lib/cms/open-graph";
+import { articleOpenGraphFields } from "@/lib/cms/article-seo";
 import { resolveBlogPostCanonical } from "@/lib/cms/blog-paths";
 import type { BlogPost, BlogCategory, SiteSettings } from "@/lib/cms/types";
 import {
@@ -82,7 +83,7 @@ export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
   await connection();
   const settings = await getPublicSettings();
   const canonical = resolveBlogPostCanonical(post);
-  return seoToMetadata(
+  const base = seoToMetadata(
     {
       title: post.seoTitle || post.title,
       description: post.seoDescription || post.excerpt,
@@ -101,6 +102,14 @@ export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
     post.excerpt,
     canonical,
   );
+
+  return {
+    ...base,
+    openGraph: {
+      ...base.openGraph,
+      ...articleOpenGraphFields(post),
+    },
+  };
 }
 
 export async function categorySeoMetadata(category: BlogCategory): Promise<Metadata> {

@@ -1,3 +1,4 @@
+import { articleModifiedTime, articlePublishedTime } from "@/lib/cms/article-seo";
 import { blogPostUrl } from "@/lib/cms/blog-paths";
 import { getSiteOrigin, absoluteUrl } from "@/lib/site-url";
 import type { BlogPost, FaqData, SiteSettings } from "@/lib/cms/types";
@@ -77,6 +78,8 @@ export function faqPageJsonLd(data: FaqData) {
 
 export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
   const url = blogPostUrl(post.slug);
+  const datePublished = articlePublishedTime(post);
+  const dateModified = articleModifiedTime(post);
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -84,8 +87,8 @@ export function blogPostingJsonLd(post: BlogPost, settings: SiteSettings) {
     url,
     headline: post.seoTitle || post.title,
     description: post.seoDescription || post.excerpt,
-    datePublished: post.publishedAt || post.createdAt,
-    dateModified: post.updatedAt,
+    ...(datePublished ? { datePublished } : {}),
+    ...(dateModified ? { dateModified } : {}),
     image: resolveOpenGraphImageFromSettings(post.ogImage || post.featuredImage, settings, post.title).url,
     author: {
       "@type": "Organization",
