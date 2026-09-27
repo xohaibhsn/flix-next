@@ -11,6 +11,11 @@ import {
 } from "@/lib/cms/defaults";
 import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
+import {
+  CMS_CONTENT_CLEANUP_V1,
+  TEST_TAGLINE_CLEANUP_V1,
+  runCompletedMigrationOnce,
+} from "@/lib/cms/migration-flags";
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
 import { resolveDefaultPageSeed } from "@/lib/cms/page-seed";
 import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
@@ -28,6 +33,24 @@ export const SITE_SETTINGS_KEY = "site";
 
 type CountRow = RowDataPacket & { n: number };
 type ColumnRow = RowDataPacket & { COLUMN_NAME: string };
+type SettingValueRow = RowDataPacket & { setting_value: unknown };
+
+async function hasMigrationFlag(key: string) {
+  const [rows] = await getDbPool().query<SettingValueRow[]>(
+    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+    [key],
+  );
+  return Boolean(rows[0]);
+}
+
+async function markMigrationFlag(key: string) {
+  await getDbPool().execute(
+    `INSERT INTO site_settings (setting_key, setting_value)
+     VALUES (?, '1')
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [key],
+  );
+}
 
 const REQUIRED_COLUMNS: Array<{ table: string; column: string; definition: string }> = [
   { table: "blog_posts", column: "excerpt", definition: "excerpt TEXT NULL" },
@@ -521,74 +544,87 @@ async function cleanupDemoBlogCopy() {
 }
 
 export async function seedSeoLongformIfNeeded() {
-  const pool = getDbPool();
-  for (const id of ["page-home", SUBSCRIPTION_PAGE_ID, "page-contact"]) {
-    const [pages] = await pool.query<Array<RowDataPacket & { id: string; name: string; slug: string; status: string; cms_enabled: number }>>(
-      "SELECT id, name, slug, status, cms_enabled FROM pages WHERE id = ? LIMIT 1",
-      [id],
-    );
-    const row = pages[0];
-    if (!row) continue;
-    const [sectionRows] = await pool.query<
-      Array<
-        RowDataPacket & {
-          id: string;
-          section_type: string;
-          label: string;
-          sort_order: number;
-          visible: number;
-          section_data: unknown;
-        }
-      >
-    >(
-      `SELECT id, section_type, label, sort_order, visible, section_data
-       FROM page_sections
-       WHERE page_id = ?
-       ORDER BY sort_order ASC`,
-      [row.id],
-    );
-    const page: CmsPage = {
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      status: row.status === "draft" ? "draft" : "published",
-      cmsEnabled: Boolean(row.cms_enabled),
-      sections: sectionRows.map((section) => ({
-        id: String(section.id),
-        type: section.section_type as SectionType,
-        label: String(section.label),
-        order: Number(section.sort_order) || 0,
-        visible: Boolean(section.visible),
-        data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
-      })),
-    };
-    const safe = sanitizePage(page);
-    const longform = applySeoLongformToPage(safe);
-    const cleaned = applyPublicCopyCleanupToPage(longform.page);
-    if (!longform.changed && !cleaned.changed) continue;
-    await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
-  }
-  await cleanupDemoFaqCopy();
-  await cleanupDemoPlanFeatures();
-  await cleanupDemoBlogCopy();
+  await runCompletedMigrationOnce({
+    flagKey: CMS_CONTENT_CLEANUP_V1,
+    hasCompleted: hasMigrationFlag,
+    markCompleted: markMigrationFlag,
+    run: async () => {
+      const pool = getDbPool();
+      for (const id of ["page-home", SUBSCRIPTION_PAGE_ID, "page-contact"]) {
+        const [pages] = await pool.query<
+          Array<RowDataPacket & { id: string; name: string; slug: string; status: string; cms_enabled: number }>
+        >("SELECT id, name, slug, status, cms_enabled FROM pages WHERE id = ? LIMIT 1", [id]);
+        const row = pages[0];
+        if (!row) continue;
+        const [sectionRows] = await pool.query<
+          Array<
+            RowDataPacket & {
+              id: string;
+              section_type: string;
+              label: string;
+              sort_order: number;
+              visible: number;
+              section_data: unknown;
+            }
+          >
+        >(
+          `SELECT id, section_type, label, sort_order, visible, section_data
+           FROM page_sections
+           WHERE page_id = ?
+           ORDER BY sort_order ASC`,
+          [row.id],
+        );
+        const page: CmsPage = {
+          id: row.id,
+          name: row.name,
+          slug: row.slug,
+          status: row.status === "draft" ? "draft" : "published",
+          cmsEnabled: Boolean(row.cms_enabled),
+          sections: sectionRows.map((section) => ({
+            id: String(section.id),
+            type: section.section_type as SectionType,
+            label: String(section.label),
+            order: Number(section.sort_order) || 0,
+            visible: Boolean(section.visible),
+            data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
+          })),
+        };
+        const safe = sanitizePage(page);
+        const longform = applySeoLongformToPage(safe);
+        const cleaned = applyPublicCopyCleanupToPage(longform.page);
+        if (!longform.changed && !cleaned.changed) continue;
+        await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
+      }
+      await cleanupDemoFaqCopy();
+      await cleanupDemoPlanFeatures();
+      await cleanupDemoBlogCopy();
+    },
+  });
 }
 
 export async function cleanupKnownTestTaglineIfNeeded() {
-  const pool = getDbPool();
-  const [rows] = await pool.query<Array<RowDataPacket & { setting_value: unknown }>>(
-    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
-    [SITE_SETTINGS_KEY],
-  );
-  if (!rows[0]) return;
-  const current = sanitizeSettings(parseJsonColumn<SiteSettings>(rows[0].setting_value, defaultSettings()));
-  const next = applyPublicCopyCleanupToSettings(current);
-  if (!next.changed) return;
-  await pool.execute(
-    `INSERT INTO site_settings (setting_key, setting_value)
-     VALUES (?, ?)
-     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
-    [SITE_SETTINGS_KEY, JSON.stringify(next.settings)],
-  );
+  await runCompletedMigrationOnce({
+    flagKey: TEST_TAGLINE_CLEANUP_V1,
+    hasCompleted: hasMigrationFlag,
+    markCompleted: markMigrationFlag,
+    run: async () => {
+      const pool = getDbPool();
+      const [rows] = await pool.query<SettingValueRow[]>(
+        "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+        [SITE_SETTINGS_KEY],
+      );
+      if (!rows[0]) return "deferred";
+      const current = sanitizeSettings(parseJsonColumn<SiteSettings>(rows[0].setting_value, defaultSettings()));
+      const next = applyPublicCopyCleanupToSettings(current);
+      if (!next.changed) return;
+      await pool.execute(
+        `INSERT INTO site_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+        [SITE_SETTINGS_KEY, JSON.stringify(next.settings)],
+      );
+    },
+  });
 }
 
 export async function migrateSubscriptionPageSlugIfNeeded() {
