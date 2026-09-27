@@ -76,6 +76,9 @@ export function InternalLinksReport({
             <Link href="/sidhu/seo/metadata-diagnostics/" className="text-sm font-semibold text-brand hover:underline">
               Metadata diagnostics →
             </Link>
+            <Link href="/sidhu/seo/image-diagnostics/" className="text-sm font-semibold text-brand hover:underline">
+              Image diagnostics →
+            </Link>
           </div>
         </div>
 

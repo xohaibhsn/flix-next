@@ -80,6 +80,9 @@ export function SeoForm({
           <Link href="/sidhu/seo/metadata-diagnostics/" className="font-semibold text-brand hover:underline">
             Open metadata diagnostics →
           </Link>
+          <Link href="/sidhu/seo/image-diagnostics/" className="font-semibold text-brand hover:underline">
+            Open image diagnostics →
+          </Link>
         </p>
         <div className="mt-4">
           <SeoOverviewTable rows={rows} />

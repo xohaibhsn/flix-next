@@ -132,6 +132,9 @@ export function MetadataDiagnosticsReport({
             <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
               Internal links →
             </Link>
+            <Link href="/sidhu/seo/image-diagnostics/" className="font-semibold text-brand hover:underline">
+              Image diagnostics →
+            </Link>
           </div>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
