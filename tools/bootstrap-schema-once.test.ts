@@ -194,7 +194,7 @@ test("source wiring: ensureReady uses AfterSchemaReady; standalone IfNeeded stil
   assert.match(admin, /export async function bootstrapAdminUsersAfterSchemaReady/);
   assert.match(admin, /export async function bootstrapAdminUsersIfNeeded/);
   assert.match(admin, /schemaAlreadyEnsured:\s*false/);
-  assert.match(admin, /ensureCmsSchema/);
+  assert.match(admin, /ensureCmsSchemaCurrent/);
 
   const auth = readFileSync(path.join(process.cwd(), "lib/auth/authenticate.ts"), "utf8");
   assert.match(auth, /bootstrapAdminUsersIfNeeded\(\)/);

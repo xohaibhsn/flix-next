@@ -291,10 +291,12 @@ export async function bootstrapAdminUsersAfterSchemaReady(options?: { allowEmerg
 /** Standalone entry: always ensures CMS schema before bootstrap work. */
 export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: boolean }) {
   if (!isDatabaseConfigured()) return;
-  const { ensureCmsSchema } = await import("@/lib/cms/mysql-migrate");
+  const { ensureCmsSchemaCurrent } = await import("@/lib/cms/mysql-migrate");
   await ensureSchemaThenBootstrap({
     schemaAlreadyEnsured: false,
-    ensureSchema: ensureCmsSchema,
+    ensureSchema: async () => {
+      await ensureCmsSchemaCurrent();
+    },
     bootstrapAfterSchema: () => bootstrapAdminUsersAfterSchemaReady(options),
   });
 }

@@ -4,7 +4,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { defaultSettings } from "@/lib/cms/defaults";
 import {
   SITE_SETTINGS_KEY,
-  ensureCmsSchema,
+  ensureCmsSchemaCurrent,
   fromMysqlDateTime,
   insertMediaRow,
   parseJsonColumn,
@@ -115,7 +115,7 @@ export class MysqlCmsRepository {
   private async ensureReady() {
     if (!this.readyPromise) {
       this.readyPromise = (async () => {
-        await ensureCmsSchema();
+        await ensureCmsSchemaCurrent();
         await seedCmsIfEmpty();
         await migrateSubscriptionPageSlugIfNeeded();
         await seedExtendedIfEmpty();

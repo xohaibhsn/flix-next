@@ -1,5 +1,14 @@
+/**
+ * Bump this whenever CMS_SCHEMA_STATEMENTS or ensureMissingColumns expectations change.
+ * Stored site_settings key cms_schema_version is compared against this value so cold
+ * starts can skip a verified full ensureCmsSchema pass. Forgetting to bump leaves
+ * new tables/columns unverified on DBs that already hold the previous version.
+ */
+export const CURRENT_CMS_SCHEMA_VERSION = 1;
+
 export const CMS_SCHEMA_STATEMENTS = [
   // Tables are created IF NOT EXISTS. Missing columns are added at runtime in ensureCmsSchema().
+  // When editing statements or REQUIRED_COLUMNS, bump CURRENT_CMS_SCHEMA_VERSION above.
   `CREATE TABLE IF NOT EXISTS pages (
     id VARCHAR(80) NOT NULL,
     name VARCHAR(120) NOT NULL,

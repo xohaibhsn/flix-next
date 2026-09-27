@@ -33,7 +33,15 @@ import {
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { withSlash } from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
-import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
+import { CMS_SCHEMA_STATEMENTS, CURRENT_CMS_SCHEMA_VERSION } from "@/lib/db/schema";
+import {
+  CMS_SCHEMA_VERSION_KEY,
+  isMissingRelationError,
+  parseStoredSchemaVersion,
+  runSchemaVersionGate,
+  type SchemaEnsureOutcome,
+  type SchemaVersionLookup,
+} from "@/lib/cms/schema-version";
 
 export const SITE_SETTINGS_KEY = "site";
 
@@ -118,6 +126,43 @@ export async function ensureCmsSchema() {
     await pool.query(statement);
   }
   await ensureMissingColumns();
+}
+
+type SchemaVersionRow = RowDataPacket & { setting_value: unknown };
+
+async function readCmsSchemaVersionLookup(): Promise<SchemaVersionLookup> {
+  try {
+    const [rows] = await getDbPool().query<SchemaVersionRow[]>(
+      "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+      [CMS_SCHEMA_VERSION_KEY],
+    );
+    if (!rows[0]) return { status: "found", version: null };
+    return { status: "found", version: parseStoredSchemaVersion(rows[0].setting_value) };
+  } catch (error) {
+    if (isMissingRelationError(error)) return { status: "unavailable" };
+    throw error;
+  }
+}
+
+async function writeCmsSchemaVersion(version: number = CURRENT_CMS_SCHEMA_VERSION): Promise<void> {
+  await getDbPool().execute(
+    `INSERT INTO site_settings (setting_key, setting_value)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+    [CMS_SCHEMA_VERSION_KEY, String(version)],
+  );
+}
+
+/**
+ * Authoritative schema entry for cold start and standalone bootstrap.
+ * Cheap version check first; full ensureCmsSchema only when required; marker written only on success.
+ */
+export async function ensureCmsSchemaCurrent(): Promise<SchemaEnsureOutcome> {
+  return runSchemaVersionGate({
+    readLookup: readCmsSchemaVersionLookup,
+    ensureSchema: ensureCmsSchema,
+    writeVersion: writeCmsSchemaVersion,
+  });
 }
 
 async function tableCount(table: "pages" | "media_assets" | "site_settings") {
