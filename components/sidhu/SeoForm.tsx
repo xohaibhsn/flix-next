@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { saveSeoSettingsAction } from "@/lib/cms/actions";
 import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea } from "@/components/sidhu/fields";
@@ -72,7 +73,11 @@ export function SeoForm({
         <p className="mt-1 text-sm text-muted">
           Current saved SEO state. Edit pages and posts from the links. Category rows are read-only in this phase.
         </p>
-        <p className="mt-2 text-sm text-muted">Advanced Category SEO controls coming in dedicated phase.</p>
+        <p className="mt-2 text-sm">
+          <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
+            Open internal link diagnostics →
+          </Link>
+        </p>
         <div className="mt-4">
           <SeoOverviewTable rows={rows} />
         </div>
