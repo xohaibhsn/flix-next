@@ -6,8 +6,34 @@ import {
   APEX_ORIGIN,
   isProductionWwwHost,
   normalizeHostname,
+  requestIsProductionWww,
   wwwToApexRedirectUrl,
+  wwwToApexRedirectUrlFromRequest,
 } from "../lib/www-host-canonical";
+
+function fakeRequest(input: {
+  hostname: string;
+  pathname?: string;
+  search?: string;
+  host?: string | null;
+  forwardedHost?: string | null;
+}) {
+  const headers = new Map<string, string>();
+  if (input.host) headers.set("host", input.host);
+  if (input.forwardedHost) headers.set("x-forwarded-host", input.forwardedHost);
+  return {
+    nextUrl: {
+      hostname: input.hostname,
+      pathname: input.pathname ?? "/",
+      search: input.search ?? "",
+    },
+    headers: {
+      get(name: string) {
+        return headers.get(name.toLowerCase()) ?? null;
+      },
+    },
+  };
+}
 
 test("www root → 301 apex root URL", () => {
   assert.equal(
@@ -124,13 +150,52 @@ test("host with port is recognized safely", () => {
   assert.equal(isProductionWwwHost("theflixiptv.com:443"), false);
 });
 
+test("request helper uses Host / x-forwarded-host when nextUrl hostname is apex", () => {
+  assert.equal(
+    wwwToApexRedirectUrlFromRequest(
+      fakeRequest({
+        hostname: "theflixiptv.com",
+        pathname: "/welcome/",
+        host: "www.theflixiptv.com",
+      }),
+    ),
+    `${APEX_ORIGIN}/welcome/`,
+  );
+  assert.equal(
+    wwwToApexRedirectUrlFromRequest(
+      fakeRequest({
+        hostname: "theflixiptv.com",
+        pathname: "/contact/",
+        search: "?source=test",
+        forwardedHost: "www.theflixiptv.com",
+      }),
+    ),
+    `${APEX_ORIGIN}/contact/?source=test`,
+  );
+  assert.equal(
+    wwwToApexRedirectUrlFromRequest(
+      fakeRequest({
+        hostname: "theflixiptv.com",
+        pathname: "/welcome/",
+        host: "theflixiptv.com",
+        forwardedHost: "staging.example.com",
+      }),
+    ),
+    null,
+  );
+  assert.equal(
+    requestIsProductionWww(fakeRequest({ hostname: "127.0.0.1", host: "www.theflixiptv.com:443" })),
+    true,
+  );
+});
+
 test("proxy exits on www before CMS redirect DB lookup", () => {
   const proxySource = readFileSync(path.join(process.cwd(), "proxy.ts"), "utf8");
   const fnStart = proxySource.indexOf("export async function proxy");
   assert.ok(fnStart > 0, "proxy function must exist");
   const body = proxySource.slice(fnStart);
 
-  const wwwCall = body.indexOf("wwwToApexRedirectUrl({ hostname, pathname, search })");
+  const wwwCall = body.indexOf("wwwToApexRedirectUrlFromRequest(request)");
   const apexRedirect = body.indexOf("NextResponse.redirect(apexTarget, 301)");
   const cmsCall = body.indexOf("cmsRedirect(request)");
   const sessionCall = body.indexOf("resolveAdminFromToken(");

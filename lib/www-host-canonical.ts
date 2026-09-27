@@ -22,6 +22,32 @@ export function isProductionWwwHost(hostname: string): boolean {
   return normalizeHostname(hostname) === PRODUCTION_WWW_HOST;
 }
 
+type HostnameRequest = {
+  nextUrl: { hostname: string };
+  headers: { get(name: string): string | null };
+};
+
+/**
+ * Prefer framework-parsed hostname; also accept Host / first x-forwarded-host
+ * when they are exactly production www (Hostinger CDN often preserves the public host there).
+ * Destination is never taken from these headers.
+ */
+export function hostnameCandidatesForWwwCheck(request: HostnameRequest): string[] {
+  const candidates = [request.nextUrl.hostname];
+  const host = request.headers.get("host");
+  if (host) candidates.push(host);
+  const forwarded = request.headers.get("x-forwarded-host");
+  if (forwarded) {
+    const first = forwarded.split(",")[0]?.trim();
+    if (first) candidates.push(first);
+  }
+  return candidates;
+}
+
+export function requestIsProductionWww(request: HostnameRequest): boolean {
+  return hostnameCandidatesForWwwCheck(request).some(isProductionWwwHost);
+}
+
 /**
  * Build the apex URL for a www request. Returns null when the host is not production www.
  * Pathname and query are preserved; destination host is always the fixed apex.
@@ -35,4 +61,12 @@ export function wwwToApexRedirectUrl(input: {
   const pathname = input.pathname || "/";
   const search = input.search ?? "";
   return `${APEX_ORIGIN}${pathname}${search}`;
+}
+
+/** Resolve www→apex from a Next request using safe hostname candidates. */
+export function wwwToApexRedirectUrlFromRequest(
+  request: HostnameRequest & { nextUrl: { hostname: string; pathname: string; search: string } },
+): string | null {
+  if (!requestIsProductionWww(request)) return null;
+  return `${APEX_ORIGIN}${request.nextUrl.pathname || "/"}${request.nextUrl.search ?? ""}`;
 }
