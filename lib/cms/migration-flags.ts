@@ -4,6 +4,7 @@
  */
 export const CMS_CONTENT_CLEANUP_V1 = "cms_content_cleanup_v1";
 export const TEST_TAGLINE_CLEANUP_V1 = "test_tagline_cleanup_v1";
+export const SUBSCRIPTION_SLUG_MIGRATION_V1 = "subscription_slug_migration_v1";
 
 export const CONTENT_CLEANUP_FLAG_KEYS = [CMS_CONTENT_CLEANUP_V1, TEST_TAGLINE_CLEANUP_V1] as const;
 

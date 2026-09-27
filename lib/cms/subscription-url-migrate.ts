@@ -102,6 +102,24 @@ export function applySubscriptionRedirectMigration(rules: RedirectRule[]): { rul
   return { rules: next, changed };
 }
 
+/** Cheap postcondition check after subscription slug migration (no full-table scans). */
+export function isSubscriptionMigrationPostconditionMet(input: {
+  pageSlug: string | null;
+  legacyRedirect: Pick<RedirectRule, "sourcePath" | "destinationPath" | "statusCode" | "active"> | null;
+  settings: SiteSettings | null;
+}): boolean {
+  if (input.pageSlug !== null && withSlash(input.pageSlug) !== SUBSCRIPTION_SLUG) return false;
+  const legacy = input.legacyRedirect;
+  if (!legacy) return false;
+  if (withSlash(legacy.sourcePath) !== SUBSCRIPTION_SLUG_LEGACY) return false;
+  if (withSlash(legacy.destinationPath.split("?")[0] || "/") !== SUBSCRIPTION_SLUG) return false;
+  if (legacy.statusCode !== 301) return false;
+  if (!legacy.active) return false;
+  if (!input.settings) return false;
+  if (remapSettingsForSubscriptionUrl(input.settings).changed) return false;
+  return true;
+}
+
 export function remapPageStructuredHrefs(page: CmsPage): { page: CmsPage; changed: boolean } {
   const sections = page.sections.map((section) => {
     const data = remapStructuredHrefs(section.data);

@@ -13,19 +13,25 @@ import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import {
   CMS_CONTENT_CLEANUP_V1,
+  SUBSCRIPTION_SLUG_MIGRATION_V1,
   TEST_TAGLINE_CLEANUP_V1,
   runCompletedMigrationOnce,
 } from "@/lib/cms/migration-flags";
+import { BLOG_INDEX_SLUG_LEGACY, resolveBlogIndexManagedRedirect } from "@/lib/cms/blog-index";
 import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
 import { resolveDefaultPageSeed } from "@/lib/cms/page-seed";
-import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { mysqlDuplicateError } from "@/lib/cms/slug-change";
 import { applySeoLongformToPage } from "@/lib/cms/seo-longform";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { remapStructuredHrefs, SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
-import { applySubscriptionRedirectMigration, remapSettingsForSubscriptionUrl } from "@/lib/cms/subscription-url-migrate";
+import {
+  applySubscriptionRedirectMigration,
+  isSubscriptionMigrationPostconditionMet,
+  remapSettingsForSubscriptionUrl,
+} from "@/lib/cms/subscription-url-migrate";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
+import { withSlash } from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS } from "@/lib/db/schema";
 
@@ -627,35 +633,51 @@ export async function cleanupKnownTestTaglineIfNeeded() {
   });
 }
 
-export async function migrateSubscriptionPageSlugIfNeeded() {
+/** Indexed exact source lookup (any active state) — same UNIQUE(source_path) path as Phase 2. */
+const GET_REDIRECT_BY_SOURCE_SQL =
+  "SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects WHERE source_path = ? LIMIT 1";
+
+type RedirectSourceRow = RowDataPacket & {
+  id: string;
+  source_path: string;
+  destination_path: string;
+  status_code: number;
+  is_active: number;
+  created_at: unknown;
+  updated_at: unknown;
+};
+
+function mapRedirectSourceRow(row: RedirectSourceRow): RedirectRule {
+  return {
+    id: row.id,
+    sourcePath: row.source_path,
+    destinationPath: row.destination_path,
+    statusCode:
+      row.status_code === 302 || row.status_code === 307 || row.status_code === 308 ? row.status_code : 301,
+    active: Boolean(row.is_active),
+    createdAt: String(row.created_at || ""),
+    updatedAt: String(row.updated_at || ""),
+  };
+}
+
+async function loadRedirectBySourcePath(sourcePath: string) {
+  const [rows] = await getDbPool().query<RedirectSourceRow[]>(GET_REDIRECT_BY_SOURCE_SQL, [
+    withSlash(sourcePath),
+  ]);
+  return rows[0] ? mapRedirectSourceRow(rows[0]) : null;
+}
+
+async function runSubscriptionSlugMigrationBody(): Promise<void | "deferred"> {
   const pool = getDbPool();
   await pool.execute(
     `UPDATE pages SET slug = ? WHERE id = ? AND (slug = ? OR slug = ?)`,
     [SUBSCRIPTION_SLUG, SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG_LEGACY, "/iptv-subscriptions-uk"],
   );
 
-  const [redirectRows] = await pool.query<
-    Array<
-      RowDataPacket & {
-        id: string;
-        source_path: string;
-        destination_path: string;
-        status_code: number;
-        is_active: number;
-        created_at: unknown;
-        updated_at: unknown;
-      }
-    >
-  >("SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects");
-  const currentRules: RedirectRule[] = redirectRows.map((row) => ({
-    id: row.id,
-    sourcePath: row.source_path,
-    destinationPath: row.destination_path,
-    statusCode: row.status_code === 302 || row.status_code === 307 || row.status_code === 308 ? row.status_code : 301,
-    active: Boolean(row.is_active),
-    createdAt: String(row.created_at || ""),
-    updatedAt: String(row.updated_at || ""),
-  }));
+  const [redirectRows] = await pool.query<RedirectSourceRow[]>(
+    "SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects",
+  );
+  const currentRules: RedirectRule[] = redirectRows.map(mapRedirectSourceRow);
   const migrated = applySubscriptionRedirectMigration(currentRules);
   if (migrated.changed) {
     for (const rule of migrated.rules) {
@@ -684,72 +706,86 @@ export async function migrateSubscriptionPageSlugIfNeeded() {
     await pool.execute("UPDATE page_sections SET section_data = ? WHERE id = ?", [JSON.stringify(next), row.id]);
   }
 
-  const [settingRows] = await pool.query<Array<RowDataPacket & { setting_value: unknown }>>(
+  const [settingRows] = await pool.query<SettingValueRow[]>(
     "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
     [SITE_SETTINGS_KEY],
   );
-  if (!settingRows[0]) return;
+  if (!settingRows[0]) return "deferred";
   const current = sanitizeSettings(parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()));
   const remapped = remapSettingsForSubscriptionUrl(current);
-  if (!remapped.changed) return;
-  await pool.execute(
-    `INSERT INTO site_settings (setting_key, setting_value)
-     VALUES (?, ?)
-     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
-    [SITE_SETTINGS_KEY, JSON.stringify(remapped.settings)],
+  if (remapped.changed) {
+    await pool.execute(
+      `INSERT INTO site_settings (setting_key, setting_value)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+      [SITE_SETTINGS_KEY, JSON.stringify(remapped.settings)],
+    );
+  }
+}
+
+async function verifySubscriptionSlugMigrationComplete() {
+  const pool = getDbPool();
+  const [pages] = await pool.query<Array<RowDataPacket & { slug: string }>>(
+    "SELECT slug FROM pages WHERE id = ? LIMIT 1",
+    [SUBSCRIPTION_PAGE_ID],
   );
+  const pageSlug = pages[0] ? String(pages[0].slug) : null;
+  const legacyRedirect = await loadRedirectBySourcePath(SUBSCRIPTION_SLUG_LEGACY);
+  const [settingRows] = await pool.query<SettingValueRow[]>(
+    "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+    [SITE_SETTINGS_KEY],
+  );
+  if (!settingRows[0]) return false;
+  const settings = sanitizeSettings(
+    parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()),
+  );
+  return isSubscriptionMigrationPostconditionMet({
+    pageSlug,
+    legacyRedirect,
+    settings,
+  });
+}
+
+export async function migrateSubscriptionPageSlugIfNeeded() {
+  await runCompletedMigrationOnce({
+    flagKey: SUBSCRIPTION_SLUG_MIGRATION_V1,
+    hasCompleted: hasMigrationFlag,
+    markCompleted: markMigrationFlag,
+    run: async () => {
+      const outcome = await runSubscriptionSlugMigrationBody();
+      if (outcome === "deferred") return "deferred";
+      if (!(await verifySubscriptionSlugMigrationComplete())) {
+        throw new Error("subscription slug migration postconditions not met");
+      }
+    },
+  });
 }
 
 export async function ensureBlogIndexRedirect() {
   try {
+    const existing = await loadRedirectBySourcePath(BLOG_INDEX_SLUG_LEGACY);
+    const { rule, changed } = resolveBlogIndexManagedRedirect(existing);
+    if (!changed) return;
     const pool = getDbPool();
-    const [redirectRows] = await pool.query<
-      Array<
-        RowDataPacket & {
-          id: string;
-          source_path: string;
-          destination_path: string;
-          status_code: number;
-          is_active: number;
-          created_at: unknown;
-          updated_at: unknown;
-        }
-      >
-    >("SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects");
-    const currentRules: RedirectRule[] = redirectRows.map((row) => ({
-      id: row.id,
-      sourcePath: row.source_path,
-      destinationPath: row.destination_path,
-      statusCode: row.status_code === 302 || row.status_code === 307 || row.status_code === 308 ? row.status_code : 301,
-      active: Boolean(row.is_active),
-      createdAt: String(row.created_at || ""),
-      updatedAt: String(row.updated_at || ""),
-    }));
-    const migrated = applyBlogIndexRedirectUpsert(currentRules);
-    if (!migrated.changed) return;
-    for (const rule of migrated.rules) {
-      const before = currentRules.find((item) => item.id === rule.id);
-      if (before && JSON.stringify(before) === JSON.stringify(rule)) continue;
-      try {
-        await pool.execute(
-          `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
-           VALUES (?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             source_path = VALUES(source_path),
-             destination_path = VALUES(destination_path),
-             status_code = VALUES(status_code),
-             is_active = VALUES(is_active)`,
-          [rule.id, rule.sourcePath, rule.destinationPath, rule.statusCode, rule.active ? 1 : 0],
-        );
-      } catch (error) {
-        if (!mysqlDuplicateError(error)) throw error;
-        await pool.execute(
-          `UPDATE redirects
-           SET destination_path = ?, status_code = ?, is_active = ?
-           WHERE source_path = ?`,
-          [rule.destinationPath, rule.statusCode, rule.active ? 1 : 0, rule.sourcePath],
-        );
-      }
+    try {
+      await pool.execute(
+        `INSERT INTO redirects (id, source_path, destination_path, status_code, is_active)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           source_path = VALUES(source_path),
+           destination_path = VALUES(destination_path),
+           status_code = VALUES(status_code),
+           is_active = VALUES(is_active)`,
+        [rule.id, rule.sourcePath, rule.destinationPath, rule.statusCode, rule.active ? 1 : 0],
+      );
+    } catch (error) {
+      if (!mysqlDuplicateError(error)) throw error;
+      await pool.execute(
+        `UPDATE redirects
+         SET destination_path = ?, status_code = ?, is_active = ?
+         WHERE source_path = ?`,
+        [rule.destinationPath, rule.statusCode, rule.active ? 1 : 0, rule.sourcePath],
+      );
     }
   } catch (error) {
     console.error("[cms] blog index redirect was not applied:", error instanceof Error ? error.message : error);

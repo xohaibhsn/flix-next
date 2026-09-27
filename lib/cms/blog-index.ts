@@ -97,3 +97,46 @@ export function applyBlogIndexRedirectUpsert(rules: RedirectRule[]): { rules: Re
 
   return { rules: next, changed };
 }
+
+/**
+ * Exact `/blog/` managed-row semantics from applyBlogIndexRedirectUpsert,
+ * without scanning or rewriting unrelated redirect records.
+ */
+export function resolveBlogIndexManagedRedirect(
+  existing: RedirectRule | null,
+  now = new Date().toISOString(),
+): { rule: RedirectRule; changed: boolean } {
+  if (existing) {
+    if (
+      existing.destinationPath === BLOG_INDEX_SLUG &&
+      existing.statusCode === 301 &&
+      existing.active &&
+      existing.sourcePath === BLOG_INDEX_SLUG_LEGACY
+    ) {
+      return { rule: existing, changed: false };
+    }
+    return {
+      rule: {
+        ...existing,
+        sourcePath: BLOG_INDEX_SLUG_LEGACY,
+        destinationPath: BLOG_INDEX_SLUG,
+        statusCode: 301,
+        active: true,
+        updatedAt: now,
+      },
+      changed: true,
+    };
+  }
+  return {
+    rule: {
+      id: BLOG_INDEX_REDIRECT_ID,
+      sourcePath: BLOG_INDEX_SLUG_LEGACY,
+      destinationPath: BLOG_INDEX_SLUG,
+      statusCode: 301,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    },
+    changed: true,
+  };
+}
