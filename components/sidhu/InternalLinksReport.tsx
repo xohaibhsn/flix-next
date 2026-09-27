@@ -69,9 +69,14 @@ export function InternalLinksReport({
               Redirects are reported only — they are not changed.
             </p>
           </div>
-          <Link href="/sidhu/seo/" className="text-sm font-semibold text-brand hover:underline">
-            ← SEO overview
-          </Link>
+          <div className="flex flex-col items-end gap-1">
+            <Link href="/sidhu/seo/" className="text-sm font-semibold text-brand hover:underline">
+              ← SEO overview
+            </Link>
+            <Link href="/sidhu/seo/metadata-diagnostics/" className="text-sm font-semibold text-brand hover:underline">
+              Metadata diagnostics →
+            </Link>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
