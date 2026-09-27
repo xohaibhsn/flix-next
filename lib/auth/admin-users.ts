@@ -18,6 +18,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createId } from "@/lib/cms/ids";
 import { fromMysqlDateTime } from "@/lib/cms/mysql-migrate";
 import { envPasswordBootstrapAction } from "@/lib/auth/bootstrap-policy";
+import { ensureSchemaThenBootstrap } from "@/lib/auth/bootstrap-schema-gate";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { getDbPool } from "@/lib/db/pool";
 import type { PublicAdminUser } from "@/lib/auth/types";
@@ -232,10 +233,8 @@ async function restorePrimaryAdminFromEnv(password: string) {
   await insertPrimaryAdminFromEnv(password);
 }
 
-export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: boolean }) {
+export async function bootstrapAdminUsersAfterSchemaReady(options?: { allowEmergency?: boolean }) {
   if (!isDatabaseConfigured()) return;
-  const { ensureCmsSchema } = await import("@/lib/cms/mysql-migrate");
-  await ensureCmsSchema();
   const bootstrap = getBootstrapCredentials();
   if (!bootstrap) return;
 
@@ -287,6 +286,17 @@ export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: b
       conn.release();
     }
   }
+}
+
+/** Standalone entry: always ensures CMS schema before bootstrap work. */
+export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: boolean }) {
+  if (!isDatabaseConfigured()) return;
+  const { ensureCmsSchema } = await import("@/lib/cms/mysql-migrate");
+  await ensureSchemaThenBootstrap({
+    schemaAlreadyEnsured: false,
+    ensureSchema: ensureCmsSchema,
+    bootstrapAfterSchema: () => bootstrapAdminUsersAfterSchemaReady(options),
+  });
 }
 
 export async function markAdminLogin(id: string) {

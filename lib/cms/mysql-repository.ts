@@ -123,8 +123,8 @@ export class MysqlCmsRepository {
         await ensureBlogIndexRedirect();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
-        const { bootstrapAdminUsersIfNeeded } = await import("@/lib/auth/admin-users");
-        await bootstrapAdminUsersIfNeeded({ allowEmergency: true });
+        const { bootstrapAdminUsersAfterSchemaReady } = await import("@/lib/auth/admin-users");
+        await bootstrapAdminUsersAfterSchemaReady({ allowEmergency: true });
       })().catch((error) => {
         this.readyPromise = null;
         throw cmsDbError(error);
