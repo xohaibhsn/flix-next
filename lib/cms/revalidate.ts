@@ -121,4 +121,5 @@ export function revalidateCategory(slug?: string) {
   if (!slug) return;
   revalidatePath(`/category/${slug}`);
   revalidatePath(`/category/${slug}/`);
+  revalidatePath("/sitemap.xml");
 }

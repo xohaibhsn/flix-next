@@ -18,17 +18,14 @@ export function iconTypeFromUrl(url: string) {
   return "image/png";
 }
 
+/** Metadata icons point at Cloudinary (or local SVG fallback) — no Node proxy hop. */
 export function siteIconMetadata(settings: SiteSettings): NonNullable<Metadata["icons"]> {
   const favicon = settings.branding.favicon;
   if (favicon?.secureUrl) {
     const remote = versionedMediaUrl(favicon);
-    const local = `/icon/?v=${encodeURIComponent(favicon.id)}`;
     const type = iconTypeFromUrl(favicon.secureUrl);
     return {
-      icon: [
-        { url: local, type },
-        { url: remote, type },
-      ],
+      icon: [{ url: remote, type }],
       shortcut: [{ url: remote, type }],
       apple: [{ url: remote, sizes: "180x180", type }],
     };
