@@ -3,6 +3,7 @@ import { rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { PAGE_SEO_KEYS } from "@/lib/cms/page-seo";
 import { remapSettingsForSubscriptionUrl } from "@/lib/cms/subscription-url-migrate";
 import { remapSettingsForBlogIndex } from "@/lib/cms/blog-index";
+import { applySubscriptionSeoTitleRepair } from "@/lib/cms/subscription-seo-microcopy";
 import type { PageSeo, SiteSettings } from "@/lib/cms/types";
 
 export const KNOWN_TEST_TAGLINE = "Your Entertainment Testt";
@@ -67,6 +68,13 @@ export function applyPublicCopyCleanupToSettings(settings: SiteSettings): { sett
     const result = rewritePageSeo(pageSeo[key]);
     if (!result.changed) continue;
     pageSeo[key] = result.seo;
+    changed = true;
+  }
+
+  // F4: broaden Firestick-narrowed subscription title even if £ encoding differs.
+  const titleRepair = applySubscriptionSeoTitleRepair(pageSeo.subscriptions);
+  if (titleRepair.changed) {
+    pageSeo.subscriptions = titleRepair.seo;
     changed = true;
   }
 
