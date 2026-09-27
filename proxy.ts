@@ -6,6 +6,7 @@ import { blogsPathFromLegacyBlogPath, isLegacyBlogPostPath } from "@/lib/cms/blo
 import { resolveSafeRedirectUrl } from "@/lib/cms/redirects";
 import { cms } from "@/lib/cms/repository";
 import { applySecurityHeaders } from "@/lib/security/headers";
+import { wwwToApexRedirectUrl } from "@/lib/www-host-canonical";
 
 function isLoginPath(pathname: string) {
   return pathname === "/sidhu/login" || pathname === "/sidhu/login/";
@@ -40,7 +41,14 @@ async function cmsRedirect(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search, hostname } = request.nextUrl;
+
+  // Host canonicalization: exit before Sidhu auth, CMS redirect DB, or legacy path work.
+  const apexTarget = wwwToApexRedirectUrl({ hostname, pathname, search });
+  if (apexTarget) {
+    return applySecurityHeaders(NextResponse.redirect(apexTarget, 301), pathname, request);
+  }
+
   const needsAdmin = isSidhuPage(pathname) || isSidhuApi(pathname);
   const session = needsAdmin ? await resolveAdminFromToken(request.cookies.get(ADMIN_SESSION_COOKIE)?.value) : null;
 
