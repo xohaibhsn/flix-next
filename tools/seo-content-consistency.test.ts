@@ -1,9 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { companyPageSeoDefaults } from "../lib/cms/company-pages";
 import { renderCmsHtml } from "../lib/cms/html";
 import { migratePublicSubscriptionHref } from "../lib/cms/page-paths";
 import { rewriteDemoCopy } from "../lib/cms/public-copy-cleanup";
 import { brandedSocialTitle } from "../lib/seo";
+
+test("about SEO default title omits brand so the root template does not duplicate it", () => {
+  const seo = companyPageSeoDefaults();
+  assert.equal(seo.about.title, "About Us");
+  assert.equal(seo.terms.title, "Terms & Conditions");
+  assert.equal(seo.refund.title, "Refund Policy");
+  assert.equal(seo.privacy.title, "Privacy Policy");
+  assert.equal(seo.cookie.title, "Cookie Policy");
+  assert.equal(seo.copyright.title, "Copyright Policy");
+});
 
 test("branded social title does not duplicate an existing brand", () => {
   assert.equal(brandedSocialTitle("Flix IPTV | IPTV Providers UK", "Flix IPTV"), "Flix IPTV | IPTV Providers UK");

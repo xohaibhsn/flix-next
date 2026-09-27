@@ -46,7 +46,7 @@ function buildCompanyPages(): CompanyPageDefinition[] {
     name: "About Us",
     slug: "/about-us/",
     adminParam: "about-us",
-    seoTitle: "About Flix IPTV",
+    seoTitle: "About Us",
     seoDescription:
       "Learn what Flix IPTV is, how UK streaming subscriptions work, and how to get help on WhatsApp.",
     focusKeyword: "Flix IPTV",
