@@ -14,6 +14,7 @@ import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-
 import {
   CMS_CONTENT_CLEANUP_V1,
   SUBSCRIPTION_SEO_MICROCOPY_V1,
+  SUBSCRIPTION_SEO_MICROCOPY_V2,
   SUBSCRIPTION_SLUG_MIGRATION_V1,
   TEST_TAGLINE_CLEANUP_V1,
   runCompletedMigrationOnce,
@@ -35,6 +36,7 @@ import {
   applySubscriptionMoneyBackExactToFaqs,
   applySubscriptionMoneyBackExactToSections,
   applySubscriptionSeoMicrocopyToSettings,
+  applySubscriptionSeoTitleRepair,
 } from "@/lib/cms/subscription-seo-microcopy";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { withSlash } from "@/lib/cms/redirects";
@@ -909,6 +911,41 @@ export async function migrateSubscriptionSeoMicrocopyIfNeeded() {
           ]);
         }
       }
+    },
+  });
+
+  // Title-only follow-up: v1 may have completed after meta-only success if £ encoding mismatched.
+  await runCompletedMigrationOnce({
+    flagKey: SUBSCRIPTION_SEO_MICROCOPY_V2,
+    hasCompleted: hasMigrationFlag,
+    markCompleted: markMigrationFlag,
+    run: async () => {
+      const pool = getDbPool();
+      const [settingRows] = await pool.query<SettingValueRow[]>(
+        "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+        [SITE_SETTINGS_KEY],
+      );
+      if (!settingRows[0]) return "deferred";
+
+      const current = sanitizeSettings(
+        parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()),
+      );
+      const repaired = applySubscriptionSeoTitleRepair(current.pageSeo.subscriptions);
+      if (!repaired.changed) return;
+
+      const nextSettings: SiteSettings = {
+        ...current,
+        pageSeo: {
+          ...current.pageSeo,
+          subscriptions: repaired.seo,
+        },
+      };
+      await pool.execute(
+        `INSERT INTO site_settings (setting_key, setting_value)
+         VALUES (?, ?)
+         ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+        [SITE_SETTINGS_KEY, JSON.stringify(nextSettings)],
+      );
     },
   });
 }

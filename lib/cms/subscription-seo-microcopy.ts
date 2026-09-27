@@ -1,17 +1,53 @@
 import type { CmsPage, CmsSection, FaqItem, PageSeo, SiteSettings } from "@/lib/cms/types";
 import { SUBSCRIPTION_PAGE_ID } from "@/lib/cms/page-paths";
 
+/** Pound sign as unicode escape so bundlers cannot corrupt file encoding. */
+const GBP = "\u00A3";
+
 /** Exact live/CMS SEO title before F4 (must match character-for-character). */
 export const SUBSCRIPTION_SEO_TITLE_BEFORE =
-  "Best IPTV Subscription UK for Firestick | From £14.99 | Flix IPTV";
+  `Best IPTV Subscription UK for Firestick | From ${GBP}14.99 | Flix IPTV`;
 
-export const SUBSCRIPTION_SEO_TITLE_AFTER = "Best IPTV Subscription UK | From £14.99 | Flix IPTV";
+export const SUBSCRIPTION_SEO_TITLE_AFTER = `Best IPTV Subscription UK | From ${GBP}14.99 | Flix IPTV`;
 
 export const SUBSCRIPTION_SEO_META_BEFORE =
   "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.";
 
 export const SUBSCRIPTION_SEO_META_AFTER =
-  "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.";
+  `Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from ${GBP}14.99, reliable service and 24/7 support.`;
+
+export function isLegacyFirestickSubscriptionTitle(title: string): boolean {
+  const value = String(title ?? "");
+  if (value === SUBSCRIPTION_SEO_TITLE_BEFORE) return true;
+  // Allow any currency glyph / encoding between "From " and "14.99".
+  return /^Best IPTV Subscription UK for Firestick \| From .+?14\.99 \| Flix IPTV$/.test(value);
+}
+
+export function isCurrentSubscriptionSeoTitle(title: string): boolean {
+  const value = String(title ?? "");
+  if (value === SUBSCRIPTION_SEO_TITLE_AFTER) return true;
+  return /^Best IPTV Subscription UK \| From .+?14\.99 \| Flix IPTV$/.test(value);
+}
+
+/**
+ * Title-only F4 v2 apply: updates Firestick-narrowed title when recognized; never overwrites custom titles.
+ */
+export function applySubscriptionSeoTitleRepair(seo: PageSeo): { seo: PageSeo; changed: boolean; skipped: boolean } {
+  if (isCurrentSubscriptionSeoTitle(seo.title)) {
+    return { seo, changed: false, skipped: false };
+  }
+  if (!isLegacyFirestickSubscriptionTitle(seo.title)) {
+    return { seo, changed: false, skipped: true };
+  }
+  const next: PageSeo = {
+    ...seo,
+    title: SUBSCRIPTION_SEO_TITLE_AFTER,
+    ogTitle: isLegacyFirestickSubscriptionTitle(seo.ogTitle) || seo.ogTitle === seo.title || !seo.ogTitle.trim()
+      ? SUBSCRIPTION_SEO_TITLE_AFTER
+      : seo.ogTitle,
+  };
+  return { seo: next, changed: true, skipped: false };
+}
 
 /** Known broad money-back phrases → eligible 1 Year+ wording (exact match only). */
 export const SUBSCRIPTION_MONEY_BACK_EXACT: Array<[string, string]> = [

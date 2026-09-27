@@ -14,6 +14,7 @@ import {
   applySubscriptionMoneyBackExactToFaqs,
   applySubscriptionMoneyBackExactToPage,
   applySubscriptionSeoMicrocopyToSettings,
+  applySubscriptionSeoTitleRepair,
   hasBroadMoneyBackClaim,
 } from "../lib/cms/subscription-seo-microcopy";
 import type { CmsPage, CmsSection, FaqItem, SiteSettings } from "../lib/cms/types";
@@ -296,12 +297,31 @@ test("URL/canonical untouched", () => {
   assert.equal(result.settings.pageSeo.subscriptions.robotsFollow, true);
 });
 
+test("title repair recognizes Firestick title with any pound glyph", () => {
+  const seo = defaultSettings().pageSeo.subscriptions;
+  seo.title = "Best IPTV Subscription UK for Firestick | From £14.99 | Flix IPTV";
+  const a = applySubscriptionSeoTitleRepair(seo);
+  assert.equal(a.changed, true);
+  assert.equal(a.seo.title, SUBSCRIPTION_SEO_TITLE_AFTER);
+
+  seo.title = "Best IPTV Subscription UK for Firestick | From \u00A314.99 | Flix IPTV";
+  assert.equal(applySubscriptionSeoTitleRepair(seo).changed, true);
+
+  seo.title = "Custom editor title";
+  const skipped = applySubscriptionSeoTitleRepair(seo);
+  assert.equal(skipped.changed, false);
+  assert.equal(skipped.skipped, true);
+});
+
 test("ensureReady wires subscription SEO microcopy after tagline cleanup", () => {
   const source = readFileSync(path.join(process.cwd(), "lib/cms/mysql-repository.ts"), "utf8");
   assert.match(source, /migrateSubscriptionSeoMicrocopyIfNeeded/);
   const migrate = readFileSync(path.join(process.cwd(), "lib/cms/mysql-migrate.ts"), "utf8");
   assert.match(migrate, /SUBSCRIPTION_SEO_MICROCOPY_V1/);
+  assert.match(migrate, /SUBSCRIPTION_SEO_MICROCOPY_V2/);
   assert.match(migrate, /applySubscriptionSeoMicrocopyToSettings/);
+  assert.match(migrate, /applySubscriptionSeoTitleRepair/);
   const flags = readFileSync(path.join(process.cwd(), "lib/cms/migration-flags.ts"), "utf8");
   assert.match(flags, /subscription_seo_microcopy_v1/);
+  assert.match(flags, /subscription_seo_microcopy_v2/);
 });
