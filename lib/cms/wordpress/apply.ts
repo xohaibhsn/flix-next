@@ -98,6 +98,16 @@ export async function applyWordpressPlan(plan: WordpressImportPlan, options: App
         active: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        seoTitle: "",
+        seoDescription: "",
+        focusKeyword: "",
+        canonicalUrl: "",
+        robotsIndex: null,
+        robotsFollow: null,
+        ogTitle: "",
+        ogDescription: "",
+        ogImage: null,
+        sitemapInclude: null,
       });
       await conn.execute(
         `INSERT IGNORE INTO blog_categories (id, name, slug, description, is_active)

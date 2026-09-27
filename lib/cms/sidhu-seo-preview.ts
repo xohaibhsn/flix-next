@@ -1,5 +1,12 @@
 import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index";
 import { blogPostPath } from "@/lib/cms/blog-paths";
+import {
+  categoryEffectiveDescription,
+  categoryEffectiveRobotsFollow,
+  categoryEffectiveRobotsIndex,
+  categoryEffectiveSitemapInclude,
+  categoryEffectiveTitle,
+} from "@/lib/cms/category-seo";
 import { STATIC_OG_PATH } from "@/lib/cms/open-graph";
 import { PAGE_SEO_KEYS, PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
 import { SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY } from "@/lib/cms/page-paths";
@@ -345,6 +352,33 @@ export function sidhuPreviewFromPost(
   });
 }
 
+export function sidhuPreviewFromCategory(
+  category: BlogCategory,
+  options: { siteName: string; siteTagline?: string; defaultOgImage?: MediaRef | null },
+) {
+  return buildSidhuSeoPreview({
+    seoTitle: category.seoTitle,
+    metaDescription: category.seoDescription,
+    fallbackTitle: category.name || "Category",
+    fallbackDescription: category.description || `Posts in ${category.name}.`,
+    canonical: category.canonicalUrl,
+    publicPath: `/category/${category.slug}/`,
+    robotsIndex: categoryEffectiveRobotsIndex(category),
+    robotsFollow: categoryEffectiveRobotsFollow(category),
+    sitemapInclude: categoryEffectiveSitemapInclude(category),
+    ogTitle: category.ogTitle,
+    ogDescription: category.ogDescription,
+    ogImage: category.ogImage,
+    defaultOgImage: options.defaultOgImage,
+    siteName: options.siteName,
+    siteTagline: options.siteTagline,
+    focusKeyword: category.focusKeyword,
+    contentTitle: category.name,
+    bodyHtml: category.description,
+    slug: category.slug,
+  });
+}
+
 export type SidhuSeoOverviewRow = {
   id: string;
   kind: "Page" | "Blog Post" | "Category";
@@ -439,23 +473,43 @@ export function sidhuSeoOverviewRows(
 
   const categoryRows: SidhuSeoOverviewRow[] = categories.map((category) => {
     const flags: string[] = [];
-    if (!trim(category.name)) flags.push("Missing title");
-    if (!trim(category.description)) flags.push("Missing description");
-    flags.push("Missing OG");
+    const effectiveTitle = categoryEffectiveTitle(category);
+    const effectiveDescription = categoryEffectiveDescription(category);
+    const indexOn = categoryEffectiveRobotsIndex(category);
+    const followOn = categoryEffectiveRobotsFollow(category);
+    const sitemapOn = categoryEffectiveSitemapInclude(category);
+    if (!category.active) flags.push("Inactive");
+    if (!indexOn) flags.push("Noindex");
+    if (!followOn) flags.push("Nofollow");
+    if (category.active && !sitemapOn) flags.push("Sitemap excluded");
+    if (!trim(effectiveTitle)) flags.push("Missing title");
+    if (!trim(effectiveDescription)) flags.push("Missing description");
+    if (!category.ogImage?.secureUrl) flags.push("Missing OG");
     return {
       id: category.id,
       kind: "Category",
       label: category.name || category.slug,
-      publicUrl: sidhuCategoryPreviewUrl(category.slug),
-      seoTitle: category.name || "—",
-      descriptionLength: category.description.length,
-      indexLabel: category.active ? "Index (default)" : "Not public",
-      sitemapLabel: category.active ? "Included" : "Excluded",
-      canonicalLabel: "Default URL",
-      ogLabel: ogLabel(false, hasDefaultOg),
+      publicUrl: sidhuDisplayUrl(category.canonicalUrl, `/category/${category.slug}/`),
+      seoTitle: trim(category.seoTitle) || trim(category.name) || "—",
+      descriptionLength: (category.seoDescription || category.description).length,
+      indexLabel: !category.active
+        ? "Not public"
+        : category.robotsIndex == null
+          ? "Index (default)"
+          : indexOn
+            ? "Index"
+            : "Noindex",
+      sitemapLabel: !category.active
+        ? "Excluded"
+        : category.sitemapInclude == null
+          ? "Included (default)"
+          : sitemapOn
+            ? "Included"
+            : "Excluded",
+      canonicalLabel: canonicalLabel(category.canonicalUrl),
+      ogLabel: ogLabel(Boolean(category.ogImage?.secureUrl), hasDefaultOg),
       updated: formatDay(category.updatedAt),
-      editHref: null,
-      note: "Advanced Category SEO controls coming in dedicated phase.",
+      editHref: `/sidhu/blog/category/${category.id}/`,
       flags,
     };
   });

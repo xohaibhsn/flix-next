@@ -42,6 +42,16 @@ export function BlogList({
       active: true,
       createdAt: now,
       updatedAt: now,
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "",
+      canonicalUrl: "",
+      robotsIndex: null,
+      robotsFollow: null,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: null,
     });
     if (!result.ok) {
       setMessage({ tone: "error", text: result.error });
@@ -117,13 +127,18 @@ export function BlogList({
         </div>
         <ul className="mt-4 space-y-2 text-sm">
           {cats.map((category) => (
-            <li key={category.id} className="flex items-center justify-between">
+            <li key={category.id} className="flex items-center justify-between gap-3">
               <span>
                 {category.name} / {category.slug}
               </span>
-              <button type="button" className="text-red-700" onClick={() => void removeCategory(category.id)}>
-                Delete
-              </button>
+              <span className="flex items-center gap-3">
+                <Link href={`/sidhu/blog/category/${category.id}/`} className="font-semibold text-brand">
+                  Edit
+                </Link>
+                <button type="button" className="text-red-700" onClick={() => void removeCategory(category.id)}>
+                  Delete
+                </button>
+              </span>
             </li>
           ))}
         </ul>

@@ -69,6 +69,16 @@ type CategoryRow = RowDataPacket & {
   is_active: number;
   created_at: unknown;
   updated_at: unknown;
+  seo_title?: string | null;
+  seo_description?: string | null;
+  focus_keyword?: string | null;
+  canonical_url?: string | null;
+  robots_index?: number | null;
+  robots_follow?: number | null;
+  og_title?: string | null;
+  og_description?: string | null;
+  og_image?: unknown;
+  sitemap_include?: number | null;
 };
 
 type PostRow = RowDataPacket & {
@@ -157,10 +167,20 @@ function mapCategory(row: CategoryRow): BlogCategory {
     id: row.id,
     name: row.name,
     slug: row.slug,
-    description: row.description,
+    description: row.description || "",
     active: Boolean(row.is_active),
     createdAt: fromMysqlDateTime(row.created_at),
     updatedAt: fromMysqlDateTime(row.updated_at),
+    seoTitle: row.seo_title || "",
+    seoDescription: row.seo_description || "",
+    focusKeyword: row.focus_keyword || "",
+    canonicalUrl: row.canonical_url || "",
+    robotsIndex: row.robots_index == null ? null : Boolean(row.robots_index),
+    robotsFollow: row.robots_follow == null ? null : Boolean(row.robots_follow),
+    ogTitle: row.og_title || "",
+    ogDescription: row.og_description || "",
+    ogImage: parseJsonColumn<MediaRef | null>(row.og_image, null),
+    sitemapInclude: row.sitemap_include == null ? null : Boolean(row.sitemap_include),
   });
 }
 
@@ -289,11 +309,36 @@ export class MysqlCatalogRepository implements CatalogRepository {
     await this.ready();
     const safe = sanitizeCategory(category);
     await getDbPool().execute(
-      `INSERT INTO blog_categories (id, name, slug, description, is_active)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO blog_categories (
+        id, name, slug, description, is_active,
+        seo_title, seo_description, focus_keyword, canonical_url,
+        robots_index, robots_follow, og_title, og_description, og_image, sitemap_include
+      )
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
-         name = VALUES(name), slug = VALUES(slug), description = VALUES(description), is_active = VALUES(is_active)`,
-      [safe.id, safe.name, safe.slug, safe.description, safe.active ? 1 : 0],
+         name = VALUES(name), slug = VALUES(slug), description = VALUES(description), is_active = VALUES(is_active),
+         seo_title = VALUES(seo_title), seo_description = VALUES(seo_description),
+         focus_keyword = VALUES(focus_keyword), canonical_url = VALUES(canonical_url),
+         robots_index = VALUES(robots_index), robots_follow = VALUES(robots_follow),
+         og_title = VALUES(og_title), og_description = VALUES(og_description),
+         og_image = VALUES(og_image), sitemap_include = VALUES(sitemap_include)`,
+      [
+        safe.id,
+        safe.name,
+        safe.slug,
+        safe.description,
+        safe.active ? 1 : 0,
+        safe.seoTitle,
+        safe.seoDescription,
+        safe.focusKeyword,
+        safe.canonicalUrl,
+        safe.robotsIndex == null ? null : safe.robotsIndex ? 1 : 0,
+        safe.robotsFollow == null ? null : safe.robotsFollow ? 1 : 0,
+        safe.ogTitle,
+        safe.ogDescription,
+        safe.ogImage ? JSON.stringify(safe.ogImage) : null,
+        safe.sitemapInclude == null ? null : safe.sitemapInclude ? 1 : 0,
+      ],
     );
     return safe;
   }

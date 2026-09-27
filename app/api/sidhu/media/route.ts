@@ -30,8 +30,8 @@ export async function GET() {
   const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
-  const [settings, posts] = await Promise.all([cms.getSettings(), cms.listPosts()]);
-  const usedIds = referencedMediaIds(settings, posts);
+  const [settings, posts, categories] = await Promise.all([cms.getSettings(), cms.listPosts(), cms.listCategories()]);
+  const usedIds = referencedMediaIds(settings, posts, categories);
   return NextResponse.json({
     ok: true,
     configured: isCloudinaryConfigured(),
@@ -115,8 +115,8 @@ export async function DELETE(request: Request) {
   const asset = await cms.getMediaById(id);
   if (!asset) return jsonError("That media item is not in the library.", 404);
   const settings = await cms.getSettings();
-  const posts = await cms.listPosts();
-  if (referencedMediaIds(settings, posts).has(id)) {
+  const [posts, categories] = await Promise.all([cms.listPosts(), cms.listCategories()]);
+  if (referencedMediaIds(settings, posts, categories).has(id)) {
     return jsonError(
       "This image is used as logo, favicon, OG, payment icon, or a blog image. Unassign it first.",
       409,

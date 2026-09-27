@@ -7,7 +7,7 @@ import { Container } from "@/components/ui/Container";
 import { blogPostPath } from "@/lib/cms/blog-paths";
 import { cms } from "@/lib/cms/repository";
 import { getPublicCategories } from "@/lib/cms/public-request-cache";
-import { pageMetadata } from "@/lib/metadata";
+import { categorySeoMetadata } from "@/lib/metadata";
 import type { BlogPost } from "@/lib/cms/types";
 
 type Props = { params: Promise<{ slug: string }> };
@@ -17,8 +17,11 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   const category = (await getPublicCategories()).find((item) => item.slug === slug && item.active);
-  if (!category) return pageMetadata("Category not found", "", "/blogs/");
-  return pageMetadata(category.name, category.description || `Posts in ${category.name}.`, `/category/${category.slug}/`);
+  if (!category) {
+    const { pageMetadata } = await import("@/lib/metadata");
+    return pageMetadata("Category not found", "", "/blogs/");
+  }
+  return categorySeoMetadata(category);
 }
 
 function Card({ post }: { post: BlogPost }) {

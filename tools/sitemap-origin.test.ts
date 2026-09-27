@@ -55,9 +55,9 @@ const samplePosts = [
 ];
 
 const sampleCategories = [
-  { slug: "guides", active: true, updatedAt: "2026-02-01T00:00:00.000Z" },
-  { slug: "setup", active: true, updatedAt: "2026-02-02T00:00:00.000Z" },
-  { slug: "inactive", active: false, updatedAt: "2026-02-03T00:00:00.000Z" },
+  { slug: "guides", active: true, updatedAt: "2026-02-01T00:00:00.000Z", sitemapInclude: null },
+  { slug: "setup", active: true, updatedAt: "2026-02-02T00:00:00.000Z", sitemapInclude: null },
+  { slug: "inactive", active: false, updatedAt: "2026-02-03T00:00:00.000Z", sitemapInclude: null },
 ];
 
 test("sitemap URL set excludes drafts, inactive categories, and redirect sources", () => {
@@ -150,7 +150,7 @@ test("sitemap source SQL avoids page_sections and post content", () => {
   const source = readFileSync(path.join(process.cwd(), "lib/cms/sitemap-source.ts"), "utf8");
   assert.match(source, /SELECT id, slug, status FROM pages/);
   assert.match(source, /SELECT slug, status, sitemap_include, updated_at FROM blog_posts/);
-  assert.match(source, /SELECT slug, is_active, updated_at FROM blog_categories/);
+  assert.match(source, /SELECT slug, is_active, updated_at, sitemap_include FROM blog_categories/);
   assert.equal(/FROM page_sections/.test(source), false);
   assert.equal(/section_data/.test(source), false);
   assert.equal(/SELECT \* FROM blog_posts/.test(source), false);
@@ -198,10 +198,10 @@ test("production-like URL membership matches known public set shape", () => {
       },
     ],
     categories: [
-      { slug: "devices", active: true, updatedAt: "2026-02-01T00:00:00.000Z" },
-      { slug: "guides", active: true, updatedAt: "2026-02-01T00:00:00.000Z" },
-      { slug: "quality", active: true, updatedAt: "2026-02-01T00:00:00.000Z" },
-      { slug: "setup", active: true, updatedAt: "2026-02-01T00:00:00.000Z" },
+      { slug: "devices", active: true, updatedAt: "2026-02-01T00:00:00.000Z", sitemapInclude: null },
+      { slug: "guides", active: true, updatedAt: "2026-02-01T00:00:00.000Z", sitemapInclude: null },
+      { slug: "quality", active: true, updatedAt: "2026-02-01T00:00:00.000Z", sitemapInclude: null },
+      { slug: "setup", active: true, updatedAt: "2026-02-01T00:00:00.000Z", sitemapInclude: null },
     ],
   });
   assert.equal(sitemapUrls(entries).length, 18);

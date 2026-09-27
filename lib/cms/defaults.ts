@@ -678,11 +678,23 @@ export function defaultFaqs(): FaqItem[] {
 
 export function defaultBlogCategories(): BlogCategory[] {
   const now = new Date().toISOString();
+  const emptySeo = {
+    seoTitle: "",
+    seoDescription: "",
+    focusKeyword: "",
+    canonicalUrl: "",
+    robotsIndex: null as boolean | null,
+    robotsFollow: null as boolean | null,
+    ogTitle: "",
+    ogDescription: "",
+    ogImage: null,
+    sitemapInclude: null as boolean | null,
+  };
   return [
-    { id: "cat-setup", name: "Setup", slug: "setup", description: "Device and playlist setup guides.", active: true, createdAt: now, updatedAt: now },
-    { id: "cat-devices", name: "Devices", slug: "devices", description: "Smart TVs, Firestick, and apps.", active: true, createdAt: now, updatedAt: now },
-    { id: "cat-quality", name: "Quality", slug: "quality", description: "Streaming quality and bandwidth.", active: true, createdAt: now, updatedAt: now },
-    { id: "cat-guides", name: "Guides", slug: "guides", description: "Getting started with Flix IPTV.", active: true, createdAt: now, updatedAt: now },
+    { id: "cat-setup", name: "Setup", slug: "setup", description: "Device and playlist setup guides.", active: true, createdAt: now, updatedAt: now, ...emptySeo },
+    { id: "cat-devices", name: "Devices", slug: "devices", description: "Smart TVs, Firestick, and apps.", active: true, createdAt: now, updatedAt: now, ...emptySeo },
+    { id: "cat-quality", name: "Quality", slug: "quality", description: "Streaming quality and bandwidth.", active: true, createdAt: now, updatedAt: now, ...emptySeo },
+    { id: "cat-guides", name: "Guides", slug: "guides", description: "Getting started with Flix IPTV.", active: true, createdAt: now, updatedAt: now, ...emptySeo },
   ];
 }
 

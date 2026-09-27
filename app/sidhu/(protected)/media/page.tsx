@@ -7,13 +7,14 @@ import { cms } from "@/lib/cms/repository";
 export const dynamic = "force-dynamic";
 
 export default async function SidhuMediaPage() {
-  const [assets, settings, posts, cloud] = await Promise.all([
+  const [assets, settings, posts, categories, cloud] = await Promise.all([
     cms.listMedia(),
     cms.getSettings(),
     cms.listPosts(),
+    cms.listCategories(),
     getCloudinaryStatusAction(),
   ]);
-  const usedIds = referencedMediaIds(settings, posts);
+  const usedIds = referencedMediaIds(settings, posts, categories);
 
   return (
       <AdminShell title="Media" subtitle="Edit alt text on existing images without re-uploading. Upload Image is still the primary add action. In-use images cannot be deleted until they are unassigned.">

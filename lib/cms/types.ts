@@ -392,6 +392,19 @@ export type BlogCategory = {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  seoTitle: string;
+  seoDescription: string;
+  focusKeyword: string;
+  canonicalUrl: string;
+  /** null = inherit pre-SEO default (index when active). */
+  robotsIndex: boolean | null;
+  /** null = inherit pre-SEO default (follow). */
+  robotsFollow: boolean | null;
+  ogTitle: string;
+  ogDescription: string;
+  ogImage: MediaRef | null;
+  /** null = inherit pre-SEO default (include when active). */
+  sitemapInclude: boolean | null;
 };
 
 export type BlogPost = {

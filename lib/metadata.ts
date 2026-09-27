@@ -7,7 +7,11 @@ import { seoToMetadata } from "@/lib/seo";
 import { getSiteOrigin } from "@/lib/site-url";
 import { resolveOpenGraphImageFromSettings, socialImageMeta } from "@/lib/cms/open-graph";
 import { resolveBlogPostCanonical } from "@/lib/cms/blog-paths";
-import type { BlogPost, SiteSettings } from "@/lib/cms/types";
+import type { BlogPost, BlogCategory, SiteSettings } from "@/lib/cms/types";
+import {
+  categoryPublicPath,
+  categorySeoAsPageSeo,
+} from "@/lib/cms/category-seo";
 
 export async function getSiteMetadata(): Promise<Metadata> {
   await connection();
@@ -97,4 +101,24 @@ export async function postSeoMetadata(post: BlogPost): Promise<Metadata> {
     post.excerpt,
     canonical,
   );
+}
+
+export async function categorySeoMetadata(category: BlogCategory): Promise<Metadata> {
+  await connection();
+  const settings = await getPublicSettings();
+  const path = categoryPublicPath(category.slug);
+  const meta = seoToMetadata(
+    categorySeoAsPageSeo(category),
+    settings,
+    category.name,
+    category.description || `Posts in ${category.name}.`,
+    path,
+  );
+  // Untouched categories historically omitted robots (default index/follow). Keep that.
+  if (category.robotsIndex == null && category.robotsFollow == null) {
+    const rest = { ...meta };
+    delete rest.robots;
+    return rest;
+  }
+  return meta;
 }

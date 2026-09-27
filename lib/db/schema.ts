@@ -4,7 +4,7 @@
  * starts can skip a verified full ensureCmsSchema pass. Forgetting to bump leaves
  * new tables/columns unverified on DBs that already hold the previous version.
  */
-export const CURRENT_CMS_SCHEMA_VERSION = 1;
+export const CURRENT_CMS_SCHEMA_VERSION = 2;
 
 export const CMS_SCHEMA_STATEMENTS = [
   // Tables are created IF NOT EXISTS. Missing columns are added at runtime in ensureCmsSchema().
@@ -95,6 +95,16 @@ export const CMS_SCHEMA_STATEMENTS = [
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    seo_title VARCHAR(200) NOT NULL DEFAULT '',
+    seo_description VARCHAR(300) NOT NULL DEFAULT '',
+    focus_keyword VARCHAR(120) NOT NULL DEFAULT '',
+    canonical_url VARCHAR(255) NOT NULL DEFAULT '',
+    robots_index TINYINT(1) NULL,
+    robots_follow TINYINT(1) NULL,
+    og_title VARCHAR(200) NOT NULL DEFAULT '',
+    og_description VARCHAR(300) NOT NULL DEFAULT '',
+    og_image LONGTEXT NULL,
+    sitemap_include TINYINT(1) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY blog_categories_slug_unique (slug)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,

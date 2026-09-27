@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { categoryEffectiveSitemapInclude } from "@/lib/cms/category-seo";
 import { seoKeyForPageId } from "@/lib/cms/page-paths";
 import type { PageSeoKey } from "@/lib/cms/page-seo";
 import { withSlash } from "@/lib/cms/redirects";
@@ -24,6 +25,8 @@ export type SitemapCategoryRow = {
   slug: string;
   active: boolean;
   updatedAt: string;
+  /** null = inherit default include-when-active. */
+  sitemapInclude: boolean | null;
 };
 
 export function sitemapPathForPage(id: string, slug: string) {
@@ -99,7 +102,7 @@ export function buildSitemapEntries(input: {
   }
 
   for (const category of input.categories) {
-    if (!category.active) continue;
+    if (!categoryEffectiveSitemapInclude(category)) continue;
     entries.push({
       url: `${input.origin}/category/${category.slug}/`,
       lastModified: new Date(category.updatedAt),

@@ -24,6 +24,7 @@ import type {
   SocialLinks,
   SocialPlatform,
 } from "@/lib/cms/types";
+import { readTriStateFlag } from "@/lib/cms/category-seo";
 import { isIconName } from "@/lib/cms/icons";
 import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import {
@@ -411,6 +412,7 @@ export function sanitizeFaq(input: FaqItem): FaqItem {
 export function sanitizeCategory(input: BlogCategory): BlogCategory {
   const now = new Date().toISOString();
   const name = sanitizeText(input.name, 80) || "Category";
+  const raw = input as BlogCategory & Record<string, unknown>;
   return {
     id: sanitizeText(input.id, 80),
     name,
@@ -419,6 +421,16 @@ export function sanitizeCategory(input: BlogCategory): BlogCategory {
     active: input.active !== false,
     createdAt: sanitizeText(input.createdAt, 40) || now,
     updatedAt: now,
+    seoTitle: sanitizeText(raw.seoTitle, 70),
+    seoDescription: sanitizeText(raw.seoDescription, 180),
+    focusKeyword: sanitizeText(raw.focusKeyword, 80),
+    canonicalUrl: sanitizeText(raw.canonicalUrl, 200),
+    robotsIndex: readTriStateFlag(raw.robotsIndex),
+    robotsFollow: readTriStateFlag(raw.robotsFollow),
+    ogTitle: sanitizeText(raw.ogTitle, 70),
+    ogDescription: sanitizeText(raw.ogDescription, 180),
+    ogImage: sanitizeMediaRef(raw.ogImage),
+    sitemapInclude: readTriStateFlag(raw.sitemapInclude),
   };
 }
 

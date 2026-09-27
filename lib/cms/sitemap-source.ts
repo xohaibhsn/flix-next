@@ -23,6 +23,7 @@ type CategoryLiteRow = RowDataPacket & {
   slug: string;
   is_active: number;
   updated_at: unknown;
+  sitemap_include?: number | null;
 };
 
 async function listSitemapPagesMysql(): Promise<SitemapPageRow[]> {
@@ -50,12 +51,13 @@ async function listSitemapPostsMysql(): Promise<SitemapPostRow[]> {
 
 async function listSitemapCategoriesMysql(): Promise<SitemapCategoryRow[]> {
   const [rows] = await getDbPool().query<CategoryLiteRow[]>(
-    "SELECT slug, is_active, updated_at FROM blog_categories ORDER BY slug ASC",
+    "SELECT slug, is_active, updated_at, sitemap_include FROM blog_categories ORDER BY slug ASC",
   );
   return rows.map((row) => ({
     slug: row.slug,
     active: Boolean(row.is_active),
     updatedAt: fromMysqlDateTime(row.updated_at),
+    sitemapInclude: row.sitemap_include == null ? null : Boolean(row.sitemap_include),
   }));
 }
 
@@ -84,6 +86,7 @@ async function listSitemapCategoriesJson(): Promise<SitemapCategoryRow[]> {
     slug: category.slug,
     active: category.active,
     updatedAt: category.updatedAt,
+    sitemapInclude: category.sitemapInclude,
   }));
 }
 

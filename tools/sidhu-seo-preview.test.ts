@@ -98,7 +98,7 @@ test("advisory canonical http warning does not rewrite the stored value", () => 
   assert.ok(preview.warnings.some((item) => item.id === "canonical-http"));
 });
 
-test("SEO overview lists pages, posts, and read-only categories", () => {
+test("SEO overview lists pages, posts, and editable categories", () => {
   const settings = defaultSettings();
   settings.pageSeo.home.robotsIndex = false;
   settings.pageSeo.home.sitemapInclude = false;
@@ -119,7 +119,9 @@ test("SEO overview lists pages, posts, and read-only categories", () => {
   assert.equal(postRow?.kind, "Blog Post");
   assert.equal(postRow?.updated, "2026-03-01");
   assert.equal(postRow?.editHref, "/sidhu/blog/post-test/");
-  assert.equal(category?.editHref, null);
-  assert.equal(category?.note, "Advanced Category SEO controls coming in dedicated phase.");
+  assert.match(category?.editHref || "", /^\/sidhu\/blog\/category\//);
+  assert.equal(category?.note, undefined);
+  assert.equal(category?.indexLabel, "Index (default)");
+  assert.equal(category?.sitemapLabel, "Included (default)");
   assert.match(category?.publicUrl || "", /^https:\/\/theflixiptv.com\/category\//);
 });

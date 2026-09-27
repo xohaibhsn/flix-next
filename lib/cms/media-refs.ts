@@ -1,6 +1,6 @@
-import type { BlogPost, SiteSettings } from "@/lib/cms/types";
+import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
 
-export function referencedMediaIds(settings: SiteSettings, posts: BlogPost[] = []) {
+export function referencedMediaIds(settings: SiteSettings, posts: BlogPost[] = [], categories: BlogCategory[] = []) {
   const ids = [
     settings.branding.logo?.id,
     settings.branding.favicon?.id,
@@ -8,6 +8,7 @@ export function referencedMediaIds(settings: SiteSettings, posts: BlogPost[] = [
     ...settings.footerPaymentImages.map((item) => item.id),
     ...Object.values(settings.pageSeo).map((seo) => seo.ogImage?.id),
     ...posts.flatMap((post) => [post.featuredImage?.id, post.ogImage?.id]),
+    ...categories.map((category) => category.ogImage?.id),
   ].filter((id): id is string => Boolean(id));
   return new Set(ids);
 }
