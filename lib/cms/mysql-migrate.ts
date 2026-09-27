@@ -13,12 +13,13 @@ import { readJsonFile } from "@/lib/cms/json-store";
 import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS } from "@/lib/cms/managed-redirects";
 import {
   CMS_CONTENT_CLEANUP_V1,
+  SUBSCRIPTION_SEO_MICROCOPY_V1,
   SUBSCRIPTION_SLUG_MIGRATION_V1,
   TEST_TAGLINE_CLEANUP_V1,
   runCompletedMigrationOnce,
 } from "@/lib/cms/migration-flags";
 import { BLOG_INDEX_SLUG_LEGACY, resolveBlogIndexManagedRedirect } from "@/lib/cms/blog-index";
-import type { CmsPage, CmsSection, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
+import type { CmsPage, CmsSection, FaqItem, MediaAsset, MediaFile, PagesFile, RedirectRule, SectionType, SiteSettings } from "@/lib/cms/types";
 import { resolveDefaultPageSeed } from "@/lib/cms/page-seed";
 import { applyPublicCopyCleanupToPage, rewriteDemoCopy } from "@/lib/cms/public-copy-cleanup";
 import { mysqlDuplicateError } from "@/lib/cms/slug-change";
@@ -30,6 +31,11 @@ import {
   isSubscriptionMigrationPostconditionMet,
   remapSettingsForSubscriptionUrl,
 } from "@/lib/cms/subscription-url-migrate";
+import {
+  applySubscriptionMoneyBackExactToFaqs,
+  applySubscriptionMoneyBackExactToSections,
+  applySubscriptionSeoMicrocopyToSettings,
+} from "@/lib/cms/subscription-seo-microcopy";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { withSlash } from "@/lib/cms/redirects";
 import { getDbPool } from "@/lib/db/pool";
@@ -811,6 +817,97 @@ export async function migrateSubscriptionPageSlugIfNeeded() {
       if (outcome === "deferred") return "deferred";
       if (!(await verifySubscriptionSlugMigrationComplete())) {
         throw new Error("subscription slug migration postconditions not met");
+      }
+    },
+  });
+}
+
+/**
+ * F4: exact-match subscription SEO title/meta + money-back eligibility on subscription page/FAQs.
+ * Skips unknown custom title/meta; writes completion flag only after a successful run.
+ */
+export async function migrateSubscriptionSeoMicrocopyIfNeeded() {
+  await runCompletedMigrationOnce({
+    flagKey: SUBSCRIPTION_SEO_MICROCOPY_V1,
+    hasCompleted: hasMigrationFlag,
+    markCompleted: markMigrationFlag,
+    run: async () => {
+      const pool = getDbPool();
+      const [settingRows] = await pool.query<SettingValueRow[]>(
+        "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+        [SITE_SETTINGS_KEY],
+      );
+      if (!settingRows[0]) return "deferred";
+
+      const current = sanitizeSettings(
+        parseJsonColumn<SiteSettings>(settingRows[0].setting_value, defaultSettings()),
+      );
+      const seoApplied = applySubscriptionSeoMicrocopyToSettings(current);
+      if (seoApplied.changed) {
+        await pool.execute(
+          `INSERT INTO site_settings (setting_key, setting_value)
+           VALUES (?, ?)
+           ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
+          [SITE_SETTINGS_KEY, JSON.stringify(seoApplied.settings)],
+        );
+      }
+
+      const [sectionRows] = await pool.query<
+        Array<
+          RowDataPacket & {
+            id: string;
+            section_type: string;
+            label: string;
+            sort_order: number;
+            visible: number;
+            section_data: unknown;
+          }
+        >
+      >(
+        `SELECT id, section_type, label, sort_order, visible, section_data
+         FROM page_sections
+         WHERE page_id = ?
+         ORDER BY sort_order ASC`,
+        [SUBSCRIPTION_PAGE_ID],
+      );
+      if (sectionRows.length) {
+        const before: CmsSection[] = sectionRows.map((section) => ({
+          id: String(section.id),
+          type: section.section_type as SectionType,
+          label: String(section.label),
+          order: Number(section.sort_order) || 0,
+          visible: Boolean(section.visible),
+          data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
+        }));
+        const money = applySubscriptionMoneyBackExactToSections(before);
+        if (money.changed) {
+          await persistPageSectionDiff(SUBSCRIPTION_PAGE_ID, before, money.sections);
+        }
+      }
+
+      const [faqRows] = await pool.query<Array<RowDataPacket & { id: string; question: string; answer: string }>>(
+        "SELECT id, question, answer FROM faqs",
+      );
+      const faqs: FaqItem[] = faqRows.map((row) => ({
+        id: String(row.id),
+        question: String(row.question || ""),
+        answer: String(row.answer || ""),
+        category: "",
+        sortOrder: 0,
+        visible: true,
+        createdAt: "",
+        updatedAt: "",
+      }));
+      const faqApplied = applySubscriptionMoneyBackExactToFaqs(faqs);
+      if (faqApplied.changed) {
+        for (const faq of faqApplied.faqs) {
+          if (!faqApplied.updatedIds.includes(faq.id)) continue;
+          await pool.execute("UPDATE faqs SET question = ?, answer = ? WHERE id = ?", [
+            faq.question,
+            faq.answer,
+            faq.id,
+          ]);
+        }
       }
     },
   });

@@ -12,6 +12,7 @@ import {
   seedExtendedIfEmpty,
   seedManagedRedirectsIfNeeded,
   migrateSubscriptionPageSlugIfNeeded,
+  migrateSubscriptionSeoMicrocopyIfNeeded,
   ensureBlogIndexRedirect,
   seedSeoLongformIfNeeded,
   cleanupKnownTestTaglineIfNeeded,
@@ -123,6 +124,7 @@ export class MysqlCmsRepository {
         await ensureBlogIndexRedirect();
         await seedSeoLongformIfNeeded();
         await cleanupKnownTestTaglineIfNeeded();
+        await migrateSubscriptionSeoMicrocopyIfNeeded();
         const { bootstrapAdminUsersAfterSchemaReady } = await import("@/lib/auth/admin-users");
         await bootstrapAdminUsersAfterSchemaReady({ allowEmergency: true });
       })().catch((error) => {

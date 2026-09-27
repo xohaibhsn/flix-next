@@ -5,6 +5,8 @@
 export const CMS_CONTENT_CLEANUP_V1 = "cms_content_cleanup_v1";
 export const TEST_TAGLINE_CLEANUP_V1 = "test_tagline_cleanup_v1";
 export const SUBSCRIPTION_SLUG_MIGRATION_V1 = "subscription_slug_migration_v1";
+/** One-time subscription page SEO title/meta + money-back eligibility microcopy (F4). */
+export const SUBSCRIPTION_SEO_MICROCOPY_V1 = "subscription_seo_microcopy_v1";
 /** Schema verification completion marker; value is CURRENT_CMS_SCHEMA_VERSION as decimal text. */
 export const CMS_SCHEMA_VERSION_KEY = "cms_schema_version";
 

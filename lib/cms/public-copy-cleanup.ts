@@ -9,11 +9,23 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Get a premium IPTV subscription in the UK with HD & 4K channels, reliable streaming, 24/7 support and a free trial. Join Flix IPTV & start watching today.",
-    "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
+    "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.",
   ],
   [
     "Get a premium IPTV subscription in the UK with HD &amp; 4K channels, reliable streaming, 24/7 support and a free trial. Join Flix IPTV &amp; start watching today.",
+    "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.",
+  ],
+  [
     "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
+    "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.",
+  ],
+  [
+    "Get a premium IPTV subscription in the UK with HD &amp; 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV &amp; start watching today.",
+    "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.",
+  ],
+  [
+    "Best IPTV Subscription UK for Firestick | From £14.99 | Flix IPTV",
+    "Best IPTV Subscription UK | From £14.99 | Flix IPTV",
   ],
   [
     "We offer a 7-Day Money Back Guarantee. If the service is not suitable, contact us on WhatsApp within the applicable 7-day period.",
@@ -341,7 +353,7 @@ const EXACT_REPLACEMENTS: Array<[string, string]> = [
   ],
   [
     "Get a premium IPTV subscription in the UK with HD & 4K channels, reliable streaming, 24/7 support and a free trial. Join The Flix IPTV and start watching today.",
-    "Get a premium IPTV subscription in the UK with HD & 4K streaming, reliable service, 24/7 support and free trials subject to availability. Join Flix IPTV & start watching today.",
+    "Get an IPTV subscription in the UK with HD & 4K streaming, flexible plans from £14.99, reliable service and 24/7 support.",
   ],
   [
     "Contact THE FLIX IPTV support by WhatsApp, email, or form.",
