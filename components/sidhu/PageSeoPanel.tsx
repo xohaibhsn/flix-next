@@ -138,7 +138,6 @@ export function PageSeoPanel({
           preview, and custom JSON-LD.
         </p>
       </div>
-      {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <SeoPreview model={preview} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
@@ -203,14 +202,17 @@ export function PageSeoPanel({
         onNotice={notice}
       />
       <p className="-mt-2 text-xs text-muted">Used when this page is shared on social platforms. Save SEO after choosing an image.</p>
-      <button
-        type="button"
-        disabled={saving}
-        className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        onClick={() => void save()}
-      >
-        {saving ? "Saving…" : "Save SEO"}
-      </button>
+      <div className="space-y-3">
+        <button
+          type="button"
+          disabled={saving}
+          className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : "Save SEO"}
+        </button>
+        {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      </div>
     </section>
   );
 }
