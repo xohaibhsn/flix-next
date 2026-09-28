@@ -95,8 +95,38 @@ export async function uploadImageBuffer(options: {
   });
 }
 
-export async function destroyCloudinaryImage(publicId: string) {
+export type CloudinaryDestroyOutcome = "ok" | "not_found";
+
+export function normalizeCloudinaryDestroyResult(result: unknown): CloudinaryDestroyOutcome {
+  const value =
+    result && typeof result === "object" && "result" in result
+      ? String((result as { result?: unknown }).result ?? "")
+          .trim()
+          .toLowerCase()
+      : "";
+  if (value === "ok") return "ok";
+  if (value === "not found") return "not_found";
+  throw new Error("Cloudinary destroy returned an unexpected result.");
+}
+
+export async function destroyCloudinaryImage(publicId: string): Promise<CloudinaryDestroyOutcome> {
   const client = configuredClient();
   const safeId = assertSafePublicId(publicId);
-  return client.uploader.destroy(safeId, { resource_type: "image" });
+  const raw = await client.uploader.destroy(safeId, { resource_type: "image" });
+  return normalizeCloudinaryDestroyResult(raw);
+}
+
+/**
+ * Cloudinary-first Media Library delete step: destroy remote (ok/not found), then remove DB row.
+ * Call only after usage checks have passed.
+ */
+export async function removeMediaAfterCloudinaryDestroy(options: {
+  publicId: string;
+  mediaId: string;
+  destroyCloudinaryImage: (publicId: string) => Promise<CloudinaryDestroyOutcome>;
+  removeMedia: (id: string) => Promise<void>;
+}): Promise<CloudinaryDestroyOutcome> {
+  const outcome = await options.destroyCloudinaryImage(options.publicId);
+  await options.removeMedia(options.mediaId);
+  return outcome;
 }

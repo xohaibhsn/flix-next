@@ -10,10 +10,11 @@ import { sanitizeText } from "@/lib/cms/validation";
 import {
   destroyCloudinaryImage,
   isCloudinaryConfigured,
+  removeMediaAfterCloudinaryDestroy,
   sanitizeFolder,
   uploadImageBuffer,
 } from "@/lib/cloudinary";
-import { publicErrorMessage } from "@/lib/security/errors";
+import { publicErrorMessage, logServerError } from "@/lib/security/errors";
 import { assertSafeImageUpload, isAllowedCloudinaryImage } from "@/lib/security/image-upload";
 import { isSameOriginMutation } from "@/lib/security/origin";
 
@@ -119,7 +120,8 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "Cloudinary returned an unsupported image type.") {
       return jsonError(error.message);
     }
-    return jsonError(publicErrorMessage(error, "Cloudinary upload failed."), 502);
+    logServerError("media-upload", error);
+    return jsonError(publicErrorMessage(error, "Media upload failed."), 502);
   }
 }
 
@@ -158,12 +160,17 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    await destroyCloudinaryImage(asset.publicId);
-    await cms.removeMedia(id);
+    await removeMediaAfterCloudinaryDestroy({
+      publicId: asset.publicId,
+      mediaId: id,
+      destroyCloudinaryImage,
+      removeMedia: (mediaId) => cms.removeMedia(mediaId),
+    });
     revalidateMedia();
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return jsonError(publicErrorMessage(error, "Cloudinary delete failed."), 502);
+    logServerError("media-delete", error);
+    return jsonError(publicErrorMessage(error, "Media delete failed."), 502);
   }
 }
 

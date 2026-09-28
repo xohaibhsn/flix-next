@@ -225,11 +225,10 @@ test("DELETE route evaluates usage before any Cloudinary or DB delete", () => {
   const deleteFn = route.slice(route.indexOf("export async function DELETE"));
   const usageIdx = deleteFn.indexOf("getMediaUsage(asset, content)");
   const rejectIdx = deleteFn.indexOf("usage.inUse");
-  const destroyIdx = deleteFn.indexOf("await destroyCloudinaryImage");
-  const removeIdx = deleteFn.indexOf("await cms.removeMedia");
+  const destroyIdx = deleteFn.indexOf("removeMediaAfterCloudinaryDestroy");
   assert.ok(usageIdx > 0);
   assert.ok(rejectIdx > usageIdx);
   assert.ok(destroyIdx > rejectIdx);
-  assert.ok(removeIdx > destroyIdx);
   assert.match(deleteFn, /409/);
+  assert.match(deleteFn, /Media delete failed/);
 });
