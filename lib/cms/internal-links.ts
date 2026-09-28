@@ -452,7 +452,7 @@ function collectNavLinks(settings: SiteSettings): Array<{ href: string; label: s
 
 export const DEFAULT_CODE_DEFINED_LINKS: NonNullable<InternalLinkScanInput["codeLinks"]> = [
   { id: "site-shell-breadcrumb-home", label: "SiteShell breadcrumb Home", href: "/welcome/", context: "SiteShell" },
-  { id: "header-logo", label: "Header logo", href: "/", context: "Header" },
+  { id: "header-logo", label: "Header logo", href: "/welcome/", context: "Header" },
 ];
 
 let findingSeq = 0;

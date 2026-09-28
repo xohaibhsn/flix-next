@@ -16,7 +16,7 @@ export function Logo({
 } & LogoBranding) {
   if (imageUrl) {
     return (
-      <Link href="/" className="flex shrink-0 items-center">
+      <Link href="/welcome/" className="flex shrink-0 items-center">
         {/* Cloudinary URLs vary in size; native img avoids layout shift issues. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -29,7 +29,7 @@ export function Logo({
   }
 
   return (
-    <Link href="/" className="flex shrink-0 items-center gap-2.5">
+    <Link href="/welcome/" className="flex shrink-0 items-center gap-2.5">
       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand shadow-[0_0_0_3px_rgba(229,9,20,0.25)]">
         <Play className="ml-0.5 h-4 w-4 fill-white text-white" aria-hidden="true" />
       </span>
