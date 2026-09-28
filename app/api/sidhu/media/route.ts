@@ -4,6 +4,7 @@ import { applyMediaAltUpdate, MEDIA_API_PERMISSIONS } from "@/lib/cms/media-alt"
 import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
 import { getMediaUsage, getMediaUsageById } from "@/lib/cms/media-refs";
+import { persistUploadedCloudinaryMedia } from "@/lib/cms/media-upload";
 import { cms } from "@/lib/cms/repository";
 import { sanitizeText } from "@/lib/cms/validation";
 import {
@@ -86,26 +87,38 @@ export async function POST(request: Request) {
       filename: safeName,
       folder,
     });
-    if (!isAllowedCloudinaryImage(uploaded)) {
-      return jsonError("Cloudinary returned an unsupported image type.");
-    }
-    const asset = await cms.addMedia({
-      id: createId("media"),
-      publicId: uploaded.publicId,
-      secureUrl: uploaded.secureUrl,
-      folder,
-      originalFilename: safeName,
-      format: uploaded.format,
-      width: uploaded.width,
-      height: uploaded.height,
-      bytes: uploaded.bytes,
-      resourceType: uploaded.resourceType,
-      createdAt: new Date().toISOString(),
-      alt,
+    const asset = await persistUploadedCloudinaryMedia({
+      uploaded,
+      isAllowed: isAllowedCloudinaryImage,
+      destroyCloudinaryImage,
+      addMedia: (next) => cms.addMedia(next),
+      onCleanupFailure: (cleanupError, publicId) => {
+        console.error("[media-upload] compensating Cloudinary destroy failed", {
+          publicId,
+          message: cleanupError instanceof Error ? cleanupError.message : "cleanup failed",
+        });
+      },
+      buildAsset: (image) => ({
+        id: createId("media"),
+        publicId: image.publicId,
+        secureUrl: image.secureUrl,
+        folder,
+        originalFilename: safeName,
+        format: image.format,
+        width: image.width,
+        height: image.height,
+        bytes: image.bytes,
+        resourceType: image.resourceType,
+        createdAt: new Date().toISOString(),
+        alt,
+      }),
     });
     revalidateMedia();
     return NextResponse.json({ ok: true, asset });
   } catch (error) {
+    if (error instanceof Error && error.message === "Cloudinary returned an unsupported image type.") {
+      return jsonError(error.message);
+    }
     return jsonError(publicErrorMessage(error, "Cloudinary upload failed."), 502);
   }
 }
