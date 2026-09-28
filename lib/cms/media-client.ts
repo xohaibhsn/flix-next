@@ -1,4 +1,11 @@
 import type { MediaAsset } from "@/lib/cms/types";
+import type { MediaUsageReference } from "@/lib/cms/media-refs";
+
+export type LibraryMediaAsset = MediaAsset & {
+  inUse?: boolean;
+  usageCount?: number;
+  usageReferences?: MediaUsageReference[];
+};
 
 export async function uploadSidhuImage(file: File, folder: string, alt = "") {
   const body = new FormData();
@@ -38,9 +45,22 @@ export async function deleteSidhuImage(id: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
   });
-  const json = (await response.json()) as { ok: boolean; error?: string };
+  const json = (await response.json()) as {
+    ok: boolean;
+    error?: string;
+    usageCount?: number;
+    usageReferences?: MediaUsageReference[];
+  };
   if (!response.ok || !json.ok) {
-    throw new Error(json.error || "Delete failed.");
+    const err = new Error(json.error || "Delete failed.") as Error & {
+      usageCount?: number;
+      usageReferences?: MediaUsageReference[];
+      status?: number;
+    };
+    err.usageCount = json.usageCount;
+    err.usageReferences = json.usageReferences;
+    err.status = response.status;
+    throw err;
   }
 }
 
@@ -49,7 +69,7 @@ export async function fetchSidhuMedia() {
   const json = (await response.json()) as {
     ok: boolean;
     configured?: boolean;
-    assets?: Array<MediaAsset & { inUse?: boolean }>;
+    assets?: LibraryMediaAsset[];
     error?: string;
   };
   if (!response.ok || !json.ok) {

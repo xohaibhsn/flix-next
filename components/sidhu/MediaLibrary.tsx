@@ -1,13 +1,18 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import type { MediaAsset } from "@/lib/cms/types";
-import { deleteSidhuImage, fetchSidhuMedia, updateSidhuImageAlt, uploadSidhuImage } from "@/lib/cms/media-client";
+import {
+  deleteSidhuImage,
+  fetchSidhuMedia,
+  updateSidhuImageAlt,
+  uploadSidhuImage,
+  type LibraryMediaAsset,
+} from "@/lib/cms/media-client";
 import { MEDIA_ALT_MAX } from "@/lib/cms/media-alt";
 import { MEDIA_UPLOAD, formatFileSize } from "@/lib/media-specs";
 import { Banner } from "@/components/sidhu/fields";
 
-type LibraryAsset = MediaAsset & { inUse?: boolean };
+type LibraryAsset = LibraryMediaAsset;
 
 export function MediaLibrary({
   initialAssets,
@@ -65,11 +70,17 @@ export function MediaLibrary({
     setMessage(null);
     try {
       const next = await updateSidhuImageAlt(asset.id, altDrafts[asset.id] ?? asset.alt);
-      setAssets((current) => current.map((item) => (item.id === next.id ? { ...item, ...next, inUse: item.inUse } : item)));
+      setAssets((current) =>
+        current.map((item) =>
+          item.id === next.id
+            ? { ...item, ...next, inUse: item.inUse, usageCount: item.usageCount, usageReferences: item.usageReferences }
+            : item,
+        ),
+      );
       setAltDrafts((current) => {
-        const next = { ...current };
-        delete next[asset.id];
-        return next;
+        const nextDrafts = { ...current };
+        delete nextDrafts[asset.id];
+        return nextDrafts;
       });
       setMessage({ tone: "ok", text: "Alt text saved. The Cloudinary file was not changed." });
     } catch (error) {
@@ -80,10 +91,18 @@ export function MediaLibrary({
   }
 
   async function remove(asset: LibraryAsset) {
-    if (asset.inUse) {
+    const count = asset.usageCount ?? (asset.inUse ? 1 : 0);
+    if (asset.inUse || count > 0) {
+      const places = (asset.usageReferences || [])
+        .slice(0, 3)
+        .map((ref) => ref.entity)
+        .filter(Boolean)
+        .join("; ");
       setMessage({
         tone: "error",
-        text: "This image is used on the site. Unassign it from Site Settings, SEO, or a blog post first.",
+        text: places
+          ? `Used in ${count} place${count === 1 ? "" : "s"} (${places}). Unassign it before deleting.`
+          : `Used in ${count} place${count === 1 ? "" : "s"}. Unassign it before deleting.`,
       });
       return;
     }
@@ -172,75 +191,89 @@ export function MediaLibrary({
         {assets.length === 0 ? (
           <p className="text-sm text-muted">No media yet.</p>
         ) : (
-          assets.map((asset) => (
-            <article key={asset.id} className="overflow-hidden rounded-xl border border-line bg-white">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={asset.secureUrl} alt={asset.alt} className="h-40 w-full object-cover" />
-              <div className="space-y-2 p-3">
-                <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
-                <p className="text-xs text-muted">
-                  {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format || "unknown"} ·{" "}
-                  {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
-                  {asset.inUse ? " · in use" : ""}
-                </p>
-                <p className="text-xs text-muted">
-                  Alt: {asset.alt.trim() ? asset.alt : "Not set"}
-                </p>
-                <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
-                  Alt text
-                  <textarea
-                    value={altDrafts[asset.id] ?? asset.alt}
-                    onChange={(event) => setAltDrafts((current) => ({ ...current, [asset.id]: event.target.value }))}
-                    maxLength={MEDIA_ALT_MAX}
-                    rows={2}
-                    className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
-                    placeholder="Leave blank for decorative images"
-                  />
-                </label>
-                <p className="text-xs text-muted">
-                  Describe the image briefly when it adds meaningful content. Leave blank for decorative images.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    className="rounded border border-line px-2 py-1 text-xs"
-                    onClick={() => void saveAlt(asset)}
-                    disabled={busy}
-                  >
-                    Save alt
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded border border-line px-2 py-1 text-xs"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(asset.secureUrl);
-                      setMessage({ tone: "ok", text: "Selected — URL copied. Assign it from an image field or paste the URL." });
-                    }}
-                  >
-                    Select/Use
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded border border-line px-2 py-1 text-xs"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(asset.secureUrl);
-                      setMessage({ tone: "ok", text: "URL copied." });
-                    }}
-                  >
-                    Copy URL
-                  </button>
-                  <button
-                    type="button"
-                    className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
-                    onClick={() => void remove(asset)}
-                    disabled={busy}
-                  >
-                    Delete
-                  </button>
+          assets.map((asset) => {
+            const usageCount = asset.usageCount ?? (asset.inUse ? 1 : 0);
+            const used = Boolean(asset.inUse || usageCount > 0);
+            const locations = (asset.usageReferences || [])
+              .slice(0, 3)
+              .map((ref) => `${ref.entity} (${ref.field})`)
+              .join(" · ");
+            return (
+              <article key={asset.id} className="overflow-hidden rounded-xl border border-line bg-white">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={asset.secureUrl} alt={asset.alt} className="h-40 w-full object-cover" />
+                <div className="space-y-2 p-3">
+                  <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
+                  <p className="text-xs text-muted">
+                    {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format || "unknown"} ·{" "}
+                    {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {used
+                      ? `Used in ${usageCount} place${usageCount === 1 ? "" : "s"}`
+                      : "Not in use"}
+                  </p>
+                  {locations ? <p className="text-xs text-muted">{locations}</p> : null}
+                  <p className="text-xs text-muted">
+                    Alt: {asset.alt.trim() ? asset.alt : "Not set"}
+                  </p>
+                  <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
+                    Alt text
+                    <textarea
+                      value={altDrafts[asset.id] ?? asset.alt}
+                      onChange={(event) => setAltDrafts((current) => ({ ...current, [asset.id]: event.target.value }))}
+                      maxLength={MEDIA_ALT_MAX}
+                      rows={2}
+                      className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
+                      placeholder="Leave blank for decorative images"
+                    />
+                  </label>
+                  <p className="text-xs text-muted">
+                    Describe the image briefly when it adds meaningful content. Leave blank for decorative images.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="rounded border border-line px-2 py-1 text-xs"
+                      onClick={() => void saveAlt(asset)}
+                      disabled={busy}
+                    >
+                      Save alt
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-line px-2 py-1 text-xs"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(asset.secureUrl);
+                        setMessage({ tone: "ok", text: "Selected — URL copied. Assign it from an image field or paste the URL." });
+                      }}
+                    >
+                      Select/Use
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-line px-2 py-1 text-xs"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(asset.secureUrl);
+                        setMessage({ tone: "ok", text: "URL copied." });
+                      }}
+                    >
+                      Copy URL
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
+                      onClick={() => void remove(asset)}
+                      disabled={busy || used || !configured}
+                      title={used ? "Unassign this image before deleting." : undefined}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </article>
-          ))
+              </article>
+            );
+          })
         )}
       </div>
     </div>

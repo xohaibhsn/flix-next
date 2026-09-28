@@ -3,7 +3,7 @@ import { requireAdminApi } from "@/lib/auth/guards";
 import { applyMediaAltUpdate, MEDIA_API_PERMISSIONS } from "@/lib/cms/media-alt";
 import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
-import { referencedMediaIds } from "@/lib/cms/media-refs";
+import { getMediaUsage, getMediaUsageById } from "@/lib/cms/media-refs";
 import { cms } from "@/lib/cms/repository";
 import { sanitizeText } from "@/lib/cms/validation";
 import {
@@ -18,27 +18,42 @@ import { isSameOriginMutation } from "@/lib/security/origin";
 
 export const runtime = "nodejs";
 
-function jsonError(message: string, status = 400) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function jsonError(message: string, status = 400, extra?: Record<string, unknown>) {
+  return NextResponse.json({ ok: false, error: message, ...extra }, { status });
 }
 
 function revalidateMedia() {
   revalidateSidhuCms();
 }
 
+async function loadMediaUsageContent() {
+  const [settings, pages, posts, categories] = await Promise.all([
+    cms.getSettings(),
+    cms.listPages(),
+    cms.listPosts(),
+    cms.listCategories(),
+  ]);
+  return { settings, pages, posts, categories };
+}
+
 export async function GET() {
   const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
   const assets = await cms.listMedia();
-  const [settings, posts, categories] = await Promise.all([cms.getSettings(), cms.listPosts(), cms.listCategories()]);
-  const usedIds = referencedMediaIds(settings, posts, categories);
+  const content = await loadMediaUsageContent();
+  const usageById = getMediaUsageById(assets, content);
   return NextResponse.json({
     ok: true,
     configured: isCloudinaryConfigured(),
-    assets: assets.map((asset) => ({
-      ...asset,
-      inUse: usedIds.has(asset.id),
-    })),
+    assets: assets.map((asset) => {
+      const usage = usageById.get(asset.id) || { inUse: false, references: [] };
+      return {
+        ...asset,
+        inUse: usage.inUse,
+        usageCount: usage.references.length,
+        usageReferences: usage.references.slice(0, 8),
+      };
+    }),
   });
 }
 
@@ -114,14 +129,21 @@ export async function DELETE(request: Request) {
   if (!id) return jsonError("Missing media id.");
   const asset = await cms.getMediaById(id);
   if (!asset) return jsonError("That media item is not in the library.", 404);
-  const settings = await cms.getSettings();
-  const [posts, categories] = await Promise.all([cms.listPosts(), cms.listCategories()]);
-  if (referencedMediaIds(settings, posts, categories).has(id)) {
+
+  const content = await loadMediaUsageContent();
+  const usage = getMediaUsage(asset, content);
+  if (usage.inUse) {
+    const places = usage.references
+      .slice(0, 5)
+      .map((ref) => ref.entity)
+      .join(", ");
     return jsonError(
-      "This image is used as logo, favicon, OG, payment icon, or a blog image. Unassign it first.",
+      `This image is used in ${usage.references.length} place${usage.references.length === 1 ? "" : "s"}${places ? `: ${places}` : ""}. Unassign it first.`,
       409,
+      { usageCount: usage.references.length, usageReferences: usage.references.slice(0, 8) },
     );
   }
+
   try {
     await destroyCloudinaryImage(asset.publicId);
     await cms.removeMedia(id);
