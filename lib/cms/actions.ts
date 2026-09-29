@@ -2,7 +2,17 @@
 
 import { requireAdminAction } from "@/lib/auth/guards";
 import { cms } from "@/lib/cms/repository";
-import { revalidateAfterSettingsSave, revalidateBlog, revalidateCategory, revalidatePageSeo, revalidatePublicSlug, revalidateSidhuCms } from "@/lib/cms/revalidate";
+import {
+  revalidateAfterSettingsSave,
+  revalidateBlog,
+  revalidateCategory,
+  revalidatePageSeo,
+  revalidatePublicFaqsData,
+  revalidatePublicPagesData,
+  revalidatePublicPlansData,
+  revalidatePublicSlug,
+  revalidateSidhuCms,
+} from "@/lib/cms/revalidate";
 import type {
   BlogCategory,
   BlogPost,
@@ -55,6 +65,7 @@ export async function savePageAction(page: CmsPage) {
         revalidatePublicSlug(path);
       }
     }
+    revalidatePublicPagesData();
     revalidateSidhuCms();
     return { ok: true as const, page: saved };
   } catch (error) {
@@ -131,6 +142,7 @@ export async function savePlanAction(plan: PricingPlan) {
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.savePlan(plan);
+    revalidatePublicPlansData();
     revalidateSidhuCms();
     return { ok: true as const, plan: saved };
   } catch (error) {
@@ -143,6 +155,7 @@ export async function deletePlanAction(id: string) {
   if (unauthorized) return unauthorized;
   try {
     await cms.deletePlan(id);
+    revalidatePublicPlansData();
     revalidateSidhuCms();
     return { ok: true as const };
   } catch (error) {
@@ -155,6 +168,7 @@ export async function saveFaqAction(item: FaqItem) {
   if (unauthorized) return unauthorized;
   try {
     const saved = await cms.saveFaq(item);
+    revalidatePublicFaqsData();
     revalidateSidhuCms();
     return { ok: true as const, item: saved };
   } catch (error) {
@@ -167,6 +181,7 @@ export async function deleteFaqAction(id: string) {
   if (unauthorized) return unauthorized;
   try {
     await cms.deleteFaq(id);
+    revalidatePublicFaqsData();
     revalidateSidhuCms();
     return { ok: true as const };
   } catch (error) {

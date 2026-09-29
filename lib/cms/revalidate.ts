@@ -1,8 +1,9 @@
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
 import { COMPANY_PAGES } from "@/lib/cms/company-pages";
 import { blogPostPath, blogPostPathLegacy } from "@/lib/cms/blog-paths";
 import { SUBSCRIPTION_SLUG, SUBSCRIPTION_SLUG_LEGACY, pathsForSlug } from "@/lib/cms/page-paths";
+import { PUBLIC_CACHE_TAGS } from "@/lib/cms/public-cache-tags";
 
 const PUBLIC_PATHS = [
   "/",
@@ -56,6 +57,27 @@ const SIDHU_PATHS = [
   "/sidhu/account/",
 ];
 
+/** Expire tagged public CMS data immediately (Route Handler + Server Action safe). */
+function expirePublicDataTag(tag: string) {
+  revalidateTag(tag, { expire: 0 });
+}
+
+export function revalidatePublicSettingsData() {
+  expirePublicDataTag(PUBLIC_CACHE_TAGS.settings);
+}
+
+export function revalidatePublicPagesData() {
+  expirePublicDataTag(PUBLIC_CACHE_TAGS.pages);
+}
+
+export function revalidatePublicPlansData() {
+  expirePublicDataTag(PUBLIC_CACHE_TAGS.plans);
+}
+
+export function revalidatePublicFaqsData() {
+  expirePublicDataTag(PUBLIC_CACHE_TAGS.faqs);
+}
+
 export function revalidatePublicSlug(slug: string) {
   for (const path of pathsForSlug(slug)) {
     revalidatePath(path);
@@ -75,6 +97,7 @@ export function revalidatePublicSite() {
 }
 
 export function revalidateAfterSettingsSave() {
+  revalidatePublicSettingsData();
   revalidatePath("/", "layout");
   for (const path of PUBLIC_PATHS) {
     revalidatePath(path);
@@ -108,6 +131,7 @@ export function revalidateBlog(slug?: string) {
 }
 
 export function revalidatePageSeo(key: PageSeoKey) {
+  revalidatePublicSettingsData();
   revalidatePath("/", "layout");
   const meta = PAGE_SEO_META[key];
   for (const path of meta.publicPaths) revalidatePath(path);
