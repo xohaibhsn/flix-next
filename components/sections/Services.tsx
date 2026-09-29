@@ -12,6 +12,11 @@ const TONES = {
   green: "bg-emerald-50 text-emerald-600",
 };
 
+/** Map root/empty Services hrefs to /welcome/ so clicks skip the / → 308 hop. */
+export function resolveServicesCardHref(linkHref: string | null | undefined): string {
+  return !linkHref || linkHref === "/" ? "/welcome/" : linkHref;
+}
+
 export function Services({ data }: { data?: ServicesData }) {
   const content = data ?? (createDefaultSectionData("services") as ServicesData);
 
@@ -26,6 +31,7 @@ export function Services({ data }: { data?: ServicesData }) {
         <div className="mt-12 grid gap-6 md:grid-cols-3">
           {content.cards.map((card) => {
             const Icon = getIcon(card.icon);
+            const linkHref = resolveServicesCardHref(card.linkHref);
             return (
               <article
                 key={card.id}
@@ -40,7 +46,7 @@ export function Services({ data }: { data?: ServicesData }) {
                 <p className="mt-2 text-sm leading-relaxed text-muted">{card.description}</p>
                 {card.linkLabel ? (
                   <Link
-                    href={card.linkHref || "/"}
+                    href={linkHref}
                     className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-brand hover:underline"
                   >
                     {card.linkLabel} <ArrowRight className="h-4 w-4" aria-hidden="true" />

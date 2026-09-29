@@ -400,7 +400,7 @@ function ServicesFields({
                 title: "New service",
                 description: "",
                 linkLabel: "Explore",
-                linkHref: "/",
+                linkHref: "/iptv-subscription-uk/",
                 tone: "red",
               },
             ],
