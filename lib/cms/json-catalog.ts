@@ -36,6 +36,7 @@ import type {
   PricingPlan,
   RedirectRule,
 } from "@/lib/cms/types";
+import { isProductionBuildPhase } from "@/lib/db/config";
 
 const PLANS_FILE = "pricing-plans.json";
 const FAQS_FILE = "faqs.json";
@@ -54,8 +55,10 @@ async function ensureJsonManagedRedirects(items: RedirectRule[]) {
     if (next.some((item) => item.sourcePath === seed.sourcePath)) continue;
     next.push(toRedirectRule(seed, now));
   }
-  await saveList(REDIRECTS_FILE, next);
-  await writeJsonFile(REDIRECT_SEED_FILE, { seeded: true, key: MANAGED_REDIRECT_SEED_KEY });
+  if (!isProductionBuildPhase()) {
+    await saveList(REDIRECTS_FILE, next);
+    await writeJsonFile(REDIRECT_SEED_FILE, { seeded: true, key: MANAGED_REDIRECT_SEED_KEY });
+  }
   return next;
 }
 
@@ -74,7 +77,7 @@ export class JsonCatalogRepository implements CatalogRepository {
       if (result.changed) changed = true;
       return sanitizePricingPlan(result.plan);
     });
-    if (changed) await saveList(PLANS_FILE, next);
+    if (changed && !isProductionBuildPhase()) await saveList(PLANS_FILE, next);
     return next;
   }
   async savePlan(plan: PricingPlan) {
@@ -102,7 +105,7 @@ export class JsonCatalogRepository implements CatalogRepository {
       if (result.changed) changed = true;
       return sanitizeFaq(result.item);
     });
-    if (changed) await saveList(FAQS_FILE, next);
+    if (changed && !isProductionBuildPhase()) await saveList(FAQS_FILE, next);
     return next;
   }
   async saveFaq(item: FaqItem) {
@@ -150,7 +153,7 @@ export class JsonCatalogRepository implements CatalogRepository {
       if (result.changed) changed = true;
       return sanitizePost(result.post);
     });
-    if (changed) await saveList(POSTS_FILE, next);
+    if (changed && !isProductionBuildPhase()) await saveList(POSTS_FILE, next);
     return next;
   }
   async getPostBySlug(slug: string) {
@@ -186,7 +189,9 @@ export class JsonCatalogRepository implements CatalogRepository {
     const seeded = await ensureJsonManagedRedirects(list);
     const migrated = applySubscriptionRedirectMigration(seeded);
     const blog = applyBlogIndexRedirectUpsert(migrated.rules);
-    if (migrated.changed || blog.changed) await saveList(REDIRECTS_FILE, blog.rules);
+    if ((migrated.changed || blog.changed) && !isProductionBuildPhase()) {
+      await saveList(REDIRECTS_FILE, blog.rules);
+    }
     return blog.rules.map(sanitizeRedirect);
   }
   async listActiveRedirects() {

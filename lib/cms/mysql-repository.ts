@@ -22,7 +22,7 @@ import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { withSlash } from "@/lib/cms/redirects";
 import { duplicateSlugError, mysqlDuplicateError } from "@/lib/cms/slug-change";
-import { isProductionBuildPhase } from "@/lib/db/config";
+import { runMysqlWithBuildFallback } from "@/lib/cms/mysql-build-fallback";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
 
 type PageRow = RowDataPacket & {
@@ -313,12 +313,10 @@ export class MysqlWithBuildFallback implements CmsOps {
 
   private async run<T>(mysqlOp: () => Promise<T>, jsonOp: () => Promise<T>): Promise<T> {
     try {
-      return await mysqlOp();
-    } catch (error) {
-      if (isProductionBuildPhase()) {
+      return await runMysqlWithBuildFallback(mysqlOp, jsonOp, () => {
         console.warn("MySQL CMS unavailable during production build; using JSON snapshot.");
-        return jsonOp();
-      }
+      });
+    } catch (error) {
       throw error instanceof Error ? error : cmsDbError(error);
     }
   }

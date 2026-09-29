@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, unlink, writeFile } from "fs/promises";
 import path from "path";
+import { isProductionBuildPhase } from "@/lib/db/config";
 
 function dataDir() {
   return path.join(process.cwd(), "data");
@@ -17,7 +18,10 @@ export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T>
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code;
     if (code === "ENOENT") {
-      await writeJsonFile(fileName, fallback);
+      // Production builds may read JSON fallbacks in memory but must not create snapshot files.
+      if (!isProductionBuildPhase()) {
+        await writeJsonFile(fileName, fallback);
+      }
       return fallback;
     }
     throw error;
