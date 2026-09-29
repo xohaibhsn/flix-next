@@ -1,4 +1,8 @@
-import { parseHeadCode, type HeadCodeNode } from "@/lib/cms/head-code";
+import {
+  filterHeadNodesForAnalytics,
+  parseHeadCode,
+  type HeadCodeNode,
+} from "@/lib/cms/head-code";
 
 function mappedAttrs(attrs: Record<string, string>) {
   const next: Record<string, string> = {};
@@ -61,8 +65,14 @@ function HeadNodeView({ node }: { node: HeadCodeNode }) {
   );
 }
 
-export function CustomHeadCode({ html }: { html: string }) {
-  const nodes = parseHeadCode(html || "");
+export function CustomHeadCode({
+  html,
+  analyticsAllowed = false,
+}: {
+  html: string;
+  analyticsAllowed?: boolean;
+}) {
+  const nodes = filterHeadNodesForAnalytics(parseHeadCode(html || ""), analyticsAllowed);
   if (!nodes.length) return null;
   return (
     <>

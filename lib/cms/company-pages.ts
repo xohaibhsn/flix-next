@@ -377,19 +377,19 @@ const PRIVACY_HTML = `<p>This Privacy Policy describes, in practical terms, how 
 <h2>Contact</h2>
 <p>Privacy questions can be sent through the same published contact details as any other support request.</p>`;
 
-const COOKIE_HTML = `<p>This Cookie Policy explains how cookies and similar technologies may be used on this Flix IPTV website. It does not invent a cookie-consent banner if the site does not show one, and it does not name analytics or advertising products that are not actually installed.</p>
+const COOKIE_HTML = `<p>This Cookie Policy explains how cookies and similar technologies may be used on this Flix IPTV website.</p>
 <h2>What cookies are</h2>
 <p>Cookies are small text files stored on your device when you visit a website. Similar technologies include local storage and pixels used by some scripts. They can remember a setting, keep a session working, or help a site understand how pages are used.</p>
 <h2>Essential cookies</h2>
 <p>Some cookies are needed for the website to operate. That can include keeping an admin session signed in on Sidhu, remembering basic site function, or supporting security. The public pages are meant to work without asking you to create an account.</p>
 <h2>Analytics, advertising and verification</h2>
-<p>The site includes a place for custom head code and SEO scripts. If the operator adds analytics, advertising, measurement, or domain-verification scripts there, those tools may set cookies or read usage data. We describe that possibility because the feature exists. We do not claim a specific analytics or ads vendor on this page.</p>
+<p>This website currently uses Google Analytics to understand how pages are used. Analytics is optional. Domain-verification tags and other trusted head scripts may also appear through the site’s custom head code. Advertising products are not named here unless they are actually installed.</p>
 <h2>Preferences</h2>
-<p>If a script or a future site feature stores a preference in your browser, that storage is used to remember a choice you made, not to replace the policies on this website.</p>
+<p>A Cookie Settings control on this website lets you accept or reject analytics. Your choice is stored in a first-party preference cookie so the site can remember it. You can change that preference later.</p>
 <h2>Third-party services</h2>
 <p>Embedded or linked third-party services — for example WhatsApp, a font or media host, or a script added in head code — may set their own cookies. Those services have their own policies. We only control cookies that this website itself sets.</p>
 <h2>Browser controls</h2>
-<p>You can block or delete cookies in your browser settings. Blocking essential cookies may affect sign-in to the admin area or other site functions. There is no separate Flix IPTV cookie dashboard on this site unless one is added later.</p>
+<p>You can block or delete cookies in your browser settings. Blocking essential cookies may affect sign-in to the admin area or other site functions. You can also reopen Cookie Settings on this website to change your analytics choice.</p>
 <h2>Updates</h2>
 <p>We may update this policy if the way the site uses cookies changes. The published page is the current version. Related details are in the <a href="/privacy-policy/">Privacy Policy</a>.</p>`;
 

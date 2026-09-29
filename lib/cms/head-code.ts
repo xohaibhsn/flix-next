@@ -110,3 +110,31 @@ export function parseHeadCode(html: string): HeadCodeNode[] {
   }
   return nodes;
 }
+
+/** Narrow classifier for current GA4 / gtag custom-head nodes (not verification meta). */
+export function isGoogleAnalyticsHeadNode(node: HeadCodeNode): boolean {
+  if (node.kind !== "script") return false;
+
+  const src = (node.attrs.src || "").trim();
+  if (src) {
+    const lower = src.toLowerCase();
+    const gtagLoader =
+      /^(https?:)?\/\/(www\.)?googletagmanager\.com\/gtag\/js(?:\?|$)/i.test(lower) &&
+      /[?&]id=g-[a-z0-9]+/i.test(lower);
+    if (gtagLoader) return true;
+    if (/^(https?:)?\/\/(www\.)?google-analytics\.com\//i.test(lower)) return true;
+    return false;
+  }
+
+  const content = node.content || "";
+  if (/gtag\s*\(\s*['"]config['"]\s*,\s*['"]G-[A-Z0-9]+['"]/i.test(content)) return true;
+  const hasDataLayer = /\bwindow\.dataLayer\b|\bdataLayer\b/.test(content);
+  const hasGtagFn = /\bfunction\s+gtag\s*\(|\bgtag\s*\(/.test(content);
+  const hasGtagJs = /gtag\s*\(\s*['"]js['"]/i.test(content);
+  return hasDataLayer && hasGtagFn && hasGtagJs;
+}
+
+export function filterHeadNodesForAnalytics(nodes: HeadCodeNode[], analyticsAllowed: boolean): HeadCodeNode[] {
+  if (analyticsAllowed) return nodes;
+  return nodes.filter((node) => !isGoogleAnalyticsHeadNode(node));
+}

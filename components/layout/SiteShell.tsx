@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { WhatsAppButton } from "@/components/layout/WhatsAppButton";
+import { AnalyticsConsent } from "@/components/privacy/AnalyticsConsent";
 import { CustomHeadCode } from "@/components/seo/CustomHeadCode";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getPublicSettings } from "@/lib/cms/public-request-cache";
@@ -11,6 +13,11 @@ import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
 import { companyPageBySeoKey, isCompanyPageSeoKey } from "@/lib/cms/company-pages";
 import { publicWhatsAppSalesUrl, publicWhatsAppVisitUrl } from "@/lib/cms/public-contact";
 import { isSalesCtaLabel } from "@/lib/cms/whatsapp-messages";
+import {
+  ANALYTICS_CONSENT_COOKIE,
+  isAnalyticsConsentGranted,
+  parseAnalyticsConsent,
+} from "@/lib/privacy/analytics-consent";
 import type { LogoBranding } from "@/components/layout/Logo";
 import type { SiteSettings } from "@/lib/cms/types";
 
@@ -36,7 +43,10 @@ export async function SiteShell({
   pageTitle?: string;
 }) {
   await connection();
-  const settings = await getPublicSettings();
+  const [settings, cookieStore] = await Promise.all([getPublicSettings(), cookies()]);
+  const consentRaw = cookieStore.get(ANALYTICS_CONSENT_COOKIE)?.value;
+  const analyticsAllowed = isAnalyticsConsentGranted(consentRaw);
+  const analyticsConsent = parseAnalyticsConsent(consentRaw);
   const branding: LogoBranding = {
     imageUrl: settings.branding.logo?.secureUrl ?? null,
     alt: settings.branding.logoAlt || settings.siteName,
@@ -52,7 +62,7 @@ export async function SiteShell({
 
   return (
     <>
-      <CustomHeadCode html={settings.customHeadCode || ""} />
+      <CustomHeadCode html={settings.customHeadCode || ""} analyticsAllowed={analyticsAllowed} />
       {showOrganization ? <JsonLd data={organizationJsonLd(settings)} /> : null}
       <JsonLd data={websiteJsonLd(settings)} />
       {showWebPage
@@ -85,6 +95,7 @@ export async function SiteShell({
       <main className="flex-1">{children}</main>
       <Footer branding={branding} settings={settings} />
       <WhatsAppButton href={publicWhatsAppVisitUrl(settings)} />
+      <AnalyticsConsent initialConsent={analyticsConsent} />
     </>
   );
 }
