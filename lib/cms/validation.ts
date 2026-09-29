@@ -7,6 +7,7 @@ import type {
   CtaData,
   FaqData,
   FaqItem,
+  HeroData,
   MediaRef,
   NavLink,
   PageSeo,
@@ -26,7 +27,7 @@ import type {
 } from "@/lib/cms/types";
 import { readTriStateFlag } from "@/lib/cms/category-seo";
 import { isIconName } from "@/lib/cms/icons";
-import { mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
+import { createDefaultSectionData, mergeSectionData, defaultSettings } from "@/lib/cms/defaults";
 import {
   COMPANY_PAGE_SEO_KEYS,
   DEFAULT_ABOUT_FOOTER_LINK,
@@ -110,6 +111,18 @@ export function sanitizeNavHref(value: unknown) {
   return href === "/" ? "/welcome/" : href;
 }
 
+/** Required public action URLs: blank/invalid/root become the field fallback. */
+export function sanitizeRequiredActionHref(value: unknown, fallback: string) {
+  const href = sanitizeHref(value);
+  return href === "/" ? fallback : href;
+}
+
+/** Optional public action URLs: blank/invalid/root become empty (omit the control). */
+export function sanitizeOptionalActionHref(value: unknown) {
+  const href = sanitizeHref(value);
+  return href === "/" ? "" : href;
+}
+
 export function sanitizeIcon(value: unknown) {
   const name = sanitizeText(value, 40);
   return isIconName(name) ? name : "Zap";
@@ -181,7 +194,7 @@ export function sanitizeSettings(input: SiteSettings): SiteSettings {
     socials: sanitizeSocials(source.socials),
     headerNav: sanitizeNavList(source.headerNav, fallback.headerNav),
     headerCtaLabel: sanitizeText(source.headerCtaLabel, 40) || "Get Started",
-    headerCtaHref: sanitizeHref(source.headerCtaHref),
+    headerCtaHref: sanitizeRequiredActionHref(source.headerCtaHref, fallback.headerCtaHref),
     footerIntro: sanitizeText(source.footerIntro, 400),
     footerCopyright: sanitizeText(source.footerCopyright, 160),
     footerQuickLinks: mergeMissingNavLinks(
@@ -260,6 +273,15 @@ function sanitizeSocials(value: unknown): SocialLinks {
 }
 
 function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSection["data"] {
+  if (type === "hero") {
+    const current = data as HeroData;
+    const defaults = createDefaultSectionData("hero") as HeroData;
+    return {
+      ...current,
+      primaryHref: sanitizeRequiredActionHref(current.primaryHref, defaults.primaryHref),
+      secondaryHref: sanitizeRequiredActionHref(current.secondaryHref, defaults.secondaryHref),
+    };
+  }
   if (type === "rich-text") {
     const current = data as RichTextData;
     return {
@@ -279,7 +301,7 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       heading: sanitizeText(current.heading, 160),
       html: sanitizeHtml(current.html),
       buttonLabel: sanitizeText(current.buttonLabel, 40),
-      buttonHref: current.buttonHref ? sanitizeHref(current.buttonHref) : "",
+      buttonHref: sanitizeOptionalActionHref(current.buttonHref),
       width,
       scrollable: Boolean(current.scrollable),
       scrollHeight,
@@ -293,7 +315,7 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       heading: sanitizeText(current.heading, 160),
       description: sanitizeText(current.description, 400),
       buttonLabel: sanitizeText(current.buttonLabel, 40),
-      buttonHref: sanitizeHref(current.buttonHref),
+      buttonHref: sanitizeRequiredActionHref(current.buttonHref, "/contact/"),
     };
   }
   if (type === "services") {
@@ -315,7 +337,7 @@ function sanitizeSectionData(type: SectionType, data: CmsSection["data"]): CmsSe
       ...current,
       plans: current.plans.map((plan) => ({
         ...plan,
-        buttonHref: sanitizeHref(plan.buttonHref),
+        buttonHref: sanitizeRequiredActionHref(plan.buttonHref, "/contact/"),
       })),
     };
   }
@@ -393,7 +415,7 @@ export function sanitizePricingPlan(input: PricingPlan): PricingPlan {
       ? input.features.map((feature) => sanitizeText(feature, 120)).filter(Boolean)
       : [],
     buttonLabel: sanitizeText(input.buttonLabel, 40) || "Choose Plan",
-    buttonHref: sanitizeHref(input.buttonHref),
+    buttonHref: sanitizeRequiredActionHref(input.buttonHref, "/contact/"),
     sortOrder: Number(input.sortOrder) || 0,
     active: input.active !== false,
     createdAt: sanitizeText(input.createdAt, 40) || now,
