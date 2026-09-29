@@ -104,6 +104,12 @@ export function sanitizeHref(value: unknown) {
   return "/";
 }
 
+/** Public nav links only: map root/blank/invalid to /welcome/ so clicks skip the / → 308 hop. */
+export function sanitizeNavHref(value: unknown) {
+  const href = sanitizeHref(value);
+  return href === "/" ? "/welcome/" : href;
+}
+
 export function sanitizeIcon(value: unknown) {
   const name = sanitizeText(value, 40);
   return isIconName(name) ? name : "Zap";
@@ -349,7 +355,7 @@ function sanitizeNavList(value: unknown, fallback: NavLink[]): NavLink[] {
     .map((item, index) => ({
       id: sanitizeText(item?.id, 80) || `nav_${index}`,
       label: sanitizeText(item?.label, 60),
-      href: sanitizeHref(item?.href),
+      href: sanitizeNavHref(item?.href),
       visible: item?.visible !== false,
     }))
     .filter((item) => item.label);

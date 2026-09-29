@@ -519,7 +519,7 @@ function NavEditor({ items, onChange }: { items: NavLink[]; onChange: (items: Na
       <button
         type="button"
         className="text-xs font-semibold text-brand"
-        onClick={() => onChange([...items, { id: createId("nav"), label: "New link", href: "/", visible: true }])}
+        onClick={() => onChange([...items, { id: createId("nav"), label: "New link", href: "/welcome/", visible: true }])}
       >
         + Add link
       </button>
