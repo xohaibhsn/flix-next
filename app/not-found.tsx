@@ -12,7 +12,7 @@ export default function NotFound() {
             That page is not available. Try Home, Subscriptions, Blog, or Contact.
           </p>
           <Link
-            href="/"
+            href="/welcome/"
             className="mt-8 inline-flex rounded-md bg-brand px-6 py-3 text-sm font-semibold text-white"
           >
             Back to Home
