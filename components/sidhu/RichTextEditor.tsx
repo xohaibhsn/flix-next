@@ -12,6 +12,13 @@ import CharacterCount from "@tiptap/extension-character-count";
 import { Table, TableRow, TableCell, TableHeader } from "@tiptap/extension-table";
 import { mergeAttributes } from "@tiptap/core";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
+import {
+  DEFAULT_RICH_TEXT_EDITOR_MODE,
+  enterHtmlSourceMode,
+  enterVisualModeFromSource,
+  resolveHtmlModeIncomingValue,
+  type RichTextEditorMode,
+} from "@/lib/cms/rich-text-editor-mode";
 
 const DANGEROUS_SCHEME = /^(javascript|data|vbscript|file):/i;
 
@@ -131,7 +138,10 @@ export function RichTextEditor({
   placeholder?: string;
 }) {
   const onChangeRef = useRef(onChange);
+  const lastEmittedRef = useRef(value || "");
   const [, setToolbar] = useState(0);
+  const [mode, setMode] = useState<RichTextEditorMode>(DEFAULT_RICH_TEXT_EDITOR_MODE);
+  const [htmlDraft, setHtmlDraft] = useState(value || "");
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkHref, setLinkHref] = useState("");
   const [linkNewTab, setLinkNewTab] = useState(false);
@@ -163,21 +173,66 @@ export function RichTextEditor({
         class: "prose-cms min-h-64 rounded-md border border-line px-3 py-2 text-sm focus:outline-none",
       },
     },
-    onUpdate: ({ editor: current }) => onChangeRef.current(current.getHTML()),
+    onUpdate: ({ editor: current }) => {
+      const html = current.getHTML();
+      lastEmittedRef.current = html;
+      onChangeRef.current(html);
+    },
     onSelectionUpdate: () => setToolbar((tick) => tick + 1),
   });
 
   useEffect(() => {
     if (!editor) return;
     const incoming = value || "<p></p>";
+
+    if (mode === "html") {
+      const resolved = resolveHtmlModeIncomingValue({
+        incoming,
+        lastEmitted: lastEmittedRef.current,
+      });
+      if (resolved.apply) {
+        lastEmittedRef.current = resolved.next;
+        setHtmlDraft(resolved.next);
+      }
+      return;
+    }
+
     if (incoming === editor.getHTML()) return;
     if (editor.isFocused) return;
     editor.commands.setContent(incoming, { emitUpdate: false });
-  }, [editor, value]);
+    lastEmittedRef.current = incoming;
+  }, [editor, value, mode]);
 
   if (!editor) return <p className="text-sm text-muted">Loading editor…</p>;
   const current = editor;
   const inTable = current.isActive("table");
+  const inHtmlMode = mode === "html";
+
+  function emitChange(html: string) {
+    lastEmittedRef.current = html;
+    onChangeRef.current(html);
+  }
+
+  function switchToHtml() {
+    const html = enterHtmlSourceMode({
+      getEditorHtml: () => current.getHTML(),
+      onChange: emitChange,
+    });
+    setHtmlDraft(html);
+    setLinkOpen(false);
+    setMode("html");
+  }
+
+  function switchToVisual() {
+    enterVisualModeFromSource({
+      sourceHtml: htmlDraft,
+      setContent: (html, opts) => {
+        current.commands.setContent(html, opts);
+      },
+      onChange: emitChange,
+    });
+    setMode("visual");
+  }
 
   function openLinkPanel() {
     const attrs = current.getAttributes("link") as Record<string, string | null>;
@@ -224,67 +279,115 @@ export function RichTextEditor({
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-1">
-        <ToolButton label="P" active={current.isActive("paragraph")} onClick={() => run(current, (chain) => chain.setParagraph().run())} />
-        <ToolButton label="H2" active={current.isActive("heading", { level: 2 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 2 }).run())} />
-        <ToolButton label="H3" active={current.isActive("heading", { level: 3 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 3 }).run())} />
-        <ToolButton label="H4" active={current.isActive("heading", { level: 4 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 4 }).run())} />
-        <ToolButton label="B" active={current.isActive("bold")} onClick={() => run(current, (chain) => chain.toggleBold().run())} />
-        <ToolButton label="I" active={current.isActive("italic")} onClick={() => run(current, (chain) => chain.toggleItalic().run())} />
-        <ToolButton label="U" active={current.isActive("underline")} onClick={() => run(current, (chain) => chain.toggleUnderline().run())} />
-        <ToolButton label="S" active={current.isActive("strike")} onClick={() => run(current, (chain) => chain.toggleStrike().run())} />
-        <ToolButton label="•" active={current.isActive("bulletList")} onClick={() => run(current, (chain) => chain.toggleBulletList().run())} />
-        <ToolButton label="1." active={current.isActive("orderedList")} onClick={() => run(current, (chain) => chain.toggleOrderedList().run())} />
-        <ToolButton label="“" active={current.isActive("blockquote")} onClick={() => run(current, (chain) => chain.toggleBlockquote().run())} />
-        <ToolButton label="—" onClick={() => run(current, (chain) => chain.setHorizontalRule().run())} />
-        <ToolButton label="Left" active={current.isActive({ textAlign: "left" })} onClick={() => run(current, (chain) => chain.setTextAlign("left").run())} />
-        <ToolButton label="Center" active={current.isActive({ textAlign: "center" })} onClick={() => run(current, (chain) => chain.setTextAlign("center").run())} />
-        <ToolButton label="Right" active={current.isActive({ textAlign: "right" })} onClick={() => run(current, (chain) => chain.setTextAlign("right").run())} />
-        <ToolButton label="Link" active={current.isActive("link")} onClick={openLinkPanel} />
-        <ToolButton label="Image" onClick={() => onRequestImage?.()} />
-        <ToolButton label="Table" title="Insert table" onClick={insertTable} />
-        <ToolButton label="+Row" title="Add row" disabled={!inTable} onClick={() => run(current, (chain) => chain.addRowAfter().run())} />
-        <ToolButton label="-Row" title="Delete row" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteRow().run())} />
-        <ToolButton label="+Col" title="Add column" disabled={!inTable} onClick={() => run(current, (chain) => chain.addColumnAfter().run())} />
-        <ToolButton label="-Col" title="Delete column" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteColumn().run())} />
-        <ToolButton label="HRow" title="Toggle header row" disabled={!inTable} onClick={() => run(current, (chain) => chain.toggleHeaderRow().run())} />
-        <ToolButton label="HCol" title="Toggle header column" disabled={!inTable} onClick={() => run(current, (chain) => chain.toggleHeaderColumn().run())} />
-        <ToolButton label="Merge" title="Merge cells" disabled={!inTable || !current.can().mergeCells()} onClick={() => run(current, (chain) => chain.mergeCells().run())} />
-        <ToolButton label="Split" title="Split cell" disabled={!inTable || !current.can().splitCell()} onClick={() => run(current, (chain) => chain.splitCell().run())} />
-        <ToolButton label="Del table" title="Delete table" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteTable().run())} />
-        <ToolButton label="Undo" onClick={() => run(current, (chain) => chain.undo().run())} />
-        <ToolButton label="Redo" onClick={() => run(current, (chain) => chain.redo().run())} />
+      <div className="mb-2 flex flex-wrap items-center gap-1" role="group" aria-label="Editor mode">
+        <button
+          type="button"
+          aria-pressed={mode === "visual"}
+          className={`rounded border px-2.5 py-1 text-xs font-semibold ${
+            mode === "visual" ? "border-brand bg-brand text-white" : "border-line bg-white text-ink"
+          }`}
+          onClick={() => {
+            if (mode !== "visual") switchToVisual();
+          }}
+        >
+          Visual
+        </button>
+        <button
+          type="button"
+          aria-pressed={mode === "html"}
+          className={`rounded border px-2.5 py-1 text-xs font-semibold ${
+            mode === "html" ? "border-brand bg-brand text-white" : "border-line bg-white text-ink"
+          }`}
+          onClick={() => {
+            if (mode !== "html") switchToHtml();
+          }}
+        >
+          HTML
+        </button>
       </div>
-      {linkOpen ? (
-        <div className="mb-2 space-y-2 rounded-md border border-line bg-paper p-3">
-          <label className="block text-xs font-semibold text-ink">
-            Link URL
-            <input
-              value={linkHref}
-              onChange={(event) => setLinkHref(event.target.value)}
-              placeholder="/contact/ or https://example.com/"
-              className="mt-1 w-full rounded border border-line bg-white px-2 py-1 text-sm"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs text-ink">
-            <input type="checkbox" checked={linkNewTab} onChange={(event) => setLinkNewTab(event.target.checked)} />
-            Open in new tab
-          </label>
-          <label className="flex items-center gap-2 text-xs text-ink">
-            <input type="checkbox" checked={linkNofollow} onChange={(event) => setLinkNofollow(event.target.checked)} />
-            Nofollow
-          </label>
-          <div className="flex flex-wrap gap-1">
-            <ToolButton label="Apply link" onClick={applyLink} />
-            <ToolButton label="Remove" onClick={() => {
-              run(current, (chain) => chain.extendMarkRange("link").unsetLink().run());
-              setLinkOpen(false);
-            }} />
-            <ToolButton label="Cancel" onClick={() => setLinkOpen(false)} />
+      {inHtmlMode ? (
+        <label className="block">
+          <span className="mb-1 block text-xs font-semibold text-ink">HTML source</span>
+          <textarea
+            value={htmlDraft}
+            onChange={(event) => {
+              const next = event.target.value;
+              setHtmlDraft(next);
+              emitChange(next);
+            }}
+            spellCheck={false}
+            className="min-h-64 w-full rounded-md border border-line bg-white px-3 py-2 font-mono text-sm leading-relaxed text-ink focus:outline-none focus:ring-2 focus:ring-brand/30"
+            aria-label="HTML source editor"
+          />
+        </label>
+      ) : (
+        <>
+          <div className="mb-2 flex flex-wrap gap-1">
+            <ToolButton label="P" active={current.isActive("paragraph")} onClick={() => run(current, (chain) => chain.setParagraph().run())} />
+            <ToolButton label="H2" active={current.isActive("heading", { level: 2 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 2 }).run())} />
+            <ToolButton label="H3" active={current.isActive("heading", { level: 3 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 3 }).run())} />
+            <ToolButton label="H4" active={current.isActive("heading", { level: 4 })} onClick={() => run(current, (chain) => chain.toggleHeading({ level: 4 }).run())} />
+            <ToolButton label="B" active={current.isActive("bold")} onClick={() => run(current, (chain) => chain.toggleBold().run())} />
+            <ToolButton label="I" active={current.isActive("italic")} onClick={() => run(current, (chain) => chain.toggleItalic().run())} />
+            <ToolButton label="U" active={current.isActive("underline")} onClick={() => run(current, (chain) => chain.toggleUnderline().run())} />
+            <ToolButton label="S" active={current.isActive("strike")} onClick={() => run(current, (chain) => chain.toggleStrike().run())} />
+            <ToolButton label="•" active={current.isActive("bulletList")} onClick={() => run(current, (chain) => chain.toggleBulletList().run())} />
+            <ToolButton label="1." active={current.isActive("orderedList")} onClick={() => run(current, (chain) => chain.toggleOrderedList().run())} />
+            <ToolButton label="“" active={current.isActive("blockquote")} onClick={() => run(current, (chain) => chain.toggleBlockquote().run())} />
+            <ToolButton label="—" onClick={() => run(current, (chain) => chain.setHorizontalRule().run())} />
+            <ToolButton label="Left" active={current.isActive({ textAlign: "left" })} onClick={() => run(current, (chain) => chain.setTextAlign("left").run())} />
+            <ToolButton label="Center" active={current.isActive({ textAlign: "center" })} onClick={() => run(current, (chain) => chain.setTextAlign("center").run())} />
+            <ToolButton label="Right" active={current.isActive({ textAlign: "right" })} onClick={() => run(current, (chain) => chain.setTextAlign("right").run())} />
+            <ToolButton label="Link" active={current.isActive("link")} onClick={openLinkPanel} />
+            <ToolButton label="Image" onClick={() => onRequestImage?.()} />
+            <ToolButton label="Table" title="Insert table" onClick={insertTable} />
+            <ToolButton label="+Row" title="Add row" disabled={!inTable} onClick={() => run(current, (chain) => chain.addRowAfter().run())} />
+            <ToolButton label="-Row" title="Delete row" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteRow().run())} />
+            <ToolButton label="+Col" title="Add column" disabled={!inTable} onClick={() => run(current, (chain) => chain.addColumnAfter().run())} />
+            <ToolButton label="-Col" title="Delete column" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteColumn().run())} />
+            <ToolButton label="HRow" title="Toggle header row" disabled={!inTable} onClick={() => run(current, (chain) => chain.toggleHeaderRow().run())} />
+            <ToolButton label="HCol" title="Toggle header column" disabled={!inTable} onClick={() => run(current, (chain) => chain.toggleHeaderColumn().run())} />
+            <ToolButton label="Merge" title="Merge cells" disabled={!inTable || !current.can().mergeCells()} onClick={() => run(current, (chain) => chain.mergeCells().run())} />
+            <ToolButton label="Split" title="Split cell" disabled={!inTable || !current.can().splitCell()} onClick={() => run(current, (chain) => chain.splitCell().run())} />
+            <ToolButton label="Del table" title="Delete table" disabled={!inTable} onClick={() => run(current, (chain) => chain.deleteTable().run())} />
+            <ToolButton label="Undo" onClick={() => run(current, (chain) => chain.undo().run())} />
+            <ToolButton label="Redo" onClick={() => run(current, (chain) => chain.redo().run())} />
           </div>
-        </div>
-      ) : null}
-      <EditorContent editor={current} />
+          {linkOpen ? (
+            <div className="mb-2 space-y-2 rounded-md border border-line bg-paper p-3">
+              <label className="block text-xs font-semibold text-ink">
+                Link URL
+                <input
+                  value={linkHref}
+                  onChange={(event) => setLinkHref(event.target.value)}
+                  placeholder="/contact/ or https://example.com/"
+                  className="mt-1 w-full rounded border border-line bg-white px-2 py-1 text-sm"
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs text-ink">
+                <input type="checkbox" checked={linkNewTab} onChange={(event) => setLinkNewTab(event.target.checked)} />
+                Open in new tab
+              </label>
+              <label className="flex items-center gap-2 text-xs text-ink">
+                <input type="checkbox" checked={linkNofollow} onChange={(event) => setLinkNofollow(event.target.checked)} />
+                Nofollow
+              </label>
+              <div className="flex flex-wrap gap-1">
+                <ToolButton label="Apply link" onClick={applyLink} />
+                <ToolButton
+                  label="Remove"
+                  onClick={() => {
+                    run(current, (chain) => chain.extendMarkRange("link").unsetLink().run());
+                    setLinkOpen(false);
+                  }}
+                />
+                <ToolButton label="Cancel" onClick={() => setLinkOpen(false)} />
+              </div>
+            </div>
+          ) : null}
+          <EditorContent editor={current} />
+        </>
+      )}
     </div>
   );
 }
