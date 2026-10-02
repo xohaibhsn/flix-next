@@ -74,6 +74,9 @@ export function SeoForm({
           Current saved SEO state. Edit pages and posts from the links. Category rows are read-only in this phase.
         </p>
         <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+          <Link href="/sidhu/seo/health/" className="font-semibold text-brand hover:underline">
+            Open SEO Health →
+          </Link>
           <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
             Open internal link diagnostics →
           </Link>
