@@ -79,6 +79,12 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
         <dt className="font-semibold text-ink">Affected item</dt>
         <dd>{finding.entity.label}</dd>
+        {finding.imageAltStatus ? (
+          <>
+            <dt className="font-semibold text-ink">Saved alt status</dt>
+            <dd>{finding.imageAltStatus}</dd>
+          </>
+        ) : null}
         <dt className="font-semibold text-ink">Public URL</dt>
         <dd className="min-w-0 break-all">
           {publicHref ? (
@@ -90,6 +96,17 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
           )}
         </dd>
       </dl>
+
+      {finding.usageContexts?.length ? (
+        <div className="mt-3 rounded-md bg-paper px-3 py-2 text-sm">
+          <p className="font-semibold text-ink">Used as</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5 text-muted">
+            {finding.usageContexts.map((context) => (
+              <li key={`${finding.id}:usage:${context}`}>{context}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
         {reviewHref ? (

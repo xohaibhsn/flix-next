@@ -46,6 +46,8 @@ export type SeoHealthFinding = {
   reviewHref: string | null;
   detailHref: string;
   action: SeoHealthAction;
+  imageAltStatus?: string;
+  usageContexts?: string[];
 };
 
 export type SeoHealthSummary = {
@@ -325,7 +327,8 @@ const IMAGE_ISSUES = {
     severity: "editorial",
     action: "suggested",
     title: "An image is using fallback alternative text",
-    explanation: "The current fallback keeps the image labelled. A more specific description may improve it.",
+    explanation:
+      "An automatic fallback is currently being used. Adding a deliberate image description may improve accessibility and context.",
   },
   HTML_ALT_STALE: {
     category: "images",
@@ -524,38 +527,127 @@ function normalizedImageIssues(finding: ImageFinding) {
   return finding.issues.filter(
     (issue) =>
       IMAGE_ISSUES[issue].action !== "none" &&
+      !(issue === "MEDIA_ALT_NOT_SET" && (finding.sourceType === "media" || finding.sourceType === "social")) &&
       !(issue === "MISSING_ALT" && finding.issues.includes("HTML_ALT_MISSING")),
   );
 }
 
+function imageAssetKey(finding: ImageFinding, findingIndex: number) {
+  const mediaId = text(finding.mediaId, "");
+  if (mediaId) return `media:${mediaId}`;
+  const imageUrl = text(finding.imageUrl, "");
+  if (imageUrl) return `url:${imageUrl}`;
+  return `finding:${finding.id || findingIndex}`;
+}
+
+function imageUsageContext(finding: ImageFinding) {
+  const labels: Record<ImageFinding["sourceType"], string> = {
+    media: "Media Library asset",
+    "blog-hero": "Blog hero",
+    "blog-listing": "Blog listing thumbnail",
+    "article-html": "Article image",
+    "page-html": "Page image",
+    brand: "Site branding",
+    decorative: "Decorative image",
+    social: "Open Graph image",
+  };
+  const title = finding.sourceType === "social" ? finding.sourceTitle.replace(/\s+OG$/i, "") : finding.sourceTitle;
+  return `${labels[finding.sourceType]}: ${title}`;
+}
+
+function imageAltStatus(findings: ImageFinding[]) {
+  const savedAlt = findings.map((finding) => text(finding.storedMediaAlt, "")).find(Boolean);
+  if (savedAlt) return `Saved in Media Library: ${savedAlt}`;
+  if (findings.some((finding) => finding.storedMediaAlt === "")) return "Blank in the Media Library";
+  return "No linked Media Library record";
+}
+
+type ImageIssueCandidate = {
+  finding: ImageFinding;
+  findingIndex: number;
+  issue: ImageIssue;
+  issueIndex: number;
+};
+
+function normalizedImageFinding(candidate: ImageIssueCandidate): SeoHealthFinding {
+  const { finding, findingIndex, issue, issueIndex } = candidate;
+  const definition = IMAGE_ISSUES[issue];
+  const reviewHref =
+    definition.severity === "healthy"
+      ? null
+      : issue === "MEDIA_ALT_NOT_SET"
+        ? finding.editMediaHref || finding.editHref
+        : finding.editHref || finding.editMediaHref;
+  return {
+    id: `image:${finding.sourceType}:${finding.mediaId || findingIndex}:${issue}:${findingIndex}:${issueIndex}`,
+    source: "image",
+    issueCode: issue,
+    ...definition,
+    entity: {
+      type: finding.sourceType,
+      id: finding.mediaId || finding.id,
+      label: finding.sourceTitle,
+    },
+    publicUrl: finding.sourceUrl,
+    evidence: imageEvidence(finding),
+    reviewHref,
+    detailHref: DETAIL_HREFS.image,
+  };
+}
+
 function normalizeImages(report: SeoHealthScannerReports["images"]) {
   const findings: SeoHealthFinding[] = [];
+  const contextsByAsset = new Map<string, ImageFinding[]>();
+  const editorialByAsset = new Map<string, ImageIssueCandidate[]>();
+
   for (const [findingIndex, finding] of report.findings.entries()) {
+    const assetKey = imageAssetKey(finding, findingIndex);
+    const contexts = contextsByAsset.get(assetKey) || [];
+    contexts.push(finding);
+    contextsByAsset.set(assetKey, contexts);
+
     for (const [issueIndex, issue] of normalizedImageIssues(finding).entries()) {
       const definition = IMAGE_ISSUES[issue];
-      const reviewHref =
-        definition.severity === "healthy"
-          ? null
-          : issue === "MEDIA_ALT_NOT_SET"
-            ? finding.editMediaHref || finding.editHref
-            : finding.editHref || finding.editMediaHref;
-      findings.push({
-        id: `image:${finding.sourceType}:${finding.mediaId || findingIndex}:${issue}:${findingIndex}:${issueIndex}`,
-        source: "image",
-        issueCode: issue,
-        ...definition,
-        entity: {
-          type: finding.sourceType,
-          id: finding.mediaId || finding.id,
-          label: finding.sourceTitle,
-        },
-        publicUrl: finding.sourceUrl,
-        evidence: imageEvidence(finding),
-        reviewHref,
-        detailHref: DETAIL_HREFS.image,
-      });
+      const candidate = { finding, findingIndex, issue, issueIndex };
+      if (definition.severity !== "editorial") {
+        findings.push(normalizedImageFinding(candidate));
+        continue;
+      }
+      const group = editorialByAsset.get(assetKey) || [];
+      group.push(candidate);
+      editorialByAsset.set(assetKey, group);
     }
   }
+
+  for (const [assetKey, candidates] of editorialByAsset) {
+    const representative =
+      candidates.find((candidate) => candidate.finding.primaryIssue === candidate.issue) || candidates[0];
+    if (!representative) continue;
+
+    const contexts = contextsByAsset.get(assetKey) || [representative.finding];
+    const usageContexts = [...new Set(contexts.map(imageUsageContext))];
+    const issueCodes = [
+      ...new Set([representative.issue, ...candidates.map((candidate) => candidate.issue)]),
+    ];
+    const mediaContext = contexts.find((context) => context.sourceType === "media");
+    const normalized = normalizedImageFinding(representative);
+    normalized.id = `image:${assetKey}:${representative.issue}`;
+    normalized.entity = {
+      type: "media asset",
+      id: representative.finding.mediaId || representative.finding.imageUrl || representative.finding.id,
+      label: mediaContext?.sourceTitle || representative.finding.sourceTitle,
+    };
+    normalized.reviewHref = representative.finding.editMediaHref || normalized.reviewHref;
+    normalized.imageAltStatus = imageAltStatus(contexts);
+    normalized.usageContexts = usageContexts;
+    normalized.evidence = [
+      ...normalized.evidence,
+      `Grouped diagnostic codes: ${issueCodes.join(", ")}`,
+      `Grouped scanner contexts: ${usageContexts.length}`,
+    ];
+    findings.push(normalized);
+  }
+
   return findings;
 }
 

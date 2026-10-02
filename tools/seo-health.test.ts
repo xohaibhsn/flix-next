@@ -62,6 +62,14 @@ function sampleMedia(overrides: Partial<MediaAsset> = {}): MediaAsset {
   };
 }
 
+function mediaRef(asset: MediaAsset) {
+  return {
+    id: asset.id,
+    publicId: asset.publicId,
+    secureUrl: asset.secureUrl,
+  };
+}
+
 function issueInput(): SeoHealthInput {
   const settings = defaultSettings();
   settings.pageSeo.contact.canonicalUrl = "not a url at all";
@@ -117,9 +125,136 @@ test("normalization is deterministic, conservative, and does not mutate scanner 
   assert.equal(first.findings.some((finding) => finding.issueCode === "EXTERNAL"), false);
   assert.equal(first.findings.some((finding) => finding.severity === "healthy"), false);
 
-  const mediaAlt = first.findings.find((finding) => finding.issueCode === "MEDIA_ALT_NOT_SET");
-  assert.equal(mediaAlt?.severity, "editorial");
-  assert.equal(mediaAlt?.action, "suggested");
+  const standaloneMediaAlt = first.findings.find((finding) => finding.issueCode === "MEDIA_ALT_NOT_SET");
+  assert.equal(standaloneMediaAlt, undefined);
+});
+
+test("image editorial findings group by media asset and retain usage contexts", () => {
+  const asset = sampleMedia({ alt: "" });
+  const post = samplePost({
+    featuredImage: mediaRef(asset),
+    ogImage: mediaRef(asset),
+  });
+  const report = buildSeoHealthReport({
+    settings: defaultSettings(),
+    pages: [],
+    posts: [post],
+    categories: [],
+    redirects: [],
+    media: [asset],
+  });
+  const imageFindings = report.findings.filter((finding) => finding.source === "image");
+
+  assert.equal(imageFindings.length, 1);
+  const grouped = imageFindings[0];
+  assert.equal(grouped.issueCode, "FALLBACK_ALT");
+  assert.equal(grouped.entity.id, asset.id);
+  assert.equal(grouped.entity.type, "media asset");
+  assert.equal(grouped.imageAltStatus, "Blank in the Media Library");
+  assert.deepEqual(grouped.usageContexts, [
+    "Media Library asset: health-image.jpg",
+    "Open Graph image: SEO Health Test Article",
+    "Blog hero: SEO Health Test Article",
+    "Blog listing thumbnail: SEO Health Test Article",
+  ]);
+  assert.match(grouped.explanation, /automatic fallback/i);
+  assert.match(grouped.evidence.join("\n"), /FALLBACK_ALT, MEDIA_ALT_NOT_SET/);
+
+  const html = renderToStaticMarkup(createElement(SeoHealthReport, { report }));
+  assert.match(html, /Saved alt status/);
+  assert.match(html, /Used as/);
+  assert.match(html, /Open Graph image: SEO Health Test Article/);
+  assert.equal((html.match(/An image is using fallback alternative text/g) || []).length, 1);
+});
+
+test("OG/social-only and favicon-only blank alt contexts do not create editorial workload", () => {
+  const socialAsset = sampleMedia({
+    id: "media-social",
+    publicId: "theflix/og/social",
+    secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/theflix/og/social.png",
+    originalFilename: "social.png",
+    format: "png",
+    alt: "",
+  });
+  const socialSettings = defaultSettings();
+  socialSettings.branding.defaultOgImage = mediaRef(socialAsset);
+  const socialReport = buildSeoHealthReport({
+    settings: socialSettings,
+    pages: [],
+    posts: [],
+    categories: [],
+    redirects: [],
+    media: [socialAsset],
+  });
+  assert.equal(socialReport.findings.some((finding) => finding.source === "image"), false);
+
+  const faviconAsset = sampleMedia({
+    id: "media-favicon",
+    publicId: "theflix/branding/favicon",
+    secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/theflix/branding/favicon.png",
+    originalFilename: "favicon.png",
+    format: "png",
+    alt: "",
+  });
+  const faviconSettings = defaultSettings();
+  faviconSettings.branding.favicon = mediaRef(faviconAsset);
+  const faviconReport = buildSeoHealthReport({
+    settings: faviconSettings,
+    pages: [],
+    posts: [],
+    categories: [],
+    redirects: [],
+    media: [faviconAsset],
+  });
+  assert.equal(faviconReport.findings.some((finding) => finding.source === "image"), false);
+});
+
+test("genuine fallback assets stay separate when the underlying media differs", () => {
+  const firstAsset = sampleMedia({ alt: "" });
+  const secondAsset = sampleMedia({
+    id: "media-health-2",
+    publicId: "theflix/health/image-2",
+    secureUrl: "https://res.cloudinary.com/demo/image/upload/v1/theflix/health/image-2.jpg",
+    originalFilename: "health-image-2.jpg",
+    alt: "",
+  });
+  const report = buildSeoHealthReport({
+    settings: defaultSettings(),
+    pages: [],
+    posts: [
+      samplePost({ featuredImage: mediaRef(firstAsset) }),
+      samplePost({
+        id: "post-health-2",
+        title: "Second SEO Health Test Article",
+        slug: "second-seo-health-test-article",
+        featuredImage: mediaRef(secondAsset),
+      }),
+    ],
+    categories: [],
+    redirects: [],
+    media: [firstAsset, secondAsset],
+  });
+  const imageFindings = report.findings.filter((finding) => finding.source === "image");
+
+  assert.equal(imageFindings.length, 2);
+  assert.deepEqual(
+    imageFindings.map((finding) => finding.entity.id).sort(),
+    [firstAsset.id, secondAsset.id].sort(),
+  );
+  assert.ok(imageFindings.every((finding) => finding.issueCode === "FALLBACK_ALT"));
+});
+
+test("image context normalization leaves metadata and internal-link findings unchanged", () => {
+  const base = issueInput();
+  const asset = base.media[0];
+  base.posts[0].featuredImage = mediaRef(asset);
+  const withExtraImageContexts = structuredClone(base);
+  withExtraImageContexts.posts[0].ogImage = mediaRef(asset);
+  withExtraImageContexts.settings.branding.defaultOgImage = mediaRef(asset);
+
+  const before = buildSeoHealthReport(base).findings.filter((finding) => finding.source !== "image");
+  const after = buildSeoHealthReport(withExtraImageContexts).findings.filter((finding) => finding.source !== "image");
+  assert.deepEqual(after, before);
 });
 
 test("one manual run loads each CMS dataset exactly once through a read-only contract", async () => {
@@ -205,6 +340,7 @@ test("health route is manual-only and the service reuses scanners without write 
   assert.match(service, /metadata: scanMetadataDiagnostics\(/);
   assert.match(service, /internalLinks: scanInternalLinks\(/);
   assert.match(service, /images: scanImageDiagnostics\(/);
+  assert.match(service, /normalizeImages\(reports\.images\)/);
   assert.doesNotMatch(service, /from ["']@\/lib\/cms\/(?:actions|repository)["']/);
   assert.doesNotMatch(service, /\bfetch\s*\(/);
   assert.doesNotMatch(service, /\b(?:create|update|delete|save|upsert)[A-Z]\w*\s*\(/);
