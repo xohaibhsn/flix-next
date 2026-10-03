@@ -6,6 +6,13 @@ import {
   type SeoHealthSeverity,
   type SeoHealthSource,
 } from "@/lib/cms/seo-health";
+import type {
+  SeoHealthAnnotatedFinding,
+  SeoHealthFindingIdentity,
+  SeoHealthWorkflowView,
+} from "@/lib/cms/seo-health-memory";
+
+type SeoHealthFindingAction = (formData: FormData) => void | Promise<void>;
 
 const SOURCE_LABELS: Record<SeoHealthSource, string> = {
   metadata: "Metadata",
@@ -26,15 +33,21 @@ const SECTION_COPY: Record<
   review: {
     title: "Review",
     description: "These may be intentional, but they are worth checking.",
-    empty: "No review items were found.",
+    empty: "No open review items were found.",
     badge: "border-amber-200 bg-amber-50 text-amber-900",
   },
   editorial: {
     title: "Editorial Suggestions",
     description: "Optional wording and presentation improvements, not technical errors.",
-    empty: "No editorial suggestions were found.",
+    empty: "No open editorial suggestions were found.",
     badge: "border-sky-200 bg-sky-50 text-sky-900",
   },
+};
+
+const STATUS_BADGE: Record<"new" | "existing" | "accepted", string> = {
+  new: "border-violet-200 bg-violet-50 text-violet-900",
+  existing: "border-slate-200 bg-slate-50 text-slate-800",
+  accepted: "border-emerald-200 bg-emerald-50 text-emerald-900",
 };
 
 function safeInternalHref(value: string | null) {
@@ -51,11 +64,29 @@ function safePublicHref(value: string) {
   }
 }
 
-function FindingCard({ finding }: { finding: SeoHealthFinding }) {
+function FindingCard({
+  finding,
+  fingerprint,
+  status,
+  acceptAction,
+  reopenAction,
+}: {
+  finding: SeoHealthFinding;
+  fingerprint?: string;
+  status?: "new" | "existing" | "accepted";
+  acceptAction?: SeoHealthFindingAction;
+  reopenAction?: SeoHealthFindingAction;
+}) {
   const copy = SECTION_COPY[finding.severity as Exclude<SeoHealthSeverity, "healthy">];
   const reviewHref = safeInternalHref(finding.reviewHref);
   const detailHref = safeInternalHref(finding.detailHref);
   const publicHref = safePublicHref(finding.publicUrl);
+  const itemLabel = `${finding.title} — ${finding.entity.label}`;
+  const canAccept =
+    Boolean(acceptAction) &&
+    Boolean(fingerprint) &&
+    status !== "accepted" &&
+    (finding.severity === "editorial" || finding.severity === "review");
 
   return (
     <article className="rounded-lg border border-line bg-white p-4">
@@ -66,13 +97,20 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
           </p>
           <h3 className="mt-1 font-semibold text-ink">{finding.title}</h3>
         </div>
-        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${copy.badge}`}>
-          {finding.action === "required"
-            ? "Manual action needed"
-            : finding.action === "review"
-              ? "Review first"
-              : "Optional suggestion"}
-        </span>
+        <div className="flex flex-wrap gap-2">
+          {status ? (
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE[status]}`}>
+              {status === "new" ? "New" : status === "existing" ? "Existing" : "Reviewed"}
+            </span>
+          ) : null}
+          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${copy.badge}`}>
+            {finding.action === "required"
+              ? "Manual action needed"
+              : finding.action === "review"
+                ? "Review first"
+                : "Optional suggestion"}
+          </span>
+        </div>
       </div>
 
       <p className="mt-2 text-sm leading-relaxed text-muted">{finding.explanation}</p>
@@ -108,7 +146,7 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
         {reviewHref ? (
           <Link href={reviewHref} className="font-semibold text-brand hover:underline">
             Review affected item →
@@ -118,6 +156,33 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
           <Link href={detailHref} className="font-semibold text-brand hover:underline">
             View detailed {SOURCE_LABELS[finding.source].toLowerCase()} report →
           </Link>
+        ) : null}
+        {canAccept && fingerprint && acceptAction ? (
+          <details className="rounded-md border border-line bg-paper px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold text-ink">Mark reviewed — no action</summary>
+            <p className="mt-2 text-xs text-muted">Acknowledge this item as acceptable / no action required:</p>
+            <p className="mt-1 text-sm text-ink">{itemLabel}</p>
+            <form action={acceptAction} className="mt-2">
+              <input type="hidden" name="fingerprint" value={fingerprint} />
+              <button
+                type="submit"
+                className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white"
+              >
+                Confirm reviewed — no action
+              </button>
+            </form>
+          </details>
+        ) : null}
+        {fingerprint && status === "accepted" && reopenAction ? (
+          <form action={reopenAction}>
+            <input type="hidden" name="fingerprint" value={fingerprint} />
+            <button
+              type="submit"
+              className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-semibold text-ink"
+            >
+              Reopen
+            </button>
+          </form>
         ) : null}
       </div>
 
@@ -138,15 +203,42 @@ function FindingCard({ finding }: { finding: SeoHealthFinding }) {
   );
 }
 
+function ResolvedCard({ item }: { item: SeoHealthFindingIdentity }) {
+  const publicHref = safePublicHref(item.publicUrl);
+  return (
+    <article className="rounded-lg border border-emerald-200 bg-white p-4">
+      <p className="text-xs font-semibold tracking-wide text-muted uppercase">
+        {SOURCE_LABELS[item.source]} · {item.entityType}
+      </p>
+      <h3 className="mt-1 font-semibold text-ink">{item.title}</h3>
+      <p className="mt-2 text-sm text-muted">{item.entityLabel}</p>
+      <p className="mt-2 min-w-0 break-all text-sm">
+        {publicHref ? (
+          <a href={publicHref} target="_blank" rel="noreferrer" className="text-brand hover:underline">
+            {item.publicUrl}
+          </a>
+        ) : (
+          item.publicUrl || "Not applicable"
+        )}
+      </p>
+      <p className="mt-2 font-mono text-[11px] text-muted">Diagnostic code: {item.issueCode}</p>
+    </article>
+  );
+}
+
 function FindingSection({
   severity,
-  findings,
+  items,
+  acceptAction,
+  reopenAction,
 }: {
   severity: Exclude<SeoHealthSeverity, "healthy">;
-  findings: SeoHealthFinding[];
+  items: SeoHealthAnnotatedFinding[];
+  acceptAction?: SeoHealthFindingAction;
+  reopenAction?: SeoHealthFindingAction;
 }) {
   const copy = SECTION_COPY[severity];
-  const rows = findings.filter((finding) => finding.severity === severity);
+  const rows = items.filter((item) => item.finding.severity === severity);
 
   return (
     <section className="rounded-xl border border-line bg-white p-5">
@@ -161,8 +253,15 @@ function FindingSection({
       </div>
       {rows.length ? (
         <div className="mt-4 space-y-3">
-          {rows.map((finding) => (
-            <FindingCard key={finding.id} finding={finding} />
+          {rows.map((item) => (
+            <FindingCard
+              key={item.finding.id}
+              finding={item.finding}
+              fingerprint={item.fingerprint}
+              status={item.status}
+              acceptAction={acceptAction}
+              reopenAction={reopenAction}
+            />
           ))}
         </div>
       ) : (
@@ -187,7 +286,25 @@ function ScanButton({ hasReport }: { hasReport: boolean }) {
   );
 }
 
-export function SeoHealthReport({ report }: { report: SeoHealthReportData | null }) {
+export function SeoHealthReport({
+  report,
+  workflow = null,
+  stateWarning = null,
+  acceptAction,
+  reopenAction,
+}: {
+  report: SeoHealthReportData | null;
+  workflow?: SeoHealthWorkflowView | null;
+  stateWarning?: string | null;
+  acceptAction?: SeoHealthFindingAction;
+  reopenAction?: SeoHealthFindingAction;
+}) {
+  const openItems = workflow?.open || (report ? report.findings.map((finding) => ({
+    finding,
+    fingerprint: "",
+    status: "new" as const,
+  })) : []);
+
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-line bg-white p-5">
@@ -204,6 +321,11 @@ export function SeoHealthReport({ report }: { report: SeoHealthReportData | null
         {!report ? (
           <p className="mt-4 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
             No scan has run yet. Select “Run SEO Health Check” when you are ready.
+          </p>
+        ) : null}
+        {stateWarning ? (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {stateWarning}
           </p>
         ) : null}
         <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
@@ -250,9 +372,84 @@ export function SeoHealthReport({ report }: { report: SeoHealthReportData | null
             </div>
           </section>
 
-          <FindingSection severity="needs-attention" findings={report.findings} />
-          <FindingSection severity="review" findings={report.findings} />
-          <FindingSection severity="editorial" findings={report.findings} />
+          {workflow ? (
+            <section className="rounded-xl border border-line bg-white p-5">
+              <h2 className="font-semibold">Workflow memory</h2>
+              <p className="mt-1 text-sm text-muted">
+                {workflow.hasBaseline
+                  ? "Compared with the previous manual scan. Accepted items stay out of the open list until reopened or the underlying value changes."
+                  : "First saved scan. Current findings are marked New so the next scan can show what changed."}
+              </p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  ["New", workflow.counts.new],
+                  ["Open", workflow.counts.open],
+                  ["Resolved since last scan", workflow.counts.resolved],
+                  ["Reviewed / Accepted", workflow.counts.accepted],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-lg border border-line bg-paper px-3 py-2">
+                    <p className="text-[11px] font-semibold tracking-wide text-muted uppercase">{label}</p>
+                    <p className="mt-1 text-lg font-semibold text-ink">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <FindingSection
+            severity="needs-attention"
+            items={openItems}
+            acceptAction={acceptAction}
+            reopenAction={reopenAction}
+          />
+          <FindingSection
+            severity="review"
+            items={openItems}
+            acceptAction={acceptAction}
+            reopenAction={reopenAction}
+          />
+          <FindingSection
+            severity="editorial"
+            items={openItems}
+            acceptAction={acceptAction}
+            reopenAction={reopenAction}
+          />
+
+          {workflow && workflow.resolved.length ? (
+            <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+              <h2 className="font-semibold text-emerald-900">Resolved since last scan</h2>
+              <p className="mt-1 text-sm text-emerald-900/80">
+                These findings were present in the previous scan and are no longer reported.
+              </p>
+              <div className="mt-4 space-y-3">
+                {workflow.resolved.map((item) => (
+                  <ResolvedCard key={`resolved:${item.fingerprint}`} item={item} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {workflow && workflow.accepted.length ? (
+            <section className="rounded-xl border border-line bg-white p-5">
+              <h2 className="font-semibold">Reviewed / Accepted</h2>
+              <p className="mt-1 text-sm text-muted">
+                Checked and intentionally left as-is. The scanner still reports them; they are only removed from the
+                open-work list.
+              </p>
+              <div className="mt-4 space-y-3">
+                {workflow.accepted.map((item) => (
+                  <FindingCard
+                    key={`accepted:${item.finding.id}`}
+                    finding={item.finding}
+                    fingerprint={item.fingerprint}
+                    status="accepted"
+                    acceptAction={acceptAction}
+                    reopenAction={reopenAction}
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
             <h2 className="font-semibold text-emerald-900">Healthy / No Action Needed</h2>

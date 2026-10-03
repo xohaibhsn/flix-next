@@ -52,6 +52,7 @@ Desktop.ini
 # Local JSON catalog cache. Production uses MySQL; this file is written on first
 # JSON-mode read from defaultBlogCategories() and is not required at runtime.
 /data/blog-categories.json
+/data/seo-health-state.json
 
 # WordPress backups / incoming dumps — never commit
 /tmp/

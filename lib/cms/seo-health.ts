@@ -423,6 +423,7 @@ function metadataEvidence(entity: SeoMetadataEntity) {
   return [
     `Search title: ${clip(text(entity.effectiveTitle))}`,
     `Title length: ${entity.titleLength} characters`,
+    `Description: ${clip(text(entity.effectiveDescription))}`,
     `Description length: ${entity.descriptionLength} characters`,
     `Canonical: ${text(entity.effectiveCanonical)}`,
     `Indexing: ${entity.robotsIndex ? "Index" : "Noindex"}; sitemap: ${entity.sitemapInclude ? "Included" : "Excluded"}`,

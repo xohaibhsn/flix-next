@@ -346,7 +346,10 @@ test("health route is manual-only and the service reuses scanners without write 
   assert.doesNotMatch(service, /\b(?:create|update|delete|save|upsert)[A-Z]\w*\s*\(/);
 
   assert.match(page, /const runRequested =/);
-  assert.match(page, /runRequested \? await runSeoHealthScan\(cms\) : null/);
+  assert.match(page, /if \(runRequested\)/);
+  assert.match(page, /runSeoHealthScan\(cms\)/);
+  assert.match(page, /buildSeoHealthWorkflow/);
+  assert.match(page, /saveSeoHealthState/);
   assert.match(report, /<form action="\/sidhu\/seo\/health\/" method="get">/);
   assert.match(report, /name="run"/);
   assert.match(report, /value="1"/);
