@@ -1,3 +1,7 @@
+import {
+  blogIndexPostCardLinks,
+  categoryArchivePostCardLinks,
+} from "@/lib/cms/blog-archive-post-links";
 import { blogIndexCategoryNavLinks } from "@/lib/cms/blog-category-nav";
 import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index";
 import {
@@ -686,6 +690,40 @@ export function scanInternalLinks(input: InternalLinkScanInput): {
       anchorText: link.label,
       storedHref: link.href,
       sourcePath: BLOG_INDEX_SLUG,
+      targets,
+      redirects: input.redirects,
+    });
+  }
+
+  // Generated post-card title links on /blogs/ (same filter + blogPostPath as the page).
+  for (const link of blogIndexPostCardLinks(input.posts)) {
+    track({
+      sourceKind: "code",
+      sourceLabel: "Blog index post card",
+      sourceUrl: BLOG_INDEX_SLUG,
+      sourceId: link.id,
+      editHref: `/sidhu/blog/${link.postId}/`,
+      context: "BlogIndexPostCard",
+      anchorText: link.label,
+      storedHref: link.href,
+      sourcePath: BLOG_INDEX_SLUG,
+      targets,
+      redirects: input.redirects,
+    });
+  }
+
+  // Generated post-card title links on active category archives.
+  for (const link of categoryArchivePostCardLinks(input.categories, input.posts)) {
+    track({
+      sourceKind: "code",
+      sourceLabel: `Category archive post card (${link.sourceLabel})`,
+      sourceUrl: link.sourcePath,
+      sourceId: link.id,
+      editHref: `/sidhu/blog/${link.postId}/`,
+      context: "CategoryArchivePostCard",
+      anchorText: link.label,
+      storedHref: link.href,
+      sourcePath: link.sourcePath,
       targets,
       redirects: input.redirects,
     });
