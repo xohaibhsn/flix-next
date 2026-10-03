@@ -1,5 +1,7 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoHealthReport } from "@/components/sidhu/SeoHealthReport";
+import { explainSeoHealthFindingAction } from "@/lib/cms/ai-seo-actions";
+import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
 import {
   acceptSeoHealthFindingAction,
   reopenSeoHealthFindingAction,
@@ -26,6 +28,8 @@ export default async function SidhuSeoHealthPage({
   let report = null;
   let workflow: SeoHealthWorkflowView | null = null;
   let stateWarning: string | null = null;
+  const aiConfigured = isOpenAiSeoConfigured();
+  let siteName: string | undefined;
 
   if (runRequested) {
     report = await runSeoHealthScan(cms);
@@ -37,6 +41,12 @@ export default async function SidhuSeoHealthPage({
     } catch {
       stateWarning =
         "Workflow memory could not be saved. The scan results below are still valid; New/Existing/Resolved may be incomplete until the next successful save.";
+    }
+    try {
+      const settings = await cms.getSettings();
+      siteName = settings.siteName?.trim() || undefined;
+    } catch {
+      siteName = undefined;
     }
   }
 
@@ -51,6 +61,9 @@ export default async function SidhuSeoHealthPage({
         stateWarning={stateWarning}
         acceptAction={acceptSeoHealthFindingAction}
         reopenAction={reopenSeoHealthFindingAction}
+        aiConfigured={aiConfigured}
+        aiExplainAction={explainSeoHealthFindingAction}
+        siteName={siteName}
       />
     </AdminShell>
   );

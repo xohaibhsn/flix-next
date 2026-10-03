@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SeoHealthAiExplain, type SeoHealthAiExplainActionResult } from "@/components/sidhu/SeoHealthAiExplain";
+import { toSeoExplainFindingInput, type SeoExplainFindingInput } from "@/lib/cms/ai-seo/schemas";
 import {
   seoHealthStatusMessage,
   type SeoHealthFinding,
@@ -13,6 +15,7 @@ import type {
 } from "@/lib/cms/seo-health-memory";
 
 type SeoHealthFindingAction = (formData: FormData) => void | Promise<void>;
+type SeoHealthAiExplainAction = (input: SeoExplainFindingInput) => Promise<SeoHealthAiExplainActionResult>;
 
 const SOURCE_LABELS: Record<SeoHealthSource, string> = {
   metadata: "Metadata",
@@ -70,12 +73,18 @@ function FindingCard({
   status,
   acceptAction,
   reopenAction,
+  aiConfigured = false,
+  aiExplainAction,
+  siteName,
 }: {
   finding: SeoHealthFinding;
   fingerprint?: string;
   status?: "new" | "existing" | "accepted";
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
+  aiConfigured?: boolean;
+  aiExplainAction?: SeoHealthAiExplainAction;
+  siteName?: string;
 }) {
   const copy = SECTION_COPY[finding.severity as Exclude<SeoHealthSeverity, "healthy">];
   const reviewHref = safeInternalHref(finding.reviewHref);
@@ -199,6 +208,14 @@ function FindingCard({
           <p className="mt-2 font-mono text-[11px]">Diagnostic code: {finding.issueCode}</p>
         </details>
       ) : null}
+
+      {finding.severity !== "healthy" ? (
+        <SeoHealthAiExplain
+          configured={aiConfigured}
+          explainAction={aiExplainAction}
+          finding={toSeoExplainFindingInput(finding, { siteName })}
+        />
+      ) : null}
     </article>
   );
 }
@@ -231,11 +248,17 @@ function FindingSection({
   items,
   acceptAction,
   reopenAction,
+  aiConfigured = false,
+  aiExplainAction,
+  siteName,
 }: {
   severity: Exclude<SeoHealthSeverity, "healthy">;
   items: SeoHealthAnnotatedFinding[];
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
+  aiConfigured?: boolean;
+  aiExplainAction?: SeoHealthAiExplainAction;
+  siteName?: string;
 }) {
   const copy = SECTION_COPY[severity];
   const rows = items.filter((item) => item.finding.severity === severity);
@@ -261,6 +284,9 @@ function FindingSection({
               status={item.status}
               acceptAction={acceptAction}
               reopenAction={reopenAction}
+              aiConfigured={aiConfigured}
+              aiExplainAction={aiExplainAction}
+              siteName={siteName}
             />
           ))}
         </div>
@@ -292,12 +318,18 @@ export function SeoHealthReport({
   stateWarning = null,
   acceptAction,
   reopenAction,
+  aiConfigured = false,
+  aiExplainAction,
+  siteName,
 }: {
   report: SeoHealthReportData | null;
   workflow?: SeoHealthWorkflowView | null;
   stateWarning?: string | null;
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
+  aiConfigured?: boolean;
+  aiExplainAction?: SeoHealthAiExplainAction;
+  siteName?: string;
 }) {
   const openItems = workflow?.open || (report ? report.findings.map((finding) => ({
     finding,
@@ -401,18 +433,27 @@ export function SeoHealthReport({
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
+            aiConfigured={aiConfigured}
+            aiExplainAction={aiExplainAction}
+            siteName={siteName}
           />
           <FindingSection
             severity="review"
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
+            aiConfigured={aiConfigured}
+            aiExplainAction={aiExplainAction}
+            siteName={siteName}
           />
           <FindingSection
             severity="editorial"
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
+            aiConfigured={aiConfigured}
+            aiExplainAction={aiExplainAction}
+            siteName={siteName}
           />
 
           {workflow && workflow.resolved.length ? (
@@ -445,6 +486,9 @@ export function SeoHealthReport({
                     status="accepted"
                     acceptAction={acceptAction}
                     reopenAction={reopenAction}
+                    aiConfigured={aiConfigured}
+                    aiExplainAction={aiExplainAction}
+                    siteName={siteName}
                   />
                 ))}
               </div>
