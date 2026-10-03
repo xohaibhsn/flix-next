@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
+import { draftSeoTitleMetaAction } from "@/lib/cms/ai-seo-actions";
 import { saveCategoryAction } from "@/lib/cms/actions";
 import {
   categoryEffectiveRobotsFollow,
@@ -12,6 +13,7 @@ import { sidhuPreviewFromCategory } from "@/lib/cms/sidhu-seo-preview";
 import type { BlogCategory, MediaAsset, MediaRef } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { SeoAiDraftPanel } from "@/components/sidhu/SeoAiDraftPanel";
 import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
@@ -113,6 +115,24 @@ export function CategoryEditor({
               />
               <p className="mt-1 text-xs text-muted">{draft.seoDescription.length}/160</p>
             </Field>
+            <SeoAiDraftPanel
+              draftAction={draftSeoTitleMetaAction}
+              context={{
+                entityKind: "category",
+                entityLabel: draft.name || "Category",
+                publicUrl: draft.slug ? `/category/${draft.slug}/` : "/blogs/",
+                currentTitle: draft.seoTitle,
+                currentDescription: draft.seoDescription,
+                contentTitle: draft.name || undefined,
+                excerpt: draft.description || undefined,
+                focusKeyword: draft.focusKeyword || undefined,
+                siteName,
+                titleSuffix: ` | ${siteName}`,
+                status: draft.active ? "active" : "inactive",
+              }}
+              onUseTitle={(value) => setDraft((current) => ({ ...current, seoTitle: value }))}
+              onUseDescription={(value) => setDraft((current) => ({ ...current, seoDescription: value }))}
+            />
             <Field label="Focus keyword" hint="For your planning only. Google does not read this field directly.">
               <TextInput
                 value={draft.focusKeyword}

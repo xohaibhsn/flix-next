@@ -4,6 +4,8 @@ export const DEFAULT_OPENAI_SEO_MODEL = "gpt-6-luna";
 export const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 export const OPENAI_SEO_TIMEOUT_MS = 12_000;
 export const OPENAI_SEO_MAX_OUTPUT_TOKENS = 500;
+/** Title/meta drafts need more tokens than explain (3+3 options with short reasons). */
+export const OPENAI_SEO_DRAFT_MAX_OUTPUT_TOKENS = 1200;
 
 export type OpenAiSeoConfig = {
   configured: boolean;

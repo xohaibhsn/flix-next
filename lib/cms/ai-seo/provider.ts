@@ -1,11 +1,17 @@
 import {
   getOpenAiSeoConfig,
+  OPENAI_SEO_DRAFT_MAX_OUTPUT_TOKENS,
   type OpenAiSeoConfig,
 } from "@/lib/cms/ai-seo/config";
 import {
+  normalizeSeoDraftResult,
   normalizeSeoExplainResult,
+  SEO_DRAFT_JSON_SCHEMA,
+  SEO_DRAFT_SYSTEM_INSTRUCTION,
   SEO_EXPLAIN_JSON_SCHEMA,
   SEO_EXPLAIN_SYSTEM_INSTRUCTION,
+  type SeoDraftInput,
+  type SeoDraftResult,
   type SeoExplainFindingInput,
   type SeoExplainResult,
 } from "@/lib/cms/ai-seo/schemas";
@@ -21,9 +27,13 @@ export type OpenAiProviderResult =
   | { ok: true; explanation: SeoExplainResult; model: string }
   | { ok: false; code: OpenAiProviderErrorCode; message: string };
 
+export type OpenAiDraftProviderResult =
+  | { ok: true; draft: SeoDraftResult; model: string }
+  | { ok: false; code: OpenAiProviderErrorCode; message: string };
+
 export type OpenAiFetch = typeof fetch;
 
-function buildUserPayload(finding: SeoExplainFindingInput) {
+function buildExplainUserPayload(finding: SeoExplainFindingInput) {
   return {
     task: "explain_seo_finding",
     finding: {
@@ -37,6 +47,26 @@ function buildUserPayload(finding: SeoExplainFindingInput) {
       evidence: finding.evidence,
       field: finding.field || null,
       siteName: finding.siteName || null,
+    },
+  };
+}
+
+function buildDraftUserPayload(input: SeoDraftInput) {
+  return {
+    task: "draft_seo_title_meta",
+    entity: {
+      kind: input.entityKind,
+      label: input.entityLabel,
+      publicUrl: input.publicUrl,
+      currentSeoTitle: input.currentTitle,
+      currentMetaDescription: input.currentDescription,
+      contentTitle: input.contentTitle || null,
+      excerpt: input.excerpt || null,
+      focusKeyword: input.focusKeyword || null,
+      categoryName: input.categoryName || null,
+      siteName: input.siteName || null,
+      automaticTitleSuffix: input.titleSuffix || null,
+      status: input.status || null,
     },
   };
 }
@@ -72,41 +102,67 @@ export function extractResponsesOutputText(payload: unknown): string {
 }
 
 export function buildOpenAiExplainRequestBody(finding: SeoExplainFindingInput, config: OpenAiSeoConfig) {
+  return buildStructuredRequestBody({
+    config,
+    schemaName: "sidhu_seo_explain",
+    jsonSchema: SEO_EXPLAIN_JSON_SCHEMA,
+    systemInstruction: SEO_EXPLAIN_SYSTEM_INSTRUCTION,
+    userPayload: buildExplainUserPayload(finding),
+    maxOutputTokens: config.maxOutputTokens,
+  });
+}
+
+export function buildOpenAiDraftRequestBody(input: SeoDraftInput, config: OpenAiSeoConfig) {
+  return buildStructuredRequestBody({
+    config,
+    schemaName: "sidhu_seo_draft",
+    jsonSchema: SEO_DRAFT_JSON_SCHEMA,
+    systemInstruction: SEO_DRAFT_SYSTEM_INSTRUCTION,
+    userPayload: buildDraftUserPayload(input),
+    maxOutputTokens: OPENAI_SEO_DRAFT_MAX_OUTPUT_TOKENS,
+  });
+}
+
+function buildStructuredRequestBody(args: {
+  config: OpenAiSeoConfig;
+  schemaName: string;
+  jsonSchema: object;
+  systemInstruction: string;
+  userPayload: unknown;
+  maxOutputTokens: number;
+}) {
   return {
-    model: config.model,
+    model: args.config.model,
     store: false,
     reasoning: { effort: "none" },
-    max_output_tokens: config.maxOutputTokens,
+    max_output_tokens: args.maxOutputTokens,
     text: {
       format: {
         type: "json_schema",
-        name: "sidhu_seo_explain",
+        name: args.schemaName,
         strict: true,
-        schema: SEO_EXPLAIN_JSON_SCHEMA,
+        schema: args.jsonSchema,
       },
     },
     input: [
       {
         role: "developer",
-        content: [{ type: "input_text", text: SEO_EXPLAIN_SYSTEM_INSTRUCTION }],
+        content: [{ type: "input_text", text: args.systemInstruction }],
       },
       {
         role: "user",
-        content: [{ type: "input_text", text: JSON.stringify(buildUserPayload(finding)) }],
+        content: [{ type: "input_text", text: JSON.stringify(args.userPayload) }],
       },
     ],
   };
 }
 
-export async function requestOpenAiSeoExplanation(
-  finding: SeoExplainFindingInput,
-  options?: {
-    fetchImpl?: OpenAiFetch;
-    config?: OpenAiSeoConfig;
-  },
-): Promise<OpenAiProviderResult> {
-  const config = options?.config ?? getOpenAiSeoConfig();
-  if (!config.configured || !config.apiKey) {
+async function requestOpenAiStructuredJson(args: {
+  body: object;
+  config: OpenAiSeoConfig;
+  fetchImpl?: OpenAiFetch;
+}): Promise<{ ok: true; json: unknown; model: string } | { ok: false; code: OpenAiProviderErrorCode; message: string }> {
+  if (!args.config.configured || !args.config.apiKey) {
     return {
       ok: false,
       code: "not_configured",
@@ -114,18 +170,18 @@ export async function requestOpenAiSeoExplanation(
     };
   }
 
-  const fetchImpl = options?.fetchImpl ?? fetch;
+  const fetchImpl = args.fetchImpl ?? fetch;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+  const timer = setTimeout(() => controller.abort(), args.config.timeoutMs);
 
   try {
-    const response = await fetchImpl(config.endpoint, {
+    const response = await fetchImpl(args.config.endpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${config.apiKey}`,
+        Authorization: `Bearer ${args.config.apiKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(buildOpenAiExplainRequestBody(finding, config)),
+      body: JSON.stringify(args.body),
       signal: controller.signal,
     });
 
@@ -165,9 +221,8 @@ export async function requestOpenAiSeoExplanation(
       };
     }
 
-    let parsedJson: unknown;
     try {
-      parsedJson = JSON.parse(text);
+      return { ok: true, json: JSON.parse(text), model: args.config.model };
     } catch {
       return {
         ok: false,
@@ -175,17 +230,6 @@ export async function requestOpenAiSeoExplanation(
         message: "AI returned an unusable response. Please try again.",
       };
     }
-
-    const explanation = normalizeSeoExplainResult(parsedJson);
-    if (!explanation) {
-      return {
-        ok: false,
-        code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
-      };
-    }
-
-    return { ok: true, explanation, model: config.model };
   } catch (error) {
     if (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message))) {
       return {
@@ -202,4 +246,65 @@ export async function requestOpenAiSeoExplanation(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function requestOpenAiSeoExplanation(
+  finding: SeoExplainFindingInput,
+  options?: {
+    fetchImpl?: OpenAiFetch;
+    config?: OpenAiSeoConfig;
+  },
+): Promise<OpenAiProviderResult> {
+  const config = options?.config ?? getOpenAiSeoConfig();
+  const result = await requestOpenAiStructuredJson({
+    body: buildOpenAiExplainRequestBody(finding, config),
+    config,
+    fetchImpl: options?.fetchImpl,
+  });
+  if (!result.ok) return result;
+
+  const explanation = normalizeSeoExplainResult(result.json);
+  if (!explanation) {
+    return {
+      ok: false,
+      code: "invalid_response",
+      message: "AI returned an unusable response. Please try again.",
+    };
+  }
+  return { ok: true, explanation, model: result.model };
+}
+
+export async function requestOpenAiSeoDraft(
+  input: SeoDraftInput,
+  options?: {
+    fetchImpl?: OpenAiFetch;
+    config?: OpenAiSeoConfig;
+  },
+): Promise<OpenAiDraftProviderResult> {
+  const config = options?.config ?? getOpenAiSeoConfig();
+  const result = await requestOpenAiStructuredJson({
+    body: buildOpenAiDraftRequestBody(input, config),
+    config,
+    fetchImpl: options?.fetchImpl,
+  });
+  if (!result.ok) {
+    // Draft-specific calm copy for non-explain tasks
+    if (result.code === "unavailable") {
+      return { ok: false, code: "unavailable", message: "AI drafting is temporarily unavailable." };
+    }
+    if (result.code === "timeout") {
+      return { ok: false, code: "timeout", message: "AI drafting took too long. Please try again." };
+    }
+    return result;
+  }
+
+  const draft = normalizeSeoDraftResult(result.json);
+  if (!draft) {
+    return {
+      ok: false,
+      code: "invalid_response",
+      message: "AI returned an unusable response. Please try again.",
+    };
+  }
+  return { ok: true, draft, model: result.model };
 }

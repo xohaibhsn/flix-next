@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { draftSeoTitleMetaAction } from "@/lib/cms/ai-seo-actions";
 import { savePageSeoAction } from "@/lib/cms/actions";
 import type { CmsPage, MediaAsset, PageSeo, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { SeoAiDraftPanel } from "@/components/sidhu/SeoAiDraftPanel";
 import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
@@ -154,6 +156,22 @@ export function PageSeoPanel({
             <TextArea value={seo.description} onChange={(event) => update({ description: event.target.value })} />
             <p className="mt-1 text-xs text-muted">{seo.description.length}/160</p>
           </Field>
+          <SeoAiDraftPanel
+            draftAction={draftSeoTitleMetaAction}
+            context={{
+              entityKind: "page",
+              entityLabel: meta.label,
+              publicUrl: meta.publicPaths.find((path) => path.endsWith("/")) || meta.publicPaths[0] || "/",
+              currentTitle: seo.title,
+              currentDescription: seo.description,
+              contentTitle: sidhuHeadingFromSections(page?.sections) || fallbackTitle,
+              focusKeyword: seo.focusKeyword || undefined,
+              siteName: settings.siteName,
+              titleSuffix: ` | ${settings.siteName}`,
+            }}
+            onUseTitle={(value) => update({ title: value })}
+            onUseDescription={(value) => update({ description: value })}
+          />
           <Field label="Focus keyword" hint="For your planning only. Google does not read this field directly.">
             <TextInput value={seo.focusKeyword} onChange={(event) => update({ focusKeyword: event.target.value })} />
           </Field>

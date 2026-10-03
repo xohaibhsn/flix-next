@@ -219,3 +219,204 @@ If evidence is insufficient, say what cannot be determined.
 Keep the explanation short and actionable.
 
 Return JSON only matching the required schema.`;
+
+export const SEO_DRAFT_ENTITY_KINDS = ["page", "post", "category"] as const;
+export type SeoDraftEntityKind = (typeof SEO_DRAFT_ENTITY_KINDS)[number];
+
+export type SeoDraftOption = {
+  value: string;
+  reason: string;
+};
+
+export type SeoDraftResult = {
+  titles: SeoDraftOption[];
+  descriptions: SeoDraftOption[];
+  guidance: string;
+};
+
+export type SeoDraftInput = {
+  entityKind: SeoDraftEntityKind;
+  entityLabel: string;
+  publicUrl: string;
+  currentTitle: string;
+  currentDescription: string;
+  contentTitle?: string;
+  excerpt?: string;
+  focusKeyword?: string;
+  categoryName?: string;
+  siteName?: string;
+  titleSuffix?: string;
+  status?: string;
+};
+
+export const SEO_DRAFT_FIELD_CAPS = {
+  entityLabel: 160,
+  publicUrl: 300,
+  currentTitle: 120,
+  currentDescription: 320,
+  contentTitle: 160,
+  excerpt: 400,
+  focusKeyword: 80,
+  categoryName: 120,
+  siteName: 80,
+  titleSuffix: 80,
+  status: 40,
+  titleValue: 70,
+  descriptionValue: 160,
+  reason: 160,
+  guidance: 400,
+  optionCount: 3,
+} as const;
+
+export const SEO_DRAFT_OPTION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["value", "reason"],
+  properties: {
+    value: { type: "string" },
+    reason: { type: "string" },
+  },
+} as const;
+
+export const SEO_DRAFT_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["titles", "descriptions", "guidance"],
+  properties: {
+    titles: {
+      type: "array",
+      minItems: SEO_DRAFT_FIELD_CAPS.optionCount,
+      maxItems: SEO_DRAFT_FIELD_CAPS.optionCount,
+      items: SEO_DRAFT_OPTION_SCHEMA,
+    },
+    descriptions: {
+      type: "array",
+      minItems: SEO_DRAFT_FIELD_CAPS.optionCount,
+      maxItems: SEO_DRAFT_FIELD_CAPS.optionCount,
+      items: SEO_DRAFT_OPTION_SCHEMA,
+    },
+    guidance: { type: "string", maxLength: SEO_DRAFT_FIELD_CAPS.guidance },
+  },
+} as const;
+
+export type ParseDraftInputResult = { ok: true; value: SeoDraftInput } | { ok: false; error: string };
+
+/** Treat all client-submitted draft context as untrusted. */
+export function parseSeoDraftInput(raw: unknown): ParseDraftInputResult {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { ok: false, error: "Invalid draft context." };
+  }
+  const data = raw as Record<string, unknown>;
+  const unexpected = Object.keys(data).filter(
+    (key) =>
+      ![
+        "entityKind",
+        "entityLabel",
+        "publicUrl",
+        "currentTitle",
+        "currentDescription",
+        "contentTitle",
+        "excerpt",
+        "focusKeyword",
+        "categoryName",
+        "siteName",
+        "titleSuffix",
+        "status",
+      ].includes(key),
+  );
+  if (unexpected.length) {
+    return { ok: false, error: "Unexpected draft fields were rejected." };
+  }
+
+  if (typeof data.entityKind !== "string" || !(SEO_DRAFT_ENTITY_KINDS as readonly string[]).includes(data.entityKind)) {
+    return { ok: false, error: "Invalid entity type." };
+  }
+
+  const entityLabel = trimTo(data.entityLabel, SEO_DRAFT_FIELD_CAPS.entityLabel);
+  const publicUrl = trimTo(data.publicUrl, SEO_DRAFT_FIELD_CAPS.publicUrl);
+  if (!entityLabel) {
+    return { ok: false, error: "Draft context is incomplete." };
+  }
+  if (!looksLikeSafeUrlOrPath(publicUrl)) {
+    return { ok: false, error: "Invalid public URL." };
+  }
+
+  const optional = (key: string, max: number) => {
+    const value = data[key];
+    if (value == null || value === "") return undefined;
+    return trimTo(value, max);
+  };
+
+  return {
+    ok: true,
+    value: {
+      entityKind: data.entityKind as SeoDraftEntityKind,
+      entityLabel,
+      publicUrl,
+      currentTitle: trimTo(data.currentTitle, SEO_DRAFT_FIELD_CAPS.currentTitle),
+      currentDescription: trimTo(data.currentDescription, SEO_DRAFT_FIELD_CAPS.currentDescription),
+      contentTitle: optional("contentTitle", SEO_DRAFT_FIELD_CAPS.contentTitle),
+      excerpt: optional("excerpt", SEO_DRAFT_FIELD_CAPS.excerpt),
+      focusKeyword: optional("focusKeyword", SEO_DRAFT_FIELD_CAPS.focusKeyword),
+      categoryName: optional("categoryName", SEO_DRAFT_FIELD_CAPS.categoryName),
+      siteName: optional("siteName", SEO_DRAFT_FIELD_CAPS.siteName),
+      titleSuffix: optional("titleSuffix", SEO_DRAFT_FIELD_CAPS.titleSuffix),
+      status: optional("status", SEO_DRAFT_FIELD_CAPS.status),
+    },
+  };
+}
+
+function normalizeDraftOption(raw: unknown, valueMax: number): SeoDraftOption | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const data = raw as Record<string, unknown>;
+  if (Object.keys(data).some((key) => !["value", "reason"].includes(key))) return null;
+  const value = trimTo(data.value, valueMax);
+  const reason = trimTo(data.reason, SEO_DRAFT_FIELD_CAPS.reason);
+  if (!value || !reason) return null;
+  return { value, reason };
+}
+
+export function normalizeSeoDraftResult(raw: unknown): SeoDraftResult | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const data = raw as Record<string, unknown>;
+  if (Object.keys(data).some((key) => !["titles", "descriptions", "guidance"].includes(key))) return null;
+  if (!Array.isArray(data.titles) || !Array.isArray(data.descriptions)) return null;
+  if (data.titles.length !== SEO_DRAFT_FIELD_CAPS.optionCount) return null;
+  if (data.descriptions.length !== SEO_DRAFT_FIELD_CAPS.optionCount) return null;
+
+  const titles = data.titles.map((item) => normalizeDraftOption(item, SEO_DRAFT_FIELD_CAPS.titleValue));
+  const descriptions = data.descriptions.map((item) =>
+    normalizeDraftOption(item, SEO_DRAFT_FIELD_CAPS.descriptionValue),
+  );
+  if (titles.some((item) => !item) || descriptions.some((item) => !item)) return null;
+
+  const guidance = trimTo(data.guidance, SEO_DRAFT_FIELD_CAPS.guidance);
+  if (!guidance) return null;
+
+  return {
+    titles: titles as SeoDraftOption[],
+    descriptions: descriptions as SeoDraftOption[],
+    guidance,
+  };
+}
+
+export const SEO_DRAFT_SYSTEM_INSTRUCTION = `You are Sidhu AI SEO Assistant.
+
+Draft search-title and meta-description options for an existing website entity.
+
+Use only supplied context.
+
+Do not invent facts, features, prices, guarantees, rankings or search performance.
+
+Prioritize clarity and user intent over character-count scoring.
+
+Do not keyword-stuff.
+
+Account for any automatic site-name suffix described in the context.
+Do not repeat that automatic brand suffix inside the saved title field.
+
+Return concise options with a short reason.
+
+These are drafts for human review and must not be treated as automatically approved.
+
+Return JSON only matching the required schema.`;

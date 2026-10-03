@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { draftSeoTitleMetaAction } from "@/lib/cms/ai-seo-actions";
 import { savePostAction } from "@/lib/cms/actions";
 import { insertEditorImage } from "@/lib/cms/blog";
 import { blogPostPath } from "@/lib/cms/blog-paths";
@@ -11,6 +12,7 @@ import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ClientRichTextEditor } from "@/components/sidhu/ClientRichTextEditor";
 import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
+import { SeoAiDraftPanel } from "@/components/sidhu/SeoAiDraftPanel";
 import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
@@ -160,6 +162,25 @@ export function BlogEditor({
               <TextArea value={draft.seoDescription} onChange={(event) => setDraft({ ...draft, seoDescription: event.target.value })} />
               <p className="mt-1 text-xs text-muted">{draft.seoDescription.length}/160</p>
             </Field>
+            <SeoAiDraftPanel
+              draftAction={draftSeoTitleMetaAction}
+              context={{
+                entityKind: "post",
+                entityLabel: draft.title || "Blog post",
+                publicUrl: draft.slug ? blogPostPath(draft.slug) : "/blogs/",
+                currentTitle: draft.seoTitle,
+                currentDescription: draft.seoDescription,
+                contentTitle: draft.title || undefined,
+                excerpt: draft.excerpt || undefined,
+                focusKeyword: draft.focusKeyword || undefined,
+                categoryName: categories.find((category) => category.id === draft.categoryId)?.name,
+                siteName,
+                titleSuffix: ` | ${siteName}`,
+                status: draft.status,
+              }}
+              onUseTitle={(value) => setDraft((current) => ({ ...current, seoTitle: value }))}
+              onUseDescription={(value) => setDraft((current) => ({ ...current, seoDescription: value }))}
+            />
             <Field label="Focus keyword" hint="For your planning only. Google does not read this field directly.">
               <TextInput value={draft.focusKeyword} onChange={(event) => setDraft({ ...draft, focusKeyword: event.target.value })} />
             </Field>

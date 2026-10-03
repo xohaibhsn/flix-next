@@ -387,9 +387,11 @@ test("AI modules never write CMS or SEO Health state", () => {
     "lib/cms/ai-seo/schemas.ts",
     "lib/cms/ai-seo/provider.ts",
     "lib/cms/ai-seo/explain.ts",
+    "lib/cms/ai-seo/draft.ts",
     "lib/cms/ai-seo/rate-limit.ts",
     "lib/cms/ai-seo-actions.ts",
     "components/sidhu/SeoHealthAiExplain.tsx",
+    "components/sidhu/SeoAiDraftPanel.tsx",
   ];
   for (const rel of files) {
     const src = readFileSync(path.join(root, rel), "utf8");
