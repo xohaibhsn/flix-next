@@ -5,9 +5,11 @@ import { savePageSeoAction } from "@/lib/cms/actions";
 import type { CmsPage, MediaAsset, PageSeo, SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
 import { PAGE_SEO_META, type PageSeoKey } from "@/lib/cms/page-seo";
+import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 import {
   sidhuHeadingFromSections,
   sidhuPreviewFromPageSeo,
@@ -85,6 +87,7 @@ export function PageSeoPanel({
   const [seo, setSeo] = useState(initialSeo);
   const [assets, setAssets] = useState(initialAssets);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
   const [saving, setSaving] = useState(false);
   const savingLock = useRef(false);
   const meta = PAGE_SEO_META[pageKey];
@@ -114,10 +117,12 @@ export function PageSeoPanel({
       const result = await savePageSeoAction(pageKey, seo);
       if (!result.ok) {
         setMessage({ tone: "error", text: result.error });
+        setSeoAdvisory(null);
         return;
       }
       setSeo(result.settings.pageSeo[pageKey]);
       setMessage({ tone: "ok", text: "SEO settings saved. Public metadata will refresh." });
+      setSeoAdvisory(result.seoAdvisory ?? null);
     } catch (error) {
       setMessage({
         tone: "error",
@@ -212,6 +217,7 @@ export function PageSeoPanel({
           {saving ? "Saving…" : "Save SEO"}
         </button>
         {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+        <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} />
       </div>
     </section>
   );

@@ -10,7 +10,9 @@ import {
 } from "@/lib/cms/media-client";
 import { MEDIA_ALT_MAX } from "@/lib/cms/media-alt";
 import { MEDIA_UPLOAD, formatFileSize } from "@/lib/media-specs";
+import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 import { Banner } from "@/components/sidhu/fields";
+import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 
 type LibraryAsset = LibraryMediaAsset;
 
@@ -29,6 +31,7 @@ export function MediaLibrary({
   const [alt, setAlt] = useState("");
   const [folder, setFolder] = useState("theflix/site");
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
   const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
 
   const reload = useCallback(async () => {
@@ -68,12 +71,19 @@ export function MediaLibrary({
   async function saveAlt(asset: LibraryAsset) {
     setBusy(true);
     setMessage(null);
+    setSeoAdvisory(null);
     try {
       const next = await updateSidhuImageAlt(asset.id, altDrafts[asset.id] ?? asset.alt);
       setAssets((current) =>
         current.map((item) =>
-          item.id === next.id
-            ? { ...item, ...next, inUse: item.inUse, usageCount: item.usageCount, usageReferences: item.usageReferences }
+          item.id === next.asset.id
+            ? {
+                ...item,
+                ...next.asset,
+                inUse: item.inUse,
+                usageCount: item.usageCount,
+                usageReferences: item.usageReferences,
+              }
             : item,
         ),
       );
@@ -83,6 +93,7 @@ export function MediaLibrary({
         return nextDrafts;
       });
       setMessage({ tone: "ok", text: "Alt text saved. The Cloudinary file was not changed." });
+      setSeoAdvisory(next.seoAdvisory ?? null);
     } catch (error) {
       setMessage({ tone: "error", text: error instanceof Error ? error.message : "Could not save alt text." });
     } finally {
@@ -128,6 +139,7 @@ export function MediaLibrary({
         </Banner>
       ) : null}
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} />
       <div className="rounded-xl border border-line bg-white p-4">
         <h2 className="text-sm font-semibold">Upload Image</h2>
         <p className="mt-1 text-xs text-muted">

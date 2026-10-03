@@ -1,5 +1,6 @@
 import type { MediaAsset } from "@/lib/cms/types";
 import type { MediaUsageReference } from "@/lib/cms/media-refs";
+import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 
 export type LibraryMediaAsset = MediaAsset & {
   inUse?: boolean;
@@ -31,11 +32,16 @@ export async function updateSidhuImageAlt(id: string, alt: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id, alt }),
   });
-  const json = (await response.json()) as { ok: boolean; asset?: MediaAsset; error?: string };
+  const json = (await response.json()) as {
+    ok: boolean;
+    asset?: MediaAsset;
+    error?: string;
+    seoAdvisory?: SeoPostSaveAdvisory;
+  };
   if (!response.ok || !json.ok || !json.asset) {
     throw new Error(json.error || "Could not save alt text.");
   }
-  return json.asset;
+  return { asset: json.asset, seoAdvisory: json.seoAdvisory };
 }
 
 export async function deleteSidhuImage(id: string) {

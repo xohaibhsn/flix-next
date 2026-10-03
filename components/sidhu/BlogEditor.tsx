@@ -11,7 +11,9 @@ import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ClientRichTextEditor } from "@/components/sidhu/ClientRichTextEditor";
 import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
+import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
+import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 import { sidhuPreviewFromPost } from "@/lib/cms/sidhu-seo-preview";
 
 export function BlogEditor({
@@ -35,6 +37,7 @@ export function BlogEditor({
   const [draft, setDraft] = useState(post);
   const [assets, setAssets] = useState(initialAssets);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState(false);
   const preview = sidhuPreviewFromPost(draft, { siteName, siteTagline, defaultOgImage });
@@ -49,16 +52,19 @@ export function BlogEditor({
     setSaving(false);
     if (!result.ok) {
       setMessage({ tone: "error", text: result.error });
+      setSeoAdvisory(null);
       return;
     }
     setDraft(result.post);
     setMessage({ tone: "ok", text: "Post saved." });
+    setSeoAdvisory(result.seoAdvisory ?? null);
     if (post.id !== result.post.id) router.replace(`/sidhu/blog/${result.post.id}/`);
   }
 
   return (
     <div className="space-y-4">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-4 rounded-xl border border-line bg-white p-5">
           <Field label="Title">

@@ -36,10 +36,28 @@ import {
 } from "@/lib/cms/page-paths";
 import { applyPageSlugChange } from "@/lib/cms/slug-change";
 import { isDangerousUrl, isReservedRedirectSource, REDIRECT_ERRORS, withSlash } from "@/lib/cms/redirects";
+import {
+  evaluateCategorySeoPostSave,
+  evaluatePageSeoPostSave,
+  evaluatePostSeoPostSave,
+  safeSeoPostSaveAdvisory,
+  unavailableSeoPostSaveAdvisory,
+  type SeoPostSaveAdvisory,
+} from "@/lib/cms/seo-post-save-guard";
 import { ClientError, publicErrorMessage } from "@/lib/security/errors";
 
 function fail(error: unknown, fallback: string) {
   return { ok: false as const, error: publicErrorMessage(error, fallback) };
+}
+
+async function attachSeoAdvisory(
+  evaluate: () => ReturnType<typeof evaluatePageSeoPostSave>,
+): Promise<SeoPostSaveAdvisory> {
+  try {
+    return safeSeoPostSaveAdvisory(evaluate);
+  } catch {
+    return unavailableSeoPostSaveAdvisory();
+  }
 }
 
 export async function savePageAction(page: CmsPage) {
@@ -131,7 +149,17 @@ export async function savePageSeoAction(key: string, seo: PageSeo) {
       },
     });
     revalidatePageSeo(key);
-    return { ok: true as const, settings: saved };
+    const savedSeo = saved.pageSeo[key];
+    const seoAdvisory = await attachSeoAdvisory(() =>
+      evaluatePageSeoPostSave({
+        key,
+        seo: savedSeo,
+        siteName: saved.siteName,
+        siteTagline: saved.tagline,
+        fallbackTitle: PAGE_SEO_META[key].label,
+      }),
+    );
+    return { ok: true as const, settings: saved, seoAdvisory };
   } catch (error) {
     return fail(error, "Could not save page SEO.");
   }
@@ -196,7 +224,20 @@ export async function saveCategoryAction(category: BlogCategory) {
     const saved = await cms.saveCategory(category);
     revalidateSidhuCms();
     revalidateCategory(saved.slug);
-    return { ok: true as const, category: saved };
+    let seoAdvisory: SeoPostSaveAdvisory;
+    try {
+      const settings = await cms.getSettings();
+      seoAdvisory = await attachSeoAdvisory(() =>
+        evaluateCategorySeoPostSave({
+          category: saved,
+          siteName: settings.siteName,
+          siteTagline: settings.tagline,
+        }),
+      );
+    } catch {
+      seoAdvisory = unavailableSeoPostSaveAdvisory();
+    }
+    return { ok: true as const, category: saved, seoAdvisory };
   } catch (error) {
     return fail(error, "Could not save category.");
   }
@@ -221,7 +262,23 @@ export async function savePostAction(post: BlogPost) {
     const saved = await cms.savePost(post);
     revalidateSidhuCms();
     revalidateBlog(saved.slug);
-    return { ok: true as const, post: saved };
+    let seoAdvisory: SeoPostSaveAdvisory;
+    try {
+      const settings = await cms.getSettings();
+      const featuredMedia =
+        saved.featuredImage?.id ? await cms.getMediaById(saved.featuredImage.id) : null;
+      seoAdvisory = await attachSeoAdvisory(() =>
+        evaluatePostSeoPostSave({
+          post: saved,
+          siteName: settings.siteName,
+          siteTagline: settings.tagline,
+          featuredMedia,
+        }),
+      );
+    } catch {
+      seoAdvisory = unavailableSeoPostSaveAdvisory();
+    }
+    return { ok: true as const, post: saved, seoAdvisory };
   } catch (error) {
     return fail(error, "Could not save post.");
   }

@@ -90,7 +90,7 @@ export type SeoHealthScannerReports = {
   images: ReturnType<typeof scanImageDiagnostics>;
 };
 
-type IssueDefinition = {
+export type IssueDefinition = {
   category: SeoHealthCategory;
   severity: SeoHealthSeverity;
   action: SeoHealthAction;
@@ -104,7 +104,8 @@ const DETAIL_HREFS: Record<SeoHealthSource, string> = {
   image: "/sidhu/seo/image-diagnostics/",
 };
 
-const METADATA_ISSUES = {
+/** Shared issue copy/severity map — reused by Post-save SEO Guard. */
+export const METADATA_ISSUE_DEFINITIONS = {
   DUPLICATE_TITLE: {
     category: "search-preview",
     severity: "review",
@@ -226,6 +227,8 @@ const METADATA_ISSUES = {
   },
 } satisfies Record<MetadataIssue, IssueDefinition>;
 
+const METADATA_ISSUES = METADATA_ISSUE_DEFINITIONS;
+
 const INTERNAL_LINK_ISSUES = {
   VALID: {
     category: "internal-links",
@@ -299,7 +302,8 @@ const INTERNAL_LINK_ISSUES = {
   },
 } satisfies Record<InternalLinkIssue, IssueDefinition>;
 
-const IMAGE_ISSUES = {
+/** Shared image issue copy/severity map — reused by Post-save SEO Guard. */
+export const IMAGE_ISSUE_DEFINITIONS = {
   MISSING_ALT: {
     category: "images",
     severity: "needs-attention",
@@ -408,6 +412,8 @@ const IMAGE_ISSUES = {
     explanation: "The image can still work, but Sidhu cannot connect it to a Media Library record. Review how it is managed.",
   },
 } satisfies Record<ImageIssue, IssueDefinition>;
+
+const IMAGE_ISSUES = IMAGE_ISSUE_DEFINITIONS;
 
 function text(value: string | null | undefined, fallback = "Not set") {
   const next = String(value || "").trim();

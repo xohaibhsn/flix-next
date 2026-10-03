@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/auth/guards";
 import { applyMediaAltUpdate, MEDIA_API_PERMISSIONS } from "@/lib/cms/media-alt";
+import { evaluateMediaAltPostSave, safeSeoPostSaveAdvisory, unavailableSeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 import { revalidateSidhuCms } from "@/lib/cms/revalidate";
 import { createId } from "@/lib/cms/ids";
 import { getMediaUsage, getMediaUsageById } from "@/lib/cms/media-refs";
@@ -194,5 +195,11 @@ export async function PATCH(request: Request) {
   const saved = await cms.updateMediaAlt(id, result.alt);
   if (!saved) return jsonError("That media item is not in the library.", 404);
   revalidateMedia();
-  return NextResponse.json({ ok: true, asset: saved });
+  let seoAdvisory;
+  try {
+    seoAdvisory = safeSeoPostSaveAdvisory(() => evaluateMediaAltPostSave({ asset: saved }));
+  } catch {
+    seoAdvisory = unavailableSeoPostSaveAdvisory();
+  }
+  return NextResponse.json({ ok: true, asset: saved, seoAdvisory });
 }

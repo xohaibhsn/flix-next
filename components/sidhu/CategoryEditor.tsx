@@ -12,7 +12,9 @@ import { sidhuPreviewFromCategory } from "@/lib/cms/sidhu-seo-preview";
 import type { BlogCategory, MediaAsset, MediaRef } from "@/lib/cms/types";
 import { Banner, Field, TextArea, TextInput } from "@/components/sidhu/fields";
 import { ImageField } from "@/components/sidhu/ImageField";
+import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
+import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 
 export function CategoryEditor({
   category: initial,
@@ -32,6 +34,7 @@ export function CategoryEditor({
   const [draft, setDraft] = useState(initial);
   const [assets, setAssets] = useState(initialAssets);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
+  const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
   const [saving, setSaving] = useState(false);
   const savingLock = useRef(false);
 
@@ -53,10 +56,12 @@ export function CategoryEditor({
       const result = await saveCategoryAction(draft);
       if (!result.ok) {
         notice(result.error, "error");
+        setSeoAdvisory(null);
         return;
       }
       setDraft(result.category);
       notice("Category saved.");
+      setSeoAdvisory(result.seoAdvisory ?? null);
     } finally {
       savingLock.current = false;
       setSaving(false);
@@ -66,6 +71,7 @@ export function CategoryEditor({
   return (
     <div className="space-y-6">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
           <section className="space-y-3 rounded-xl border border-line bg-white p-5">
