@@ -1,3 +1,4 @@
+import { blogIndexCategoryNavLinks } from "@/lib/cms/blog-category-nav";
 import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index";
 import {
   BLOG_POST_PREFIX_LEGACY,
@@ -668,6 +669,23 @@ export function scanInternalLinks(input: InternalLinkScanInput): {
       anchorText: link.label,
       storedHref: link.href,
       sourcePath: "/welcome/",
+      targets,
+      redirects: input.redirects,
+    });
+  }
+
+  // Generated from CMS categories, same helper as the /blogs/ page render.
+  for (const link of blogIndexCategoryNavLinks(input.categories)) {
+    track({
+      sourceKind: "code",
+      sourceLabel: "Blog index category navigation",
+      sourceUrl: BLOG_INDEX_SLUG,
+      sourceId: `blog-category-nav:${link.id}`,
+      editHref: `/sidhu/blog/category/${link.id}/`,
+      context: "BlogCategoryNav",
+      anchorText: link.label,
+      storedHref: link.href,
+      sourcePath: BLOG_INDEX_SLUG,
       targets,
       redirects: input.redirects,
     });

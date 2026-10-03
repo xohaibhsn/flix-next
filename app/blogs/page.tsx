@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { BlogCategoryNav } from "@/components/blog/BlogCategoryNav";
 import { PageHero } from "@/components/layout/PageHero";
 import { SiteShell } from "@/components/layout/SiteShell";
 import { Container } from "@/components/ui/Container";
+import { blogIndexCategoryNavLinks } from "@/lib/cms/blog-category-nav";
 import { BLOG_INDEX_SLUG } from "@/lib/cms/blog-index";
 import { blogPostPath } from "@/lib/cms/blog-paths";
 import { cms } from "@/lib/cms/repository";
@@ -67,6 +69,7 @@ export default async function BlogIndexPage() {
       />
       <section className="bg-paper py-16">
         <Container>
+          <BlogCategoryNav links={blogIndexCategoryNavLinks(categories)} />
           {published.length === 0 ? (
             <p className="text-sm text-muted">No published posts yet.</p>
           ) : (
