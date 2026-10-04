@@ -6,6 +6,8 @@ import type { Permission } from "@/lib/auth/permissions";
 import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
 import { draftSeoTitleMeta, type DraftSeoTitleMetaResult } from "@/lib/cms/ai-seo/draft";
 import { explainSeoFinding, type ExplainSeoFindingResult } from "@/lib/cms/ai-seo/explain";
+import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
+import { researchUkContentOpportunitiesFromCms } from "@/lib/cms/ai-seo/research-run";
 import { parseSeoDraftInput } from "@/lib/cms/ai-seo/schemas";
 
 function clientIp(headerStore: Headers) {
@@ -87,6 +89,38 @@ export async function draftSeoTitleMetaAction(rawInput: unknown): Promise<DraftS
   const headerStore = await headers();
   const result = await draftSeoTitleMeta({
     rawInput: parsed.value,
+    adminId: actor.user.id,
+    ip: clientIp(headerStore),
+  });
+
+  return { ...result, configured: true };
+}
+
+export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult & {
+  configured?: boolean;
+};
+
+/**
+ * Explicit user-triggered UK content opportunity research (web_search).
+ * Never creates, edits, saves, or publishes CMS content.
+ */
+export async function researchUkContentOpportunitiesAction(): Promise<ResearchUkOpportunitiesActionResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return { ok: false, code: "unauthorized", error: actor.error, configured: isOpenAiSeoConfigured() };
+  }
+
+  if (!isOpenAiSeoConfigured()) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "Sidhu AI SEO Assistant is not configured yet.",
+      configured: false,
+    };
+  }
+
+  const headerStore = await headers();
+  const result = await researchUkContentOpportunitiesFromCms({
     adminId: actor.user.id,
     ip: clientIp(headerStore),
   });

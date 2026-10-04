@@ -18,13 +18,14 @@ function read(rel: string) {
 test("SEO nav exposes current subsections only", () => {
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.label),
-    ["Overview", "Issues", "Content", "Metadata", "Links", "Media", "Advanced"],
+    ["Overview", "Issues", "Opportunities", "Content", "Metadata", "Links", "Media", "Advanced"],
   );
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.href),
     [
       "/sidhu/seo/",
       "/sidhu/seo/health/",
+      "/sidhu/seo/opportunities/",
       "/sidhu/seo/content/",
       "/sidhu/seo/metadata-diagnostics/",
       "/sidhu/seo/internal-links/",
@@ -33,7 +34,8 @@ test("SEO nav exposes current subsections only", () => {
     ],
   );
   const src = read("lib/cms/sidhu-seo-nav.ts");
-  assert.doesNotMatch(src, /Opportunities|Performance|History|GSC|AI Content/i);
+  assert.match(src, /Opportunities/);
+  assert.doesNotMatch(src, /Performance|History|GSC|AI Content/i);
 });
 
 test("SEO nav active matching keeps Overview exact", () => {
@@ -55,6 +57,8 @@ test("SEO Overview is a control-center hub without inventory table or auto scans
   assert.doesNotMatch(page, /SeoOverviewTable|SeoForm|runSeoHealthScan|scanMetadata|scanInternal|scanImage|openai|explainSeo/i);
   assert.doesNotMatch(hub, /SeoOverviewTable/);
   assert.match(hub, /Open Issues/);
+  assert.match(hub, /Open Opportunities/);
+  assert.match(hub, /UK Content Opportunities/);
   assert.match(hub, /Open Content/);
   assert.match(hub, /Open Metadata/);
   assert.match(hub, /Open Links/);
@@ -63,7 +67,8 @@ test("SEO Overview is a control-center hub without inventory table or auto scans
   assert.match(hub, /AI SEO Assistant/);
   assert.match(hub, /Last saved scan/);
   assert.match(hub, /No SEO Health scan has been run yet/);
-  assert.doesNotMatch(hub, /Opportunities|GSC|fake score|\/\s*100|live score|real-time/i);
+  assert.doesNotMatch(hub, /GSC|fake score|\/\s*100|live score|real-time/i);
+  assert.doesNotMatch(hub, /researchUkContentOpportunitiesAction/);
   assert.match(healthState, /Pure read/);
   assert.doesNotMatch(healthState, /readJsonFile/);
   assert.match(healthState, /export async function saveSeoHealthState/);

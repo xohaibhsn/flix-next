@@ -45,6 +45,15 @@ export function SeoOverviewHub({ inventoryCount, lastScanAt, openFindingCount }:
       meta: healthMeta,
     },
     {
+      id: "opportunities",
+      title: "UK Content Opportunities",
+      description:
+        "Manual live UK web research that compares potential topics against current site coverage before you decide to create or refresh content.",
+      href: "/sidhu/seo/opportunities/",
+      actionLabel: "Open Opportunities",
+      meta: "Research runs only when you click Research UK opportunities.",
+    },
+    {
       id: "content",
       title: "Content SEO",
       description: "Inventory of page, post, and category metadata with edit links.",

@@ -65,3 +65,35 @@ export const AI_SEO_RATE_LIMITS = {
   dailyMax: DAILY_MAX,
   dailyWindowMs: DAILY_WINDOW_MS,
 } as const;
+
+/** Stricter research limiter — web_search is more expensive than draft/explain. */
+const RESEARCH_BURST_MAX = 2;
+const RESEARCH_DAILY_MAX = 10;
+const researchBurstAttempts = new Map<string, WindowState>();
+const researchDailyAttempts = new Map<string, WindowState>();
+
+export function aiSeoResearchRateLimitKey(adminId: string, ip: string) {
+  const material = `${adminId || "unknown"}:${ip || "unknown"}`;
+  return createHash("sha256").update(`flix-ai-seo-research:${material}`).digest("hex");
+}
+
+export function checkAiSeoResearchRateLimit(adminId: string, ip: string): AiSeoRateLimitResult {
+  const key = aiSeoResearchRateLimitKey(adminId, ip);
+  const burst = consume(researchBurstAttempts, key, RESEARCH_BURST_MAX, BURST_WINDOW_MS);
+  if (!burst.ok) return burst;
+  const daily = consume(researchDailyAttempts, key, RESEARCH_DAILY_MAX, DAILY_WINDOW_MS);
+  if (!daily.ok) return daily;
+  return { ok: true };
+}
+
+export function resetAiSeoResearchRateLimitForTests() {
+  researchBurstAttempts.clear();
+  researchDailyAttempts.clear();
+}
+
+export const AI_SEO_RESEARCH_RATE_LIMITS = {
+  burstMax: RESEARCH_BURST_MAX,
+  burstWindowMs: BURST_WINDOW_MS,
+  dailyMax: RESEARCH_DAILY_MAX,
+  dailyWindowMs: DAILY_WINDOW_MS,
+} as const;

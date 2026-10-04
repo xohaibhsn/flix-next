@@ -43,13 +43,13 @@ test("ModuleSubNav public props stay JSON-serializable", () => {
   }
 });
 
-test("SEO nav active matching covers all seven subsections with Overview exact", () => {
+test("SEO nav active matching covers all subsections with Overview exact", () => {
   type SidhuSeoId = (typeof SIDHU_SEO_NAV)[number]["id"];
 
-  assert.equal(SIDHU_SEO_NAV.length, 7);
+  assert.equal(SIDHU_SEO_NAV.length, 8);
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.label),
-    ["Overview", "Issues", "Content", "Metadata", "Links", "Media", "Advanced"],
+    ["Overview", "Issues", "Opportunities", "Content", "Metadata", "Links", "Media", "Advanced"],
   );
   assert.equal(SIDHU_SEO_NAV[0]?.exact, true);
 
@@ -57,6 +57,7 @@ test("SEO nav active matching covers all seven subsections with Overview exact",
     { path: "/sidhu/seo/", activeId: "overview" },
     { path: "/sidhu/seo", activeId: "overview" },
     { path: "/sidhu/seo/health/", activeId: "issues" },
+    { path: "/sidhu/seo/opportunities/", activeId: "opportunities" },
     { path: "/sidhu/seo/content/", activeId: "content" },
     { path: "/sidhu/seo/metadata-diagnostics/", activeId: "metadata" },
     { path: "/sidhu/seo/internal-links/", activeId: "links" },
@@ -77,7 +78,9 @@ test("SEO nav active matching covers all seven subsections with Overview exact",
 
   assert.equal(isSeoNavActive("/sidhu/seo/health/", "/sidhu/seo/"), false);
   assert.equal(isSeoNavActive("/sidhu/seo/", "/sidhu/seo/"), true);
-  assert.doesNotMatch(read("lib/cms/sidhu-seo-nav.ts"), /Opportunities|History|Performance|GSC/i);
+  assert.equal(isSeoNavActive("/sidhu/seo/opportunities/", "/sidhu/seo/opportunities/"), true);
+  assert.match(read("lib/cms/sidhu-seo-nav.ts"), /Opportunities/);
+  assert.doesNotMatch(read("lib/cms/sidhu-seo-nav.ts"), /History|Performance|GSC/i);
 });
 
 test("shared matcher lives outside the client module so Server Components stay clean", () => {
