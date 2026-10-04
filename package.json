@@ -11,7 +11,7 @@
     "build:default": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:auth": "tsx --test tools/*.test.ts",
+    "test:auth": "tsx --require ./tools/stubs/preload-server-only.cjs --test tools/*.test.ts",
     "og:smoke": "node tools/og-metadata-smoke.mjs",
     "import:wordpress": "tsx tools/import-wordpress.ts"
   },
@@ -32,6 +32,7 @@
     "@tiptap/starter-kit": "3.30.5",
     "bcryptjs": "^3.0.3",
     "cloudinary": "^2.10.1",
+    "google-auth-library": "^11.1.0",
     "lucide-react": "^1.33.0",
     "mysql2": "^3.24.0",
     "next": "16.3.6",
