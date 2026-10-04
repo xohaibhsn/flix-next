@@ -16,6 +16,7 @@ export default async function SidhuSettingsPage() {
     <AdminShell
       title="Site Settings"
       subtitle="Global site name, tagline, logo, favicon, default Open Graph image, and public head scripts. The Home Hero heading is edited under Pages → Home."
+      breadcrumbs={[{ label: "Site" }, { label: "Settings" }]}
     >
       <SiteSettingsForm
         settings={settings}

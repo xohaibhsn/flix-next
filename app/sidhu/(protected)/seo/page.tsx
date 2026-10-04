@@ -14,6 +14,7 @@ export default async function SidhuSeoPage() {
     <AdminShell
       title="SEO"
       subtitle="Overview of page, post, and category SEO. Edit page and post metadata in their editors. Site-wide custom JSON-LD is below."
+      breadcrumbs={[{ label: "SEO" }, { label: "Overview" }]}
     >
       <SeoForm settings={settings} posts={posts} categories={categories} />
     </AdminShell>

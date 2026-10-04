@@ -2,6 +2,9 @@
 
 import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes } from "react";
 import { ICON_OPTIONS } from "@/lib/cms/icons";
+import { Alert, type AlertTone } from "@/components/sidhu/ui/Alert";
+import { HelpText } from "@/components/sidhu/ui/HelpText";
+import { cn } from "@/components/sidhu/ui/cn";
 
 export function Field({
   label,
@@ -15,21 +18,26 @@ export function Field({
   return (
     <label className="block">
       <span className="text-xs font-semibold tracking-wide text-ink/70 uppercase">{label}</span>
-      {hint ? <span className="mt-0.5 block text-xs text-muted">{hint}</span> : null}
+      {hint ? <HelpText>{hint}</HelpText> : null}
       <div className="mt-1.5">{children}</div>
     </label>
   );
 }
 
-export const inputClass =
-  "w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand";
+export const inputClass = cn(
+  "w-full rounded-md border border-line bg-admin-surface px-3 py-2 text-sm text-ink",
+  "outline-none transition-colors",
+  "placeholder:text-muted/70",
+  "focus-visible:border-brand focus-visible:ring-2 focus-visible:ring-brand/25",
+  "disabled:cursor-not-allowed disabled:bg-paper disabled:text-muted",
+);
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${inputClass} ${props.className ?? ""}`} />;
+  return <input {...props} className={cn(inputClass, props.className)} />;
 }
 
 export function TextArea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={`${inputClass} min-h-24 ${props.className ?? ""}`} />;
+  return <textarea {...props} className={cn(inputClass, "min-h-24", props.className)} />;
 }
 
 export function IconSelect({
@@ -54,16 +62,15 @@ export function Banner({
   tone,
   children,
 }: {
-  tone: "ok" | "error" | "info";
+  tone: "ok" | "error" | "info" | "warning";
   children: ReactNode;
 }) {
-  const cls =
-    tone === "ok"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-      : tone === "error"
-        ? "border-red-200 bg-red-50 text-red-800"
-        : "border-sky-200 bg-sky-50 text-sky-800";
-  return <div className={`rounded-md border px-3 py-2 text-sm ${cls}`}>{children}</div>;
+  const alertTone: AlertTone = tone === "ok" ? "ok" : tone;
+  return (
+    <Alert tone={alertTone} role={tone === "error" ? "alert" : "status"}>
+      {children}
+    </Alert>
+  );
 }
 
 export function RowActions({
@@ -75,17 +82,19 @@ export function RowActions({
   onDown: () => void;
   onRemove: () => void;
 }) {
+  const quiet =
+    "inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-line bg-admin-surface px-2.5 text-xs font-semibold text-ink transition-colors hover:bg-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/25";
   return (
-    <div className="flex gap-1">
-      <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={onUp}>
+    <div className="flex flex-wrap gap-1.5">
+      <button type="button" className={quiet} onClick={onUp}>
         Up
       </button>
-      <button type="button" className="rounded border border-line px-2 py-1 text-xs" onClick={onDown}>
+      <button type="button" className={quiet} onClick={onDown}>
         Down
       </button>
       <button
         type="button"
-        className="rounded border border-red-200 px-2 py-1 text-xs text-red-700"
+        className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-md border border-red-200 bg-admin-surface px-2.5 text-xs font-semibold text-red-700 transition-colors hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
         onClick={onRemove}
       >
         Remove

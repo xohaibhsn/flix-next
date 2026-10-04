@@ -12,7 +12,7 @@ function severityLabel(severity: SeoPostSaveFinding["severity"]) {
 function severityClass(severity: SeoPostSaveFinding["severity"]) {
   if (severity === "needs-attention") return "border-amber-300 bg-amber-50 text-amber-950";
   if (severity === "review") return "border-sky-200 bg-sky-50 text-sky-950";
-  return "border-line bg-panel text-ink";
+  return "border-line bg-paper text-ink";
 }
 
 export function SeoPostSaveAdvisoryPanel({
@@ -24,7 +24,7 @@ export function SeoPostSaveAdvisoryPanel({
 
   if (advisory.status === "unavailable") {
     return (
-      <div className="rounded-md border border-line bg-panel px-3 py-2 text-sm text-muted">
+      <div className="rounded-md border border-line bg-paper px-3 py-2 text-sm text-muted">
         <p className="font-semibold text-ink">SEO check after save</p>
         <p className="mt-1">{advisory.message}</p>
       </div>

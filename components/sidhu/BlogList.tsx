@@ -74,10 +74,7 @@ export function BlogList({
   return (
     <div className="space-y-6">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
-      <Link href="/sidhu/blog/new/" className="inline-flex rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white">
-        New Post
-      </Link>
-      <div className="overflow-hidden rounded-xl border border-line bg-white">
+      <div className="overflow-hidden rounded-xl border border-line bg-admin-surface">
         <table className="w-full text-left text-sm">
           <thead className="bg-paper text-xs tracking-wide text-muted uppercase">
             <tr>

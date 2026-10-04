@@ -37,7 +37,11 @@ export default async function SidhuDashboardPage() {
       };
 
   return (
-    <AdminShell title="Dashboard" subtitle="CMS overview only. No revenue, orders, or ERP widgets.">
+    <AdminShell
+      title="Dashboard"
+      subtitle="CMS overview only. No revenue, orders, or ERP widgets."
+      breadcrumbs={[{ label: "Overview" }, { label: "Dashboard" }]}
+    >
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Pages" value={String(stats.pages)} />
         <Stat label="Blog posts" value={String(stats.posts)} />
@@ -48,13 +52,13 @@ export default async function SidhuDashboardPage() {
         <Stat label="Media" value={String(stats.media)} />
         <Stat label="Redirects" value={String(stats.redirects)} />
       </div>
-      <div className="mt-6 rounded-xl border border-line bg-white p-5">
+      <div className="mt-6 rounded-xl border border-line bg-admin-surface p-5">
         <p className="text-sm font-semibold">Cloudinary</p>
         <p className="mt-2 text-sm text-muted">
           Cloud name: {cloud.cloudName}. Status: {cloud.configured ? "configured" : "API key/secret missing"}
         </p>
       </div>
-      <div className="mt-6 rounded-xl border border-line bg-white p-5">
+      <div className="mt-6 rounded-xl border border-line bg-admin-surface p-5">
         <p className="text-sm font-semibold">System / Security</p>
         <p className="mt-1 text-xs text-muted">Safe status only. Secrets are never shown here.</p>
         <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
@@ -87,14 +91,17 @@ export default async function SidhuDashboardPage() {
             href={item.href}
             className={
               item.primary
-                ? "rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white"
-                : "rounded-md border border-line bg-white px-4 py-2 text-sm"
+                ? "inline-flex min-h-10 items-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white hover:bg-brand-hover"
+                : "inline-flex min-h-10 items-center rounded-md border border-line bg-admin-surface px-4 py-2 text-sm hover:bg-paper"
             }
           >
             {item.label}
           </Link>
         ))}
-        <Link href="/" className="rounded-md border border-line bg-white px-4 py-2 text-sm">
+        <Link
+          href="/"
+          className="inline-flex min-h-10 items-center rounded-md border border-line bg-admin-surface px-4 py-2 text-sm hover:bg-paper"
+        >
           View website
         </Link>
       </div>
@@ -104,7 +111,7 @@ export default async function SidhuDashboardPage() {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-5">
+    <div className="rounded-xl border border-line bg-admin-surface p-5">
       <p className="text-xs font-semibold tracking-wide text-muted uppercase">{label}</p>
       <p className="mt-2 text-2xl font-bold">{value}</p>
     </div>

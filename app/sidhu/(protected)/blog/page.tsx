@@ -1,6 +1,8 @@
+import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { BlogList } from "@/components/sidhu/BlogList";
 import { PageSeoPanel } from "@/components/sidhu/PageSeoPanel";
+import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { requireAdminSession } from "@/lib/auth/guards";
 import { adminHasPermission } from "@/lib/auth/session";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
@@ -18,7 +20,16 @@ export default async function SidhuBlogPage() {
     getCloudinaryStatusAction(),
   ]);
   return (
-    <AdminShell title="Blog" subtitle="Draft, publish, and organise posts. Public listing is /blogs/; posts are /blogs/[slug]/.">
+    <AdminShell
+      title="Blog"
+      subtitle="Draft, publish, and organise posts. Public listing is /blogs/; posts are /blogs/[slug]/."
+      breadcrumbs={[{ label: "Content" }, { label: "Blog" }]}
+      actions={
+        <Link href="/sidhu/blog/new/" className={sidhuButtonClass("primary")}>
+          New Post
+        </Link>
+      }
+    >
       <div className="space-y-6">
         <BlogList posts={posts} categories={categories} />
         {adminHasPermission(user, "seo") ? (

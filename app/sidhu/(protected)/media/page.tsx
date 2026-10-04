@@ -18,7 +18,11 @@ export default async function SidhuMediaPage() {
   const usageById = getMediaUsageById(assets, { settings, pages, posts, categories });
 
   return (
-      <AdminShell title="Media" subtitle="Edit alt text on existing images without re-uploading. Upload Image is still the primary add action. In-use images cannot be deleted until they are unassigned.">
+    <AdminShell
+      title="Media"
+      subtitle="Edit alt text on existing images without re-uploading. Upload Image is still the primary add action. In-use images cannot be deleted until they are unassigned."
+      breadcrumbs={[{ label: "Content" }, { label: "Media" }]}
+    >
       <MediaLibrary
         configured={cloud.configured}
         initialAssets={assets.map((asset) => {

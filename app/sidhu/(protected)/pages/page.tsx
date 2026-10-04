@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
+import { SectionCard } from "@/components/sidhu/ui/SectionCard";
+import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { editorHrefForPageId } from "@/lib/cms/page-paths";
 import { cms } from "@/lib/cms/repository";
 
@@ -9,8 +11,12 @@ export default async function SidhuPagesPage() {
   const pages = await cms.listPages();
 
   return (
-    <AdminShell title="Pages" subtitle="Home, IPTV Subscription, Contact, About Us, and policy pages use the same section builder.">
-      <div className="overflow-hidden rounded-xl border border-line bg-white">
+    <AdminShell
+      title="Pages"
+      subtitle="Home, IPTV Subscription, Contact, About Us, and policy pages use the same section builder."
+      breadcrumbs={[{ label: "Content" }, { label: "Pages" }]}
+    >
+      <SectionCard padding="none" className="overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-paper text-xs tracking-wide text-muted uppercase">
             <tr>
@@ -30,7 +36,7 @@ export default async function SidhuPagesPage() {
                   <td className="px-4 py-3">{page.cmsEnabled ? "Enabled" : "Not yet"}</td>
                   <td className="px-4 py-3">
                     {href ? (
-                      <Link href={href} className="font-semibold text-brand">
+                      <Link href={href} className={sidhuButtonClass("ghost", "min-h-9 px-2 text-brand")}>
                         Edit
                       </Link>
                     ) : (
@@ -42,7 +48,7 @@ export default async function SidhuPagesPage() {
             })}
           </tbody>
         </table>
-      </div>
+      </SectionCard>
     </AdminShell>
   );
 }

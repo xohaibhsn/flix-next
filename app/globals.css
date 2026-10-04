@@ -10,6 +10,13 @@
   --color-muted: #6b7280;
   --color-line: #e7e9ee;
   --color-paper: #f6f7f9;
+  /* Sidhu admin surfaces (unused on public pages) */
+  --color-admin-canvas: #f3f4f7;
+  --color-admin-sidebar: #0c0e14;
+  --color-admin-sidebar-border: rgba(255, 255, 255, 0.1);
+  --color-admin-sidebar-muted: rgba(255, 255, 255, 0.45);
+  --color-admin-surface: #ffffff;
+  --color-panel: #f6f7f9;
 }
 
 html {

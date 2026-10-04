@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
   FileText,
   FolderOpen,
   ImageIcon,
   LayoutDashboard,
-  Menu,
   Mail,
+  Menu,
   Newspaper,
   Redo2,
   Search,
@@ -18,126 +18,248 @@ import {
   Tag,
   UserRound,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { LogoutButton } from "@/components/sidhu/LogoutButton";
 import { useAdminSession } from "@/components/sidhu/AdminSessionProvider";
-import { hasPermission, type Permission } from "@/lib/auth/permissions";
+import { PageHeader } from "@/components/sidhu/ui/PageHeader";
+import { SectionCard } from "@/components/sidhu/ui/SectionCard";
+import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
+import { cn } from "@/components/sidhu/ui/cn";
+import {
+  filterSidhuNavGroups,
+  isSidhuNavActive,
+  type SidhuNavIcon,
+  type SidhuNavItem,
+} from "@/lib/cms/sidhu-nav";
+import type { BreadcrumbItem } from "@/components/sidhu/ui/Breadcrumbs";
 
-const NAV: Array<{ href: string; label: string; icon: typeof LayoutDashboard; permission: Permission }> = [
-  { href: "/sidhu/", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard" },
-  { href: "/sidhu/pages/", label: "Pages", icon: FileText, permission: "pages" },
-  { href: "/sidhu/blog/", label: "Blog", icon: Newspaper, permission: "blog" },
-  { href: "/sidhu/pricing/", label: "Pricing", icon: Tag, permission: "pricing" },
-  { href: "/sidhu/faqs/", label: "FAQs", icon: FolderOpen, permission: "faqs" },
-  { href: "/sidhu/seo/", label: "SEO", icon: Search, permission: "seo" },
-  { href: "/sidhu/media/", label: "Media", icon: ImageIcon, permission: "media" },
-  { href: "/sidhu/redirects/", label: "Redirects", icon: Redo2, permission: "redirects" },
-  { href: "/sidhu/settings/", label: "Site Settings", icon: Settings, permission: "site_settings" },
-  { href: "/sidhu/messages/", label: "Messages", icon: Mail, permission: "messages" },
-  { href: "/sidhu/users/", label: "Users", icon: Shield, permission: "users_security" },
-];
+const ICONS: Record<SidhuNavIcon, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  pages: FileText,
+  blog: Newspaper,
+  media: ImageIcon,
+  seo: Search,
+  pricing: Tag,
+  faqs: FolderOpen,
+  redirects: Redo2,
+  settings: Settings,
+  messages: Mail,
+  users: Shield,
+};
 
-function isActive(pathname: string, href: string) {
-  if (href === "/sidhu/") return pathname === "/sidhu" || pathname === "/sidhu/";
-  return pathname === href || pathname.startsWith(href);
+function NavLink({
+  item,
+  pathname,
+  onNavigate,
+}: {
+  item: SidhuNavItem;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const Icon = ICONS[item.icon];
+  const active = isSidhuNavActive(pathname, item.href);
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+        active ? "bg-brand text-white" : "text-white/70 hover:bg-white/5 hover:text-white",
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <span>{item.label}</span>
+    </Link>
+  );
+}
+
+function NavGroups({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const session = useAdminSession();
+  const groups =
+    session != null ? filterSidhuNavGroups(session.role, session.permissions) : [];
+
+  return (
+    <div className="space-y-5">
+      {groups.map((group) => (
+        <div key={group.id}>
+          <p className="px-3 text-[10px] font-semibold tracking-[0.16em] text-admin-sidebar-muted uppercase">
+            {group.label}
+          </p>
+          <div className="mt-1.5 space-y-0.5">
+            {group.items.map((item) => (
+              <NavLink key={item.href} item={item} pathname={pathname} onNavigate={onNavigate} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AccountFooter({
+  pathname,
+  onNavigate,
+  compact,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+  compact?: boolean;
+}) {
+  const session = useAdminSession();
+  const accountActive = isSidhuNavActive(pathname, "/sidhu/account/");
+  return (
+    <div className={cn("border-t border-admin-sidebar-border", compact ? "p-3" : "p-4")}>
+      <p className="px-3 text-[10px] font-semibold tracking-[0.16em] text-admin-sidebar-muted uppercase">
+        Account
+      </p>
+      <div className="mt-1.5 space-y-0.5">
+        <Link
+          href="/sidhu/account/"
+          onClick={onNavigate}
+          aria-current={accountActive ? "page" : undefined}
+          className={cn(
+            "flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30",
+            accountActive ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5 hover:text-white",
+          )}
+        >
+          <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+          My Account
+        </Link>
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm text-white/55 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+        >
+          View website
+        </Link>
+        <div className="px-3 py-1">
+          <LogoutButton className="min-h-10 w-full justify-start rounded-md px-0 text-sm font-medium text-white/55 hover:text-white" />
+        </div>
+      </div>
+      {session ? (
+        <p className="mt-2 truncate px-3 text-[11px] text-admin-sidebar-muted">
+          {session.displayName || session.username}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 export function AdminShell({
   children,
   title,
   subtitle,
+  breadcrumbs,
+  actions,
 }: {
   children: ReactNode;
   title: string;
   subtitle?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  actions?: ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const session = useAdminSession();
-  const items = NAV.filter((item) => session && hasPermission(session.role, session.permissions, item.permission));
-  const accountActive = isActive(pathname, "/sidhu/account/");
+  const panelId = useId();
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   return (
-    <div className="flex min-h-screen bg-[#f3f4f7] text-ink">
-      <aside className="hidden w-64 shrink-0 flex-col bg-[#0c0e14] text-white lg:flex">
-        <div className="border-b border-white/10 px-5 py-5">
+    <div className="sidhu-admin flex min-h-screen bg-admin-canvas text-ink">
+      <aside className="hidden w-[240px] shrink-0 flex-col bg-admin-sidebar text-white lg:flex">
+        <div className="border-b border-admin-sidebar-border px-5 py-5">
           <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
           <p className="mt-1 text-sm font-bold">Flix IPTV CMS</p>
-          <p className="mt-1 text-[11px] text-white/45">
-            {session ? session.displayName || session.username : "Protected admin session"}
-          </p>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
-          {items.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${
-                  active ? "bg-brand text-white" : "text-white/70 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Icon className="h-4 w-4" aria-hidden="true" />
-                {item.label}
-              </Link>
-            );
-          })}
+        <nav aria-label="Sidhu modules" className="flex-1 overflow-y-auto p-3">
+          <NavGroups pathname={pathname} />
         </nav>
-        <div className="border-t border-white/10 p-4 text-xs text-white/40">
-          <Link
-            href="/sidhu/account/"
-            className={`flex items-center gap-2 ${accountActive ? "text-white" : "hover:text-white"}`}
-          >
-            <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-            My Account
-          </Link>
-          <Link href="/" className="mt-3 block hover:text-white">
-            View website →
-          </Link>
-          <div className="mt-3">
-            <LogoutButton />
-          </div>
-        </div>
+        <AccountFooter pathname={pathname} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-line bg-white px-4 py-3 lg:px-8">
-          <div>
-            <h1 className="text-lg font-bold">{title}</h1>
-            {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
+        <header className="sticky top-0 z-20 border-b border-line bg-admin-surface/95 px-4 py-3 backdrop-blur-sm lg:px-8">
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <PageHeader title={title} subtitle={subtitle} breadcrumbs={breadcrumbs} actions={actions} />
+            </div>
+            <button
+              type="button"
+              className={cn(
+                sidhuButtonClass("secondary"),
+                "shrink-0 px-0 lg:hidden",
+                "h-10 w-10",
+              )}
+              onClick={() => setOpen(true)}
+              aria-label="Open navigation menu"
+              aria-expanded={open}
+              aria-controls={panelId}
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
-          <button
-            type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-line lg:hidden"
-            onClick={() => setOpen((v) => !v)}
-            aria-label="Open menu"
-          >
-            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
         </header>
+
         {open ? (
-          <div className="border-b border-line bg-[#0c0e14] p-3 lg:hidden">
-            {items.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setOpen(false)}
-                className="block rounded-md px-3 py-2 text-sm text-white/80"
-              >
-                {item.label}
-              </Link>
-            ))}
-            <Link href="/sidhu/account/" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm text-white/80">
-              My Account
-            </Link>
-            <div className="px-3 py-2">
-              <LogoutButton />
+          <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Sidhu navigation">
+            <button
+              type="button"
+              className="absolute inset-0 bg-ink/45"
+              aria-label="Close navigation menu"
+              onClick={() => setOpen(false)}
+            />
+            <div
+              id={panelId}
+              className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col bg-admin-sidebar text-white shadow-none"
+            >
+              <div className="flex items-center justify-between border-b border-admin-sidebar-border px-4 py-4">
+                <div>
+                  <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
+                  <p className="mt-0.5 text-sm font-bold">Flix IPTV CMS</p>
+                </div>
+                <button
+                  ref={closeRef}
+                  type="button"
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-md text-white/80 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
+                  onClick={() => setOpen(false)}
+                  aria-label="Close navigation menu"
+                >
+                  <X className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+              <nav aria-label="Sidhu modules" className="flex-1 overflow-y-auto p-3">
+                <NavGroups pathname={pathname} onNavigate={() => setOpen(false)} />
+              </nav>
+              <AccountFooter pathname={pathname} onNavigate={() => setOpen(false)} compact />
             </div>
           </div>
         ) : null}
-        <div className="flex-1 p-4 lg:p-8">{children}</div>
+
+        <div className="flex-1 px-4 py-5 lg:px-8 lg:py-6">{children}</div>
       </div>
     </div>
   );
@@ -145,13 +267,13 @@ export function AdminShell({
 
 export function ComingSoon({ moduleName }: { moduleName: string }) {
   return (
-    <div className="rounded-xl border border-line bg-white p-8">
+    <SectionCard className="p-8">
       <p className="text-sm font-semibold text-brand">Coming in the next local phase</p>
       <h2 className="mt-2 text-2xl font-bold">{moduleName}</h2>
       <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">
-        This screen is intentionally empty. No fake data, editors, or placeholders that pretend
-        the module works. Home page editing, media, and branding settings are available now.
+        This screen is intentionally empty. No fake data, editors, or placeholders that pretend the
+        module works. Home page editing, media, and branding settings are available now.
       </p>
-    </div>
+    </SectionCard>
   );
 }

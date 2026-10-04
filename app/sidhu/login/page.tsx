@@ -17,8 +17,8 @@ export default async function SidhuLoginPage({
   const query = await searchParams;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f3f4f7] px-4">
-      <div className="w-full max-w-md rounded-xl border border-line bg-white p-8 shadow-sm">
+    <div className="sidhu-admin flex min-h-screen items-center justify-center bg-admin-canvas px-4">
+      <div className="w-full max-w-md rounded-xl border border-line bg-admin-surface p-8">
         <p className="text-xs font-semibold tracking-[0.2em] text-brand uppercase">Sidhu</p>
         <h1 className="mt-2 text-2xl font-bold text-ink">Sign in to CMS</h1>
         <p className="mt-2 text-sm text-muted">This admin area is protected. Sign in with your Sidhu account.</p>
