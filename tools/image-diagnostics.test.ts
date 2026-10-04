@@ -248,10 +248,10 @@ test("extractHtmlImages distinguishes missing vs empty alt", () => {
 test("Sidhu image diagnostics route wired; no auto-fix", () => {
   const root = process.cwd();
   const page = readFileSync(path.join(root, "app/sidhu/(protected)/seo/image-diagnostics/page.tsx"), "utf8");
-  const form = readFileSync(path.join(root, "components/sidhu/SeoForm.tsx"), "utf8");
+  const seoNav = readFileSync(path.join(root, "lib/cms/sidhu-seo-nav.ts"), "utf8");
   const report = readFileSync(path.join(root, "components/sidhu/ImageDiagnosticsReport.tsx"), "utf8");
   assert.match(page, /scanImageDiagnostics/);
-  assert.match(form, /\/sidhu\/seo\/image-diagnostics\//);
+  assert.match(seoNav, /\/sidhu\/seo\/image-diagnostics\//);
   assert.doesNotMatch(report, /Fix Automatically|auto-fix|Generate alt|bulk fix/i);
   assert.match(report, /Edit media/);
   assert.match(report, /Edit source/);

@@ -102,6 +102,7 @@ export function MessagesList({ messages }: { messages: ContactMessage[] }) {
                       <Td>
                         <ListActions>
                           <ListActionButton
+                            variant="quiet"
                             onClick={() => setOpenId(openId === item.id ? null : item.id)}
                             aria-expanded={openId === item.id}
                           >
@@ -129,6 +130,7 @@ export function MessagesList({ messages }: { messages: ContactMessage[] }) {
                   <p className="text-sm">{item.subject || summarize(item.message)}</p>
                   <ListActions>
                     <ListActionButton
+                      variant="quiet"
                       onClick={() => setOpenId(openId === item.id ? null : item.id)}
                       aria-expanded={openId === item.id}
                     >

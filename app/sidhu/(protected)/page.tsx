@@ -132,9 +132,9 @@ export default async function SidhuDashboardPage() {
           <DashboardSection title="SEO">
             <SectionCard padding="sm" className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-ink">SEO Control</p>
+                <p className="text-sm font-semibold text-ink">SEO Control Center</p>
                 <p className="mt-0.5 text-xs text-muted">
-                  Open the SEO overview. Health scans stay manual — nothing runs from this dashboard.
+                  Open SEO Overview. Health scans stay manual — nothing runs from this dashboard.
                 </p>
               </div>
               <Link href="/sidhu/seo/" className={sidhuButtonClass("secondary", "min-h-9")}>

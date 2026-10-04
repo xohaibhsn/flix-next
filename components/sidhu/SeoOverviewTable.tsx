@@ -51,7 +51,10 @@ export function SeoOverviewTable({ rows }: { rows: SidhuSeoOverviewRow[] }) {
               <td className="px-3 py-3 text-xs text-muted">{row.updated}</td>
               <td className="px-3 py-3">
                 {row.editHref ? (
-                  <Link href={row.editHref} className="font-semibold text-brand">
+                  <Link
+                    href={row.editHref}
+                    className="inline-flex min-h-9 items-center rounded-md border border-line bg-admin-surface px-2.5 text-xs font-semibold text-ink hover:bg-paper"
+                  >
                     Edit
                   </Link>
                 ) : (

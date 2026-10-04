@@ -427,10 +427,10 @@ test("draft posts and inactive categories excluded; CMS redirect collision path"
 test("Sidhu metadata diagnostics route wired; no auto-fix", () => {
   const root = process.cwd();
   const page = readFileSync(path.join(root, "app/sidhu/(protected)/seo/metadata-diagnostics/page.tsx"), "utf8");
-  const form = readFileSync(path.join(root, "components/sidhu/SeoForm.tsx"), "utf8");
+  const seoNav = readFileSync(path.join(root, "lib/cms/sidhu-seo-nav.ts"), "utf8");
   const report = readFileSync(path.join(root, "components/sidhu/MetadataDiagnosticsReport.tsx"), "utf8");
   assert.match(page, /scanMetadataDiagnostics/);
-  assert.match(form, /\/sidhu\/seo\/metadata-diagnostics\//);
+  assert.match(seoNav, /\/sidhu\/seo\/metadata-diagnostics\//);
   assert.doesNotMatch(report, /Fix now|Rewrite|Generate SEO|Apply canonical|auto-fix/i);
   assert.match(report, /Edit source/);
 });

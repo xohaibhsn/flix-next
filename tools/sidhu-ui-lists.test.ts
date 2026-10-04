@@ -62,6 +62,7 @@ test("blog list keeps posts, categories, listing SEO, and edit/view routes", () 
   assert.match(blogPage, /PageSeoPanel/);
   assert.match(blogPage, /listingSeo=/);
   assert.match(blogPage, /\/sidhu\/blog\/new\//);
+  assert.match(blogPage, /sidhuButtonClass\("primary"\)/);
   assert.match(blogList, /id: "posts"/);
   assert.match(blogList, /id: "categories"/);
   assert.match(blogList, /id: "listing-seo"/);
@@ -71,6 +72,8 @@ test("blog list keeps posts, categories, listing SEO, and edit/view routes", () 
   assert.match(blogList, /deletePostAction/);
   assert.match(blogList, /saveCategoryAction/);
   assert.match(blogList, /StatusBadge/);
+  assert.doesNotMatch(blogList, /<TableToolbar>[\s\S]*?New Post[\s\S]*?<\/TableToolbar>/);
+  assert.equal((blogList.match(/New Post/g) || []).length, 1);
 });
 
 test("media keeps upload/alt/delete wiring with toolbar empty states", () => {

@@ -137,9 +137,6 @@ export function BlogList({
                 value={query}
                 onChange={setQuery}
               />
-              <Link href="/sidhu/blog/new/" className={sidhuButtonClass("primary", "min-h-9")}>
-                New Post
-              </Link>
             </TableToolbar>
           }
         >
@@ -195,10 +192,13 @@ export function BlogList({
                           <Td hideBelow="lg">{post.featured ? "Yes" : "No"}</Td>
                           <Td>
                             <ListActions>
-                              <ListActionLink href={`/sidhu/blog/${post.id}/`}>Edit</ListActionLink>
+                              <ListActionLink href={`/sidhu/blog/${post.id}/`} variant="secondary">
+                                Edit
+                              </ListActionLink>
                               {post.status === "published" && post.slug ? (
                                 <ListActionLink
                                   href={blogPostPath(post.slug)}
+                                  variant="quiet"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title="View public post"
@@ -233,10 +233,13 @@ export function BlogList({
                         {post.featured ? " · Featured" : ""}
                       </p>
                       <ListActions>
-                        <ListActionLink href={`/sidhu/blog/${post.id}/`}>Edit</ListActionLink>
+                        <ListActionLink href={`/sidhu/blog/${post.id}/`} variant="secondary">
+                          Edit
+                        </ListActionLink>
                         {post.status === "published" && post.slug ? (
                           <ListActionLink
                             href={blogPostPath(post.slug)}
+                            variant="quiet"
                             target="_blank"
                             rel="noopener noreferrer"
                           >
@@ -294,7 +297,9 @@ export function BlogList({
                         <Td className="font-mono text-xs text-muted">{category.slug}</Td>
                         <Td>
                           <ListActions>
-                            <ListActionLink href={`/sidhu/blog/category/${category.id}/`}>Edit</ListActionLink>
+                            <ListActionLink href={`/sidhu/blog/category/${category.id}/`} variant="secondary">
+                              Edit
+                            </ListActionLink>
                             <ListActionButton variant="danger" onClick={() => void removeCategory(category.id)}>
                               Delete
                             </ListActionButton>
@@ -311,7 +316,9 @@ export function BlogList({
                     <p className="font-semibold">{category.name}</p>
                     <p className="font-mono text-xs text-muted">{category.slug}</p>
                     <ListActions>
-                      <ListActionLink href={`/sidhu/blog/category/${category.id}/`}>Edit</ListActionLink>
+                      <ListActionLink href={`/sidhu/blog/category/${category.id}/`} variant="secondary">
+                        Edit
+                      </ListActionLink>
                       <ListActionButton variant="danger" onClick={() => void removeCategory(category.id)}>
                         Delete
                       </ListActionButton>

@@ -1,32 +1,23 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { saveSeoSettingsAction } from "@/lib/cms/actions";
-import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
+import type { SiteSettings } from "@/lib/cms/types";
 import { Banner, Field, TextArea } from "@/components/sidhu/fields";
-import { SeoOverviewTable } from "@/components/sidhu/SeoOverviewTable";
 import { parseJsonLdInput } from "@/lib/cms/json-ld-input";
-import { sidhuSeoOverviewRows } from "@/lib/cms/sidhu-seo-preview";
+import { SectionCard } from "@/components/sidhu/ui/SectionCard";
+import { Button } from "@/components/sidhu/ui/Button";
 
 const JSON_LD_HINT =
   "Paste JSON-LD or a <script type=\"application/ld+json\"> wrapper. Invalid JSON is rejected and the last valid value is kept. Leave empty to render nothing.";
 
-export function SeoForm({
-  settings: initial,
-  posts,
-  categories,
-}: {
-  settings: SiteSettings;
-  posts: BlogPost[];
-  categories: BlogCategory[];
-}) {
+/** Site-wide custom JSON-LD editor — save contract unchanged (saveSeoSettingsAction). */
+export function SeoForm({ settings: initial }: { settings: SiteSettings }) {
   const [settings, setSettings] = useState(initial);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const savingLock = useRef(false);
-  const rows = sidhuSeoOverviewRows(settings, posts, categories);
 
   function validate() {
     const parsed = parseJsonLdInput(settings.siteCustomJsonLd || "");
@@ -68,36 +59,14 @@ export function SeoForm({
     <div className="space-y-4">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
 
-      <section className="rounded-xl border border-line bg-white p-5">
-        <h2 className="font-semibold">SEO Overview</h2>
-        <p className="mt-1 text-sm text-muted">
-          Current saved SEO state. Edit pages and posts from the links. Category rows are read-only in this phase.
-        </p>
-        <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link href="/sidhu/seo/health/" className="font-semibold text-brand hover:underline">
-            Open SEO Health →
-          </Link>
-          <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
-            Open internal link diagnostics →
-          </Link>
-          <Link href="/sidhu/seo/metadata-diagnostics/" className="font-semibold text-brand hover:underline">
-            Open metadata diagnostics →
-          </Link>
-          <Link href="/sidhu/seo/image-diagnostics/" className="font-semibold text-brand hover:underline">
-            Open image diagnostics →
-          </Link>
-        </p>
-        <div className="mt-4">
-          <SeoOverviewTable rows={rows} />
+      <SectionCard className="space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-ink">Site-wide Custom JSON-LD Schema</h2>
+          <p className="mt-1 text-sm text-muted">
+            Organization schema is automatically rendered on Home only. Use this field only for additional schema you
+            intentionally want across the site.
+          </p>
         </div>
-      </section>
-
-      <section className="space-y-4 rounded-xl border border-line bg-white p-5">
-        <h2 className="font-semibold">Site-wide Custom JSON-LD Schema</h2>
-        <p className="text-sm text-muted">
-          Organization schema is automatically rendered on Home only. Use this field only for additional schema you
-          intentionally want across the site.
-        </p>
         <Field label="Site-wide Custom JSON-LD Schema" hint={JSON_LD_HINT}>
           <TextArea
             value={settings.siteCustomJsonLd || ""}
@@ -107,9 +76,9 @@ export function SeoForm({
             placeholder='{ "@context": "https://schema.org", "@type": "Service" }'
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" className="rounded border border-line px-3 py-1 text-xs font-semibold" onClick={validate}>
+            <Button type="button" variant="secondary" className="min-h-9 px-3 text-xs" onClick={validate}>
               Validate
-            </button>
+            </Button>
             {feedback ? (
               <span className={feedback.tone === "error" ? "text-xs text-red-700" : "text-xs text-muted"}>
                 {feedback.text}
@@ -117,15 +86,10 @@ export function SeoForm({
             ) : null}
           </div>
         </Field>
-        <button
-          type="button"
-          disabled={saving}
-          className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-          onClick={() => void save()}
-        >
+        <Button type="button" variant="primary" disabled={saving} onClick={() => void save()}>
           {saving ? "Saving…" : "Save site-wide schema"}
-        </button>
-      </section>
+        </Button>
+      </SectionCard>
     </div>
   );
 }

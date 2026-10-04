@@ -1,5 +1,6 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoHealthReport } from "@/components/sidhu/SeoHealthReport";
+import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { explainSeoHealthFindingAction } from "@/lib/cms/ai-seo-actions";
 import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
 import {
@@ -52,19 +53,30 @@ export default async function SidhuSeoHealthPage({
 
   return (
     <AdminShell
-      title="SEO Health"
-      subtitle="A manual, read-only overview of the existing SEO diagnostics. Nothing is changed automatically."
+      title="SEO"
+      subtitle="Search visibility, metadata and technical diagnostics."
+      breadcrumbs={[{ label: "SEO", href: "/sidhu/seo/" }, { label: "Issues" }]}
     >
-      <SeoHealthReport
-        report={report}
-        workflow={workflow}
-        stateWarning={stateWarning}
-        acceptAction={acceptSeoHealthFindingAction}
-        reopenAction={reopenSeoHealthFindingAction}
-        aiConfigured={aiConfigured}
-        aiExplainAction={explainSeoHealthFindingAction}
-        siteName={siteName}
-      />
+      <SeoModuleChrome>
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-ink">SEO Health</h2>
+            <p className="mt-1 text-sm text-muted">
+              Manual, read-only issue review. Nothing is changed automatically.
+            </p>
+          </div>
+          <SeoHealthReport
+            report={report}
+            workflow={workflow}
+            stateWarning={stateWarning}
+            acceptAction={acceptSeoHealthFindingAction}
+            reopenAction={reopenSeoHealthFindingAction}
+            aiConfigured={aiConfigured}
+            aiExplainAction={explainSeoHealthFindingAction}
+            siteName={siteName}
+          />
+        </div>
+      </SeoModuleChrome>
     </AdminShell>
   );
 }

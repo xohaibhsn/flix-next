@@ -375,10 +375,10 @@ test("scan maps edit-source links for pages, posts, and settings", () => {
 test("Sidhu internal-links route and SEO nav wiring exist; no auto-fix", () => {
   const root = process.cwd();
   const page = readFileSync(path.join(root, "app/sidhu/(protected)/seo/internal-links/page.tsx"), "utf8");
-  const form = readFileSync(path.join(root, "components/sidhu/SeoForm.tsx"), "utf8");
+  const seoNav = readFileSync(path.join(root, "lib/cms/sidhu-seo-nav.ts"), "utf8");
   const report = readFileSync(path.join(root, "components/sidhu/InternalLinksReport.tsx"), "utf8");
   assert.match(page, /scanInternalLinks/);
-  assert.match(form, /\/sidhu\/seo\/internal-links\//);
+  assert.match(seoNav, /\/sidhu\/seo\/internal-links\//);
   assert.doesNotMatch(report, /Fix automatically|auto-fix|autofix/i);
   assert.match(report, /Edit source/);
 });

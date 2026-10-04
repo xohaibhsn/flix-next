@@ -1,12 +1,13 @@
 import "server-only";
 
+import { readFile } from "fs/promises";
 import {
   emptySeoHealthState,
   sanitizeSeoHealthState,
   SEO_HEALTH_STATE_KEY,
   type SeoHealthStateV1,
 } from "@/lib/cms/seo-health-memory";
-import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
+import { dataFile, writeJsonFile } from "@/lib/cms/json-store";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { getDbPool } from "@/lib/db/pool";
 import type { RowDataPacket } from "mysql2";
@@ -43,9 +44,14 @@ async function writeMysqlState(state: SeoHealthStateV1) {
   );
 }
 
+/** Pure read — never create/write state on Overview or idle Health loads. */
 async function readJsonState(): Promise<SeoHealthStateV1> {
-  const raw = await readJsonFile<unknown>(JSON_STATE_FILE, emptySeoHealthState());
-  return sanitizeSeoHealthState(raw);
+  try {
+    const raw = await readFile(dataFile(JSON_STATE_FILE), "utf8");
+    return sanitizeSeoHealthState(JSON.parse(raw) as unknown);
+  } catch {
+    return emptySeoHealthState();
+  }
 }
 
 async function writeJsonState(state: SeoHealthStateV1) {

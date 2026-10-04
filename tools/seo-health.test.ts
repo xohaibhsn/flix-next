@@ -335,7 +335,7 @@ test("health route is manual-only and the service reuses scanners without write 
   const service = readFileSync(path.join(root, "lib/cms/seo-health.ts"), "utf8");
   const page = readFileSync(path.join(root, "app/sidhu/(protected)/seo/health/page.tsx"), "utf8");
   const report = readFileSync(path.join(root, "components/sidhu/SeoHealthReport.tsx"), "utf8");
-  const form = readFileSync(path.join(root, "components/sidhu/SeoForm.tsx"), "utf8");
+  const seoNav = readFileSync(path.join(root, "lib/cms/sidhu-seo-nav.ts"), "utf8");
 
   assert.match(service, /metadata: scanMetadataDiagnostics\(/);
   assert.match(service, /internalLinks: scanInternalLinks\(/);
@@ -354,7 +354,7 @@ test("health route is manual-only and the service reuses scanners without write 
   assert.match(report, /name="run"/);
   assert.match(report, /value="1"/);
   assert.match(report, /No scan has run yet/);
-  assert.match(form, /\/sidhu\/seo\/health\//);
+  assert.match(seoNav, /\/sidhu\/seo\/health\//);
 
   for (const href of [
     "/sidhu/seo/metadata-diagnostics/",
