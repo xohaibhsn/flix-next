@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ListActionLink } from "@/components/sidhu/ui/ListActions";
+import { RelatedWorkspaces } from "@/components/sidhu/ui/RelatedWorkspaces";
 import type {
   DuplicateGroup,
   MetadataDiagnosticsSummary,
@@ -63,9 +64,9 @@ function DuplicateSection({
                     <span>{entity.label}</span>
                     <span className="text-xs break-all text-muted">{entity.publicUrl}</span>
                     {entity.editHref ? (
-                      <Link href={entity.editHref} className="text-xs font-semibold text-brand">
+                      <ListActionLink href={entity.editHref} variant="secondary">
                         Edit source
-                      </Link>
+                      </ListActionLink>
                     ) : null}
                   </li>
                 );
@@ -125,18 +126,27 @@ export function MetadataDiagnosticsReport({
               Duplicate-title and duplicate-description groups count indexable URLs only.
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 text-sm">
-            <Link href="/sidhu/seo/" className="font-semibold text-brand hover:underline">
-              ← SEO overview
-            </Link>
-            <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
-              Internal links →
-            </Link>
-            <Link href="/sidhu/seo/image-diagnostics/" className="font-semibold text-brand hover:underline">
-              Image diagnostics →
-            </Link>
-          </div>
         </div>
+        <RelatedWorkspaces
+          title="Related SEO workspaces"
+          items={[
+            {
+              href: "/sidhu/seo/",
+              title: "SEO Overview",
+              description: "Control Center hub.",
+            },
+            {
+              href: "/sidhu/seo/internal-links/",
+              title: "Internal Links",
+              description: "Href and orphan diagnostics.",
+            },
+            {
+              href: "/sidhu/seo/image-diagnostics/",
+              title: "Image Report",
+              description: "Alt and media coverage.",
+            },
+          ]}
+        />
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {counts.map((item) => (
             <div key={item.label} className="rounded-lg border border-line bg-paper px-3 py-2">
@@ -192,9 +202,9 @@ export function MetadataDiagnosticsReport({
                     </td>
                     <td className="px-3 py-3">
                       {row.editHref ? (
-                        <Link href={row.editHref} className="font-semibold text-brand">
+                        <ListActionLink href={row.editHref} variant="secondary">
                           Edit source
-                        </Link>
+                        </ListActionLink>
                       ) : (
                         "—"
                       )}
@@ -290,9 +300,9 @@ export function MetadataDiagnosticsReport({
                     </td>
                     <td className="px-3 py-3">
                       {row.editHref ? (
-                        <Link href={row.editHref} className="font-semibold text-brand">
+                        <ListActionLink href={row.editHref} variant="secondary">
                           Edit source
-                        </Link>
+                        </ListActionLink>
                       ) : (
                         "—"
                       )}

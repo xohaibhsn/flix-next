@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ListActionLink } from "@/components/sidhu/ui/ListActions";
+import { RelatedWorkspaces } from "@/components/sidhu/ui/RelatedWorkspaces";
 import type {
   InternalLinkFinding,
   InternalLinkIssue,
@@ -69,18 +70,28 @@ export function InternalLinksReport({
               Redirects are reported only — they are not changed.
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1">
-            <Link href="/sidhu/seo/" className="text-sm font-semibold text-brand hover:underline">
-              ← SEO overview
-            </Link>
-            <Link href="/sidhu/seo/metadata-diagnostics/" className="text-sm font-semibold text-brand hover:underline">
-              Metadata diagnostics →
-            </Link>
-            <Link href="/sidhu/seo/image-diagnostics/" className="text-sm font-semibold text-brand hover:underline">
-              Image diagnostics →
-            </Link>
-          </div>
         </div>
+
+        <RelatedWorkspaces
+          title="Related SEO workspaces"
+          items={[
+            {
+              href: "/sidhu/seo/",
+              title: "SEO Overview",
+              description: "Control Center hub.",
+            },
+            {
+              href: "/sidhu/seo/metadata-diagnostics/",
+              title: "Metadata Report",
+              description: "Titles, descriptions, canonicals.",
+            },
+            {
+              href: "/sidhu/seo/image-diagnostics/",
+              title: "Image Report",
+              description: "Alt and media coverage.",
+            },
+          ]}
+        />
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {counts.map((item) => (
@@ -162,9 +173,9 @@ export function InternalLinksReport({
                     </td>
                     <td className="px-3 py-3">
                       {row.editHref ? (
-                        <Link href={row.editHref} className="font-semibold text-brand">
+                        <ListActionLink href={row.editHref} variant="secondary">
                           Edit source
-                        </Link>
+                        </ListActionLink>
                       ) : (
                         <span className="text-xs text-muted">—</span>
                       )}

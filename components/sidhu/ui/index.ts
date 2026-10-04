@@ -21,6 +21,11 @@ export { FormSection } from "@/components/sidhu/ui/FormSection";
 export { HelpText } from "@/components/sidhu/ui/HelpText";
 export { ListActionButton, ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
 export { PageHeader } from "@/components/sidhu/ui/PageHeader";
+export {
+  RelatedWorkspaces,
+  SectionActions,
+  type RelatedWorkspaceItem,
+} from "@/components/sidhu/ui/RelatedWorkspaces";
 export { SectionCard } from "@/components/sidhu/ui/SectionCard";
 export { StatusBadge, type StatusBadgeTone } from "@/components/sidhu/ui/StatusBadge";
 export { CollapsiblePreview } from "@/components/sidhu/ui/CollapsiblePreview";

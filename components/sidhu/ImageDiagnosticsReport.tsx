@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
+import { ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
+import { RelatedWorkspaces } from "@/components/sidhu/ui/RelatedWorkspaces";
 import type {
   ImageDiagnosticsSummary,
   ImageFilter,
@@ -65,18 +66,27 @@ export function ImageDiagnosticsReport({
               Nothing is rewritten. Media Library alt changes do not update old TipTap HTML automatically.
             </p>
           </div>
-          <div className="flex flex-col items-end gap-1 text-sm">
-            <Link href="/sidhu/seo/" className="font-semibold text-brand hover:underline">
-              ← SEO overview
-            </Link>
-            <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
-              Internal links →
-            </Link>
-            <Link href="/sidhu/seo/metadata-diagnostics/" className="font-semibold text-brand hover:underline">
-              Metadata diagnostics →
-            </Link>
-          </div>
         </div>
+        <RelatedWorkspaces
+          title="Related SEO workspaces"
+          items={[
+            {
+              href: "/sidhu/seo/",
+              title: "SEO Overview",
+              description: "Control Center hub.",
+            },
+            {
+              href: "/sidhu/seo/internal-links/",
+              title: "Internal Links",
+              description: "Href and orphan diagnostics.",
+            },
+            {
+              href: "/sidhu/seo/metadata-diagnostics/",
+              title: "Metadata Report",
+              description: "Titles, descriptions, canonicals.",
+            },
+          ]}
+        />
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {counts.map((item) => (
             <div key={item.label} className="rounded-lg border border-line bg-paper px-3 py-2">
@@ -172,21 +182,21 @@ export function ImageDiagnosticsReport({
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <div className="flex flex-col gap-1">
+                      <ListActions>
                         {row.editHref ? (
-                          <Link href={row.editHref} className="font-semibold text-brand">
+                          <ListActionLink href={row.editHref} variant="secondary">
                             Edit source
-                          </Link>
+                          </ListActionLink>
                         ) : null}
                         {row.editMediaHref ? (
-                          <Link href={row.editMediaHref} className="text-xs font-semibold text-brand">
+                          <ListActionLink href={row.editMediaHref} variant="quiet">
                             Edit media
-                          </Link>
+                          </ListActionLink>
                         ) : null}
                         {!row.editHref && !row.editMediaHref ? (
                           <span className="text-xs text-muted">—</span>
                         ) : null}
-                      </div>
+                      </ListActions>
                     </td>
                   </tr>
                 ))

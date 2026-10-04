@@ -13,6 +13,7 @@ import {
 import type { PublicAdminUser } from "@/lib/auth/types";
 import { Banner, Field, TextInput } from "@/components/sidhu/fields";
 import { PasswordField } from "@/components/sidhu/PasswordField";
+import { Button, sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { StatusBadge } from "@/components/sidhu/ui/StatusBadge";
 import {
   MODULE_PERMISSIONS,
@@ -76,7 +77,7 @@ export function UserEditForm({
   return (
     <div className="space-y-4">
       <p className="text-sm">
-        <Link href="/sidhu/users/" className="font-semibold text-brand">
+        <Link href="/sidhu/users/" className={sidhuButtonClass("ghost", "min-h-9 px-0 text-sm")}>
           ← Current users
         </Link>
       </p>
@@ -125,16 +126,16 @@ export function UserEditForm({
           </select>
         </Field>
         {role === "custom" && !user.isPrimary ? <PermissionBoxes selected={user.permissions} /> : null}
-        <button type="submit" disabled={editPending} className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        <Button type="submit" variant="primary" disabled={editPending}>
           {editPending ? "Saving…" : "Save details"}
-        </button>
+        </Button>
       </form>
 
       {isCurrentUser ? (
         <section className="rounded-xl border border-line bg-white p-5">
           <h2 className="font-semibold">Password</h2>
           <p className="mt-2 text-sm text-muted">Change your own password in My Account. You will be asked to sign in again.</p>
-          <Link href="/sidhu/account/" className="mt-4 inline-flex rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white">
+          <Link href="/sidhu/account/" className={sidhuButtonClass("primary", "mt-4 inline-flex")}>
             Change my password
           </Link>
         </section>
@@ -158,21 +159,21 @@ export function UserEditForm({
             />
             <PasswordField name="confirmPassword" label="Confirm password" autoComplete="new-password" />
           </div>
-          <button type="submit" disabled={resetPending} className="rounded-md border border-line px-5 py-2.5 text-sm font-semibold disabled:opacity-60">
+          <Button type="submit" variant="secondary" disabled={resetPending}>
             {resetPending ? "Saving…" : "Reset password"}
-          </button>
+          </Button>
         </form>
       )}
 
       {user.isPrimary ? null : (
         <section className="flex flex-wrap gap-2 rounded-xl border border-line bg-white p-5">
-          <button type="button" className="rounded-md border border-line px-4 py-2 text-sm" onClick={() => void toggleActive()}>
+          <Button type="button" variant="secondary" onClick={() => void toggleActive()}>
             {user.active ? "Disable user" : "Enable user"}
-          </button>
+          </Button>
           {isCurrentUser ? null : (
-            <button type="button" className="rounded-md border border-red-200 px-4 py-2 text-sm text-red-700" onClick={() => void remove()}>
+            <Button type="button" variant="danger" onClick={() => void remove()}>
               Delete user
-            </button>
+            </Button>
           )}
         </section>
       )}

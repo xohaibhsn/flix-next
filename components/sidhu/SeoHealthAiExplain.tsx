@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Button } from "@/components/sidhu/ui/Button";
 import type { SeoExplainFindingInput, SeoExplainResult } from "@/lib/cms/ai-seo/schemas";
 
 export type SeoHealthAiExplainActionResult =
@@ -49,39 +50,30 @@ export function SeoHealthAiExplain({
 
   return (
     <div className="mt-3">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={runExplain}
-        className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-semibold text-ink disabled:opacity-60"
-      >
+      <Button type="button" variant="secondary" disabled={pending} className="min-h-9 px-3 text-sm" onClick={runExplain}>
         {pending ? "Sidhu AI is explaining…" : "Explain with Sidhu AI"}
-      </button>
+      </Button>
 
       {open ? (
         <div className="mt-3 rounded-md border border-line bg-paper px-3 py-3 text-sm text-ink">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-semibold">Sidhu AI explanation</p>
             <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={pending}
-                onClick={runExplain}
-                className="text-xs font-semibold text-brand hover:underline disabled:opacity-60"
-              >
+              <Button type="button" variant="ghost" disabled={pending} className="min-h-8 px-2 text-xs" onClick={runExplain}>
                 Try again
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="ghost"
+                className="min-h-8 px-2 text-xs"
                 onClick={() => {
                   setOpen(false);
                   setError(null);
                   setExplanation(null);
                 }}
-                className="text-xs font-semibold text-muted hover:underline"
               >
                 Close
-              </button>
+              </Button>
             </div>
           </div>
 

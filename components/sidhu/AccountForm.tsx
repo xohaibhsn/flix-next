@@ -5,6 +5,7 @@ import { changeOwnPasswordAction, type FormState } from "@/lib/auth/actions";
 import { Banner } from "@/components/sidhu/fields";
 import { PasswordField } from "@/components/sidhu/PasswordField";
 import { useAdminSession } from "@/components/sidhu/AdminSessionProvider";
+import { Button } from "@/components/sidhu/ui/Button";
 import { ROLE_LABELS } from "@/lib/auth/permissions";
 
 const initial: FormState = {};
@@ -31,13 +32,9 @@ export function AccountForm() {
         <PasswordField name="currentPassword" label="Current password" autoComplete="current-password" />
         <PasswordField name="newPassword" label="New password" autoComplete="new-password" />
         <PasswordField name="confirmPassword" label="Confirm new password" autoComplete="new-password" />
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
+        <Button type="submit" variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Update password"}
-        </button>
+        </Button>
       </form>
     </div>
   );

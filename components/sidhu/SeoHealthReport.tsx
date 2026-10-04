@@ -1,5 +1,7 @@
-import Link from "next/link";
 import { SeoHealthAiExplain, type SeoHealthAiExplainActionResult } from "@/components/sidhu/SeoHealthAiExplain";
+import { Button } from "@/components/sidhu/ui/Button";
+import { ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
+import { RelatedWorkspaces } from "@/components/sidhu/ui/RelatedWorkspaces";
 import { toSeoExplainFindingInput, type SeoExplainFindingInput } from "@/lib/cms/ai-seo/schemas";
 import {
   seoHealthStatusMessage,
@@ -16,6 +18,29 @@ import type {
 
 type SeoHealthFindingAction = (formData: FormData) => void | Promise<void>;
 type SeoHealthAiExplainAction = (input: SeoExplainFindingInput) => Promise<SeoHealthAiExplainActionResult>;
+
+const RELATED_SEO_WORKSPACES = [
+  {
+    href: "/sidhu/seo/",
+    title: "SEO Overview",
+    description: "Control Center hub for all SEO workspaces.",
+  },
+  {
+    href: "/sidhu/seo/metadata-diagnostics/",
+    title: "Metadata Report",
+    description: "Titles, descriptions, and canonical diagnostics.",
+  },
+  {
+    href: "/sidhu/seo/internal-links/",
+    title: "Internal Links",
+    description: "Href and orphan link diagnostics.",
+  },
+  {
+    href: "/sidhu/seo/image-diagnostics/",
+    title: "Image Report",
+    description: "Alt text and media coverage diagnostics.",
+  },
+] as const;
 
 const SOURCE_LABELS: Record<SeoHealthSource, string> = {
   metadata: "Metadata",
@@ -155,17 +180,19 @@ function FindingCard({
         </div>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        {reviewHref ? (
-          <Link href={reviewHref} className="font-semibold text-brand hover:underline">
-            Review affected item →
-          </Link>
-        ) : null}
-        {detailHref ? (
-          <Link href={detailHref} className="font-semibold text-brand hover:underline">
-            View detailed {SOURCE_LABELS[finding.source].toLowerCase()} report →
-          </Link>
-        ) : null}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <ListActions>
+          {reviewHref ? (
+            <ListActionLink href={reviewHref} variant="secondary">
+              Review item
+            </ListActionLink>
+          ) : null}
+          {detailHref ? (
+            <ListActionLink href={detailHref} variant="quiet">
+              View {SOURCE_LABELS[finding.source].toLowerCase()} report
+            </ListActionLink>
+          ) : null}
+        </ListActions>
         {canAccept && fingerprint && acceptAction ? (
           <details className="rounded-md border border-line bg-paper px-3 py-2">
             <summary className="cursor-pointer text-sm font-semibold text-ink">Mark reviewed — no action</summary>
@@ -173,24 +200,18 @@ function FindingCard({
             <p className="mt-1 text-sm text-ink">{itemLabel}</p>
             <form action={acceptAction} className="mt-2">
               <input type="hidden" name="fingerprint" value={fingerprint} />
-              <button
-                type="submit"
-                className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-white"
-              >
+              <Button type="submit" variant="primary" className="min-h-9 px-3 text-sm">
                 Confirm reviewed — no action
-              </button>
+              </Button>
             </form>
           </details>
         ) : null}
         {fingerprint && status === "accepted" && reopenAction ? (
           <form action={reopenAction}>
             <input type="hidden" name="fingerprint" value={fingerprint} />
-            <button
-              type="submit"
-              className="rounded-md border border-line bg-white px-3 py-1.5 text-sm font-semibold text-ink"
-            >
+            <Button type="submit" variant="secondary" className="min-h-9 px-3 text-sm">
               Reopen
-            </button>
+            </Button>
           </form>
         ) : null}
       </div>
@@ -300,14 +321,9 @@ function FindingSection({
 function ScanButton({ hasReport }: { hasReport: boolean }) {
   return (
     <form action="/sidhu/seo/health/" method="get">
-      <button
-        type="submit"
-        name="run"
-        value="1"
-        className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white"
-      >
+      <Button type="submit" name="run" value="1" variant="primary" className="min-h-10 px-5">
         {hasReport ? "Run SEO Health Check Again" : "Run SEO Health Check"}
-      </button>
+      </Button>
     </form>
   );
 }
@@ -360,20 +376,7 @@ export function SeoHealthReport({
             {stateWarning}
           </p>
         ) : null}
-        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <Link href="/sidhu/seo/" className="font-semibold text-brand hover:underline">
-            ← SEO overview
-          </Link>
-          <Link href="/sidhu/seo/metadata-diagnostics/" className="font-semibold text-brand hover:underline">
-            Detailed metadata report
-          </Link>
-          <Link href="/sidhu/seo/internal-links/" className="font-semibold text-brand hover:underline">
-            Detailed internal-link report
-          </Link>
-          <Link href="/sidhu/seo/image-diagnostics/" className="font-semibold text-brand hover:underline">
-            Detailed image report
-          </Link>
-        </div>
+        <RelatedWorkspaces title="Related SEO workspaces" items={RELATED_SEO_WORKSPACES} />
       </section>
 
       {report ? (
