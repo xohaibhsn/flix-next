@@ -23,5 +23,7 @@ export { ListActionButton, ListActionLink, ListActions } from "@/components/sidh
 export { PageHeader } from "@/components/sidhu/ui/PageHeader";
 export { SectionCard } from "@/components/sidhu/ui/SectionCard";
 export { StatusBadge, type StatusBadgeTone } from "@/components/sidhu/ui/StatusBadge";
-export { ModuleSubNav, type ModuleSubNavItem } from "@/components/sidhu/ui/ModuleSubNav";
+export { ModuleSubNav } from "@/components/sidhu/ui/ModuleSubNav";
+export type { ModuleSubNavItem } from "@/lib/cms/module-subnav";
+export { isModuleSubNavItemActive } from "@/lib/cms/module-subnav";
 export { SubNav, type SubNavItem } from "@/components/sidhu/ui/SubNav";

@@ -1,12 +1,12 @@
-export type SidhuSeoNavItem = {
+import { isModuleSubNavItemActive, type ModuleSubNavItem } from "@/lib/cms/module-subnav";
+
+export type SidhuSeoNavItem = ModuleSubNavItem & {
   id: "overview" | "issues" | "content" | "metadata" | "links" | "media" | "advanced";
-  label: string;
-  href: string;
 };
 
-/** Current-feature SEO subsections only — no empty future tabs. */
+/** Current-feature SEO subsections only — no empty future tabs. Serializable data only. */
 export const SIDHU_SEO_NAV: readonly SidhuSeoNavItem[] = [
-  { id: "overview", label: "Overview", href: "/sidhu/seo/" },
+  { id: "overview", label: "Overview", href: "/sidhu/seo/", exact: true },
   { id: "issues", label: "Issues", href: "/sidhu/seo/health/" },
   { id: "content", label: "Content", href: "/sidhu/seo/content/" },
   { id: "metadata", label: "Metadata", href: "/sidhu/seo/metadata-diagnostics/" },
@@ -15,17 +15,14 @@ export const SIDHU_SEO_NAV: readonly SidhuSeoNavItem[] = [
   { id: "advanced", label: "Advanced", href: "/sidhu/seo/advanced/" },
 ] as const;
 
-function normalizeAdminPath(pathname: string) {
-  if (!pathname) return "/";
-  return pathname.endsWith("/") ? pathname : `${pathname}/`;
-}
-
-/** Overview is exact-match only so nested SEO routes do not light Overview. */
+/** Convenience wrapper for href-based checks in existing tests. */
 export function isSeoNavActive(pathname: string, href: string) {
-  const path = normalizeAdminPath(pathname);
-  const target = normalizeAdminPath(href);
-  if (target === "/sidhu/seo/") {
-    return path === "/sidhu/seo/";
-  }
-  return path === target || path.startsWith(target);
+  const item = SIDHU_SEO_NAV.find(
+    (entry) => entry.href === href || entry.href === (href.endsWith("/") ? href : `${href}/`),
+  );
+  if (item) return isModuleSubNavItemActive(pathname, item);
+  return isModuleSubNavItemActive(pathname, {
+    href,
+    exact: href === "/sidhu/seo/" || href === "/sidhu/seo",
+  });
 }

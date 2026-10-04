@@ -132,6 +132,9 @@ test("ModuleSubNav is semantic with aria-current support", () => {
   assert.match(src, /aria-current/);
   assert.match(src, /aria-label/);
   assert.match(src, /flex-wrap/);
+  assert.doesNotMatch(src, /\bisActive\b/);
+  assert.match(read("components/sidhu/SeoModuleChrome.tsx"), /items=\{SIDHU_SEO_NAV\}/);
+  assert.doesNotMatch(read("components/sidhu/SeoModuleChrome.tsx"), /\bisActive\s*=/);
 });
 
 test("Blog keeps one primary New Post in PageHeader and quiet View / secondary Edit / danger Delete", () => {

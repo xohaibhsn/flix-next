@@ -3,30 +3,31 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/components/sidhu/ui/cn";
+import {
+  isModuleSubNavItemActive,
+  type ModuleSubNavItem,
+} from "@/lib/cms/module-subnav";
 
-export type ModuleSubNavItem = {
-  id: string;
-  label: string;
-  href: string;
-};
+export type { ModuleSubNavItem };
 
+/**
+ * Link-based module subsection nav.
+ * Active state is computed inside this client component from serializable item data.
+ * Do not pass function props from Server Components.
+ */
 export function ModuleSubNav({
   items,
   ariaLabel = "Section",
-  isActive,
 }: {
   items: readonly ModuleSubNavItem[];
   ariaLabel?: string;
-  isActive?: (pathname: string, href: string) => boolean;
 }) {
   const pathname = usePathname() || "";
 
   return (
     <nav aria-label={ariaLabel} className="flex flex-wrap gap-1 border-b border-line">
       {items.map((item) => {
-        const active = isActive
-          ? isActive(pathname, item.href)
-          : pathname === item.href || pathname.startsWith(item.href);
+        const active = isModuleSubNavItemActive(pathname, item);
         return (
           <Link
             key={item.id}
