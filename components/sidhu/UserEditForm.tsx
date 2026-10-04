@@ -13,7 +13,7 @@ import {
 import type { PublicAdminUser } from "@/lib/auth/types";
 import { Banner, Field, TextInput } from "@/components/sidhu/fields";
 import { PasswordField } from "@/components/sidhu/PasswordField";
-import { StatusBadge } from "@/components/sidhu/UsersManager";
+import { StatusBadge } from "@/components/sidhu/ui/StatusBadge";
 import {
   MODULE_PERMISSIONS,
   PERMISSION_LABELS,
@@ -84,10 +84,14 @@ export function UserEditForm({
       <section className="rounded-xl border border-line bg-white p-5">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="font-semibold">{user.displayName}</h2>
-          <StatusBadge label={ROLE_LABELS[user.role]} tone={user.role === "super_admin" ? "ok" : "muted"} />
-          <StatusBadge label={user.active ? "Active" : "Disabled"} tone={user.active ? "ok" : "warn"} />
-          {user.isPrimary ? <StatusBadge label="Primary" tone="muted" /> : null}
-          {isCurrentUser ? <StatusBadge label="You" tone="ok" /> : null}
+          <StatusBadge tone={user.role === "super_admin" ? "success" : "neutral"}>
+            {ROLE_LABELS[user.role]}
+          </StatusBadge>
+          <StatusBadge tone={user.active ? "success" : "warning"}>
+            {user.active ? "Active" : "Disabled"}
+          </StatusBadge>
+          {user.isPrimary ? <StatusBadge tone="neutral">Primary</StatusBadge> : null}
+          {isCurrentUser ? <StatusBadge tone="success">You</StatusBadge> : null}
         </div>
         <p className="mt-2 text-sm text-muted">{user.username}</p>
         <p className="mt-1 text-xs text-muted">

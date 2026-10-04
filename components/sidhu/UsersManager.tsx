@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createUserAction, setUserActiveAction, type FormState } from "@/lib/auth/actions";
 import type { PublicAdminUser } from "@/lib/auth/types";
@@ -14,18 +13,26 @@ import {
   type AdminRole,
 } from "@/lib/auth/permissions";
 import { useAdminSession } from "@/components/sidhu/AdminSessionProvider";
+import {
+  DataTable,
+  DataTableShell,
+  ListCard,
+  ListStack,
+  TableHead,
+  TableRow,
+  TableScroll,
+  TableSearch,
+  TableToolbar,
+  Td,
+  Th,
+} from "@/components/sidhu/ui/DataTable";
+import { EmptyState } from "@/components/sidhu/ui/EmptyState";
+import { ListActionButton, ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
+import { StatusBadge } from "@/components/sidhu/ui/StatusBadge";
+import { Button } from "@/components/sidhu/ui/Button";
+import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 
 const empty: FormState = {};
-
-export function StatusBadge({ label, tone }: { label: string; tone: "ok" | "warn" | "muted" }) {
-  const cls =
-    tone === "ok"
-      ? "bg-emerald-50 text-emerald-800"
-      : tone === "warn"
-        ? "bg-amber-50 text-amber-800"
-        : "bg-slate-100 text-slate-700";
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${cls}`}>{label}</span>;
-}
 
 function PermissionBoxes({ selected }: { selected: string[] }) {
   return (
@@ -50,16 +57,12 @@ function CreateUserForm() {
   }, [state.ok, router]);
 
   return (
-    <section className="rounded-xl border border-line bg-white p-5">
+    <SectionCard padding="sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-semibold">Add user</h2>
-        <button
-          type="button"
-          className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white"
-          onClick={() => setOpen((value) => !value)}
-        >
+        <h2 className="text-sm font-semibold">Add user</h2>
+        <Button type="button" variant="primary" className="min-h-9" onClick={() => setOpen((value) => !value)}>
           {open ? "Close" : "Add user"}
-        </button>
+        </Button>
       </div>
       {open ? (
         <form action={action} className="mt-4 space-y-4">
@@ -95,12 +98,12 @@ function CreateUserForm() {
             </select>
           </Field>
           {role === "custom" ? <PermissionBoxes selected={["dashboard"]} /> : null}
-          <button type="submit" disabled={pending} className="rounded-md bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+          <Button type="submit" variant="primary" disabled={pending}>
             {pending ? "Saving…" : "Create user"}
-          </button>
+          </Button>
         </form>
       ) : null}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -113,6 +116,15 @@ export function UsersManager({ users }: { users: PublicAdminUser[] }) {
   const session = useAdminSession();
   const router = useRouter();
   const [message, setMessage] = useState<FormState>({});
+  const [query, setQuery] = useState("");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((user) =>
+      `${user.displayName} ${user.username} ${ROLE_LABELS[user.role]}`.toLowerCase().includes(q),
+    );
+  }, [users, query]);
 
   async function toggleActive(user: PublicAdminUser) {
     if (user.isPrimary) return;
@@ -128,103 +140,121 @@ export function UsersManager({ users }: { users: PublicAdminUser[] }) {
       {message.error ? <Banner tone="error">{message.error}</Banner> : null}
       {message.ok ? <Banner tone="ok">User updated.</Banner> : null}
 
-      <section className="overflow-hidden rounded-xl border border-line bg-white">
-        <div className="border-b border-line px-4 py-3">
-          <h2 className="font-semibold">Current users</h2>
-        </div>
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#f8f8fb] text-xs tracking-wide text-muted uppercase">
-              <tr>
-                <th className="px-4 py-3">Display name</th>
-                <th className="px-4 py-3">Username</th>
-                <th className="px-4 py-3">Role</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Last login</th>
-                <th className="px-4 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => {
+      <DataTableShell
+        toolbar={
+          <TableToolbar>
+            <TableSearch
+              id="users-search"
+              label="Search users"
+              placeholder="Search name, username, role…"
+              value={query}
+              onChange={setQuery}
+            />
+            <p className="text-xs text-muted">{filtered.length} shown</p>
+          </TableToolbar>
+        }
+      >
+        {filtered.length === 0 ? (
+          <div className="p-4">
+            <EmptyState
+              title={users.length === 0 ? "No users yet" : "No matching users"}
+              description={users.length === 0 ? "Create a Sidhu account to get started." : "Try a different search term."}
+            />
+          </div>
+        ) : (
+          <>
+            <TableScroll className="hidden md:block">
+              <DataTable>
+                <TableHead>
+                  <tr>
+                    <Th>Display name</Th>
+                    <Th>Username</Th>
+                    <Th>Role</Th>
+                    <Th>Status</Th>
+                    <Th hideBelow="lg">Last login</Th>
+                    <Th>
+                      <span className="sr-only">Actions</span>
+                    </Th>
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {filtered.map((user) => {
+                    const isYou = session?.id === user.id;
+                    return (
+                      <TableRow key={user.id}>
+                        <Td>
+                          <p className="font-medium">{user.displayName}</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {user.isPrimary ? <StatusBadge tone="neutral">Primary</StatusBadge> : null}
+                            {isYou ? <StatusBadge tone="success">You</StatusBadge> : null}
+                          </div>
+                        </Td>
+                        <Td>{user.username}</Td>
+                        <Td>
+                          <StatusBadge tone={user.role === "super_admin" ? "success" : "neutral"}>
+                            {ROLE_LABELS[user.role]}
+                          </StatusBadge>
+                        </Td>
+                        <Td>
+                          <StatusBadge tone={user.active ? "success" : "warning"}>
+                            {user.active ? "Active" : "Disabled"}
+                          </StatusBadge>
+                        </Td>
+                        <Td hideBelow="lg" className="text-muted">
+                          {formatLogin(user.lastLoginAt)}
+                        </Td>
+                        <Td>
+                          <ListActions>
+                            <ListActionLink href={`/sidhu/users/${user.id}/`}>Edit</ListActionLink>
+                            {user.isPrimary ? null : (
+                              <ListActionButton variant="secondary" onClick={() => void toggleActive(user)}>
+                                {user.active ? "Disable" : "Enable"}
+                              </ListActionButton>
+                            )}
+                          </ListActions>
+                        </Td>
+                      </TableRow>
+                    );
+                  })}
+                </tbody>
+              </DataTable>
+            </TableScroll>
+
+            <ListStack>
+              {filtered.map((user) => {
                 const isYou = session?.id === user.id;
                 return (
-                  <tr key={user.id} className="border-t border-line">
-                    <td className="px-4 py-3">
-                      <p className="font-medium">{user.displayName}</p>
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {user.isPrimary ? <StatusBadge label="Primary" tone="muted" /> : null}
-                        {isYou ? <StatusBadge label="You" tone="ok" /> : null}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{user.username}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge
-                        label={ROLE_LABELS[user.role]}
-                        tone={user.role === "super_admin" ? "ok" : "muted"}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <StatusBadge label={user.active ? "Active" : "Disabled"} tone={user.active ? "ok" : "warn"} />
-                    </td>
-                    <td className="px-4 py-3 text-muted">{formatLogin(user.lastLoginAt)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`/sidhu/users/${user.id}/`} className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold">
-                          Edit
-                        </Link>
-                        {user.isPrimary ? null : (
-                          <button
-                            type="button"
-                            className="rounded-md border border-line px-3 py-1.5 text-xs"
-                            onClick={() => void toggleActive(user)}
-                          >
-                            {user.active ? "Disable" : "Enable"}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                  <ListCard key={user.id}>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold">{user.displayName}</p>
+                      {user.isPrimary ? <StatusBadge tone="neutral">Primary</StatusBadge> : null}
+                      {isYou ? <StatusBadge tone="success">You</StatusBadge> : null}
+                    </div>
+                    <p className="text-sm text-muted">{user.username}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge tone={user.role === "super_admin" ? "success" : "neutral"}>
+                        {ROLE_LABELS[user.role]}
+                      </StatusBadge>
+                      <StatusBadge tone={user.active ? "success" : "warning"}>
+                        {user.active ? "Active" : "Disabled"}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-xs text-muted">Last login: {formatLogin(user.lastLoginAt)}</p>
+                    <ListActions>
+                      <ListActionLink href={`/sidhu/users/${user.id}/`}>Edit</ListActionLink>
+                      {user.isPrimary ? null : (
+                        <ListActionButton variant="secondary" onClick={() => void toggleActive(user)}>
+                          {user.active ? "Disable" : "Enable"}
+                        </ListActionButton>
+                      )}
+                    </ListActions>
+                  </ListCard>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="divide-y divide-line md:hidden">
-          {users.map((user) => {
-            const isYou = session?.id === user.id;
-            return (
-              <article key={user.id} className="space-y-2 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold">{user.displayName}</p>
-                  {user.isPrimary ? <StatusBadge label="Primary" tone="muted" /> : null}
-                  {isYou ? <StatusBadge label="You" tone="ok" /> : null}
-                </div>
-                <p className="text-sm text-muted">{user.username}</p>
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge label={ROLE_LABELS[user.role]} tone={user.role === "super_admin" ? "ok" : "muted"} />
-                  <StatusBadge label={user.active ? "Active" : "Disabled"} tone={user.active ? "ok" : "warn"} />
-                </div>
-                <p className="text-xs text-muted">Last login: {formatLogin(user.lastLoginAt)}</p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <Link href={`/sidhu/users/${user.id}/`} className="rounded-md border border-line px-3 py-1.5 text-xs font-semibold">
-                    Edit
-                  </Link>
-                  {user.isPrimary ? null : (
-                    <button
-                      type="button"
-                      className="rounded-md border border-line px-3 py-1.5 text-xs"
-                      onClick={() => void toggleActive(user)}
-                    >
-                      {user.active ? "Disable" : "Enable"}
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+            </ListStack>
+          </>
+        )}
+      </DataTableShell>
     </div>
   );
 }

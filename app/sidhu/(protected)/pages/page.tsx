@@ -1,7 +1,18 @@
-import Link from "next/link";
 import { AdminShell } from "@/components/sidhu/AdminShell";
-import { SectionCard } from "@/components/sidhu/ui/SectionCard";
-import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
+import {
+  DataTable,
+  DataTableShell,
+  ListCard,
+  ListStack,
+  TableHead,
+  TableRow,
+  TableScroll,
+  Td,
+  Th,
+} from "@/components/sidhu/ui/DataTable";
+import { EmptyState } from "@/components/sidhu/ui/EmptyState";
+import { ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
+import { StatusBadge } from "@/components/sidhu/ui/StatusBadge";
 import { editorHrefForPageId } from "@/lib/cms/page-paths";
 import { cms } from "@/lib/cms/repository";
 
@@ -13,42 +24,81 @@ export default async function SidhuPagesPage() {
   return (
     <AdminShell
       title="Pages"
-      subtitle="Home, IPTV Subscription, Contact, About Us, and policy pages use the same section builder."
+      subtitle="Find a page and open its editor."
       breadcrumbs={[{ label: "Content" }, { label: "Pages" }]}
     >
-      <SectionCard padding="none" className="overflow-hidden">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-paper text-xs tracking-wide text-muted uppercase">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Slug</th>
-              <th className="px-4 py-3">CMS</th>
-              <th className="px-4 py-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
+      {pages.length === 0 ? (
+        <EmptyState title="No pages yet" description="CMS pages will appear here once available." />
+      ) : (
+        <DataTableShell>
+          <TableScroll className="hidden md:block">
+            <DataTable>
+              <TableHead>
+                <tr>
+                  <Th>Name</Th>
+                  <Th hideBelow="md">Public path</Th>
+                  <Th>Status</Th>
+                  <Th>
+                    <span className="sr-only">Actions</span>
+                  </Th>
+                </tr>
+              </TableHead>
+              <tbody>
+                {pages.map((page) => {
+                  const href = editorHrefForPageId(page.id);
+                  return (
+                    <TableRow key={page.id}>
+                      <Td className="font-medium">{page.name}</Td>
+                      <Td hideBelow="md" className="font-mono text-xs text-muted">
+                        {page.slug}
+                      </Td>
+                      <Td>
+                        <StatusBadge tone={page.cmsEnabled ? "success" : "neutral"}>
+                          {page.cmsEnabled ? "CMS enabled" : "Not enabled"}
+                        </StatusBadge>
+                      </Td>
+                      <Td>
+                        {href ? (
+                          <ListActions>
+                            <ListActionLink href={href}>Edit</ListActionLink>
+                          </ListActions>
+                        ) : (
+                          <span className="text-muted">No editor</span>
+                        )}
+                      </Td>
+                    </TableRow>
+                  );
+                })}
+              </tbody>
+            </DataTable>
+          </TableScroll>
+          <ListStack>
             {pages.map((page) => {
               const href = editorHrefForPageId(page.id);
               return (
-                <tr key={page.id} className="border-t border-line">
-                  <td className="px-4 py-3 font-medium">{page.name}</td>
-                  <td className="px-4 py-3 text-muted">{page.slug}</td>
-                  <td className="px-4 py-3">{page.cmsEnabled ? "Enabled" : "Not yet"}</td>
-                  <td className="px-4 py-3">
-                    {href ? (
-                      <Link href={href} className={sidhuButtonClass("ghost", "min-h-9 px-2 text-brand")}>
-                        Edit
-                      </Link>
-                    ) : (
-                      <span className="text-muted">No editor</span>
-                    )}
-                  </td>
-                </tr>
+                <ListCard key={page.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-ink">{page.name}</p>
+                      <p className="mt-0.5 font-mono text-xs text-muted">{page.slug}</p>
+                    </div>
+                    <StatusBadge tone={page.cmsEnabled ? "success" : "neutral"}>
+                      {page.cmsEnabled ? "CMS enabled" : "Not enabled"}
+                    </StatusBadge>
+                  </div>
+                  {href ? (
+                    <ListActions>
+                      <ListActionLink href={href}>Edit</ListActionLink>
+                    </ListActions>
+                  ) : (
+                    <span className="text-sm text-muted">No editor</span>
+                  )}
+                </ListCard>
               );
             })}
-          </tbody>
-        </table>
-      </SectionCard>
+          </ListStack>
+        </DataTableShell>
+      )}
     </AdminShell>
   );
 }

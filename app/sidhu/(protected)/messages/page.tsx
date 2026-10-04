@@ -8,8 +8,9 @@ export default async function SidhuMessagesPage() {
   const messages = await cms.listMessages();
   return (
     <AdminShell
-      title="Contact messages"
-      subtitle="Inquiries from the public contact form. SMTP is not configured; messages are stored in MySQL."
+      title="Messages"
+      subtitle="Contact form inquiries. Message bodies open on View — they do not fill the table."
+      breadcrumbs={[{ label: "Operations" }, { label: "Messages" }]}
     >
       <MessagesList messages={messages} />
     </AdminShell>

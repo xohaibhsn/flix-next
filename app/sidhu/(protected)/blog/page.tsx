@@ -22,7 +22,7 @@ export default async function SidhuBlogPage() {
   return (
     <AdminShell
       title="Blog"
-      subtitle="Draft, publish, and organise posts. Public listing is /blogs/; posts are /blogs/[slug]/."
+      subtitle="Manage posts and categories. Listing SEO stays on this page under its own tab."
       breadcrumbs={[{ label: "Content" }, { label: "Blog" }]}
       actions={
         <Link href="/sidhu/blog/new/" className={sidhuButtonClass("primary")}>
@@ -30,20 +30,23 @@ export default async function SidhuBlogPage() {
         </Link>
       }
     >
-      <div className="space-y-6">
-        <BlogList posts={posts} categories={categories} />
-        {adminHasPermission(user, "seo") ? (
-          <PageSeoPanel
-            pageKey="blog"
-            seo={settings.pageSeo.blog}
-            assets={assets}
-            configured={cloud.configured}
-            settings={settings}
-            fallbackTitle="Blog"
-            fallbackDescription="Guides and updates from Flix IPTV."
-          />
-        ) : null}
-      </div>
+      <BlogList
+        posts={posts}
+        categories={categories}
+        listingSeo={
+          adminHasPermission(user, "seo") ? (
+            <PageSeoPanel
+              pageKey="blog"
+              seo={settings.pageSeo.blog}
+              assets={assets}
+              configured={cloud.configured}
+              settings={settings}
+              fallbackTitle="Blog"
+              fallbackDescription="Guides and updates from Flix IPTV."
+            />
+          ) : undefined
+        }
+      />
     </AdminShell>
   );
 }

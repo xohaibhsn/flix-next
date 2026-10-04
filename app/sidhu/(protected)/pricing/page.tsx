@@ -7,7 +7,11 @@ export const dynamic = "force-dynamic";
 export default async function SidhuPricingPage() {
   const plans = await cms.listPlans();
   return (
-    <AdminShell title="Pricing" subtitle="Central plans used by Home and IPTV Subscription pricing sections.">
+    <AdminShell
+      title="Pricing"
+      subtitle="Central plans used by Home and IPTV Subscription pricing sections."
+      breadcrumbs={[{ label: "Site" }, { label: "Pricing" }]}
+    >
       <PricingManager initialPlans={plans} />
     </AdminShell>
   );

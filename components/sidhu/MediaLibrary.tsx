@@ -13,6 +13,12 @@ import { MEDIA_UPLOAD, formatFileSize } from "@/lib/media-specs";
 import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
 import { Banner } from "@/components/sidhu/fields";
 import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
+import { EmptyState } from "@/components/sidhu/ui/EmptyState";
+import { StatusBadge } from "@/components/sidhu/ui/StatusBadge";
+import { Button } from "@/components/sidhu/ui/Button";
+import { SectionCard } from "@/components/sidhu/ui/SectionCard";
+import { TableSearch, TableToolbar } from "@/components/sidhu/ui/DataTable";
+import { ListActionButton, ListActions } from "@/components/sidhu/ui/ListActions";
 
 type LibraryAsset = LibraryMediaAsset;
 
@@ -33,6 +39,8 @@ export function MediaLibrary({
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
   const [altDrafts, setAltDrafts] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
+  const [altFilter, setAltFilter] = useState<"all" | "missing" | "set">("all");
 
   const reload = useCallback(async () => {
     const result = await fetchSidhuMedia();
@@ -41,6 +49,21 @@ export function MediaLibrary({
   }, []);
 
   const localPreview = useMemo(() => preview, [preview]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return assets.filter((asset) => {
+      const hasAlt = Boolean(asset.alt.trim());
+      if (altFilter === "missing" && hasAlt) return false;
+      if (altFilter === "set" && !hasAlt) return false;
+      if (!q) return true;
+      return (
+        asset.originalFilename.toLowerCase().includes(q) ||
+        asset.alt.toLowerCase().includes(q) ||
+        (asset.folder || "").toLowerCase().includes(q)
+      );
+    });
+  }, [assets, query, altFilter]);
 
   function chooseFile(next: File | null) {
     if (preview) URL.revokeObjectURL(preview);
@@ -140,13 +163,16 @@ export function MediaLibrary({
       ) : null}
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
       <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} />
-      <div className="rounded-xl border border-line bg-white p-4">
-        <h2 className="text-sm font-semibold">Upload Image</h2>
-        <p className="mt-1 text-xs text-muted">
-          JPG, JPEG, PNG, or WEBP · max {MEDIA_UPLOAD.maxLabel}. Choose a file to preview it, then click
-          Upload Image. Nothing is sent until you click Upload Image.
-        </p>
-        <div className="mt-3 grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
+
+      <SectionCard padding="sm" className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">Upload Image</h2>
+          <p className="mt-1 text-xs text-muted">
+            JPG, JPEG, PNG, or WEBP · max {MEDIA_UPLOAD.maxLabel}. Choose a file to preview it, then click
+            Upload Image. Nothing is sent until you click Upload Image.
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-[160px_minmax(0,1fr)]">
           <div className="flex h-36 items-center justify-center overflow-hidden rounded-md border border-dashed border-line bg-paper">
             {localPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -188,106 +214,136 @@ export function MediaLibrary({
                 <option value="theflix/site">theflix/site</option>
               </select>
             </label>
-            <button
+            <Button
               type="button"
-              className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              variant="primary"
               disabled={!configured || busy || !file}
               onClick={() => void upload()}
             >
               {busy ? "Uploading…" : "Upload Image"}
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      </SectionCard>
+
+      <SectionCard padding="none" className="overflow-hidden">
+        <TableToolbar>
+          <TableSearch
+            id="media-search"
+            label="Search media"
+            placeholder="Search filename, alt, folder…"
+            value={query}
+            onChange={setQuery}
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <span className="sr-only">Alt filter</span>
+              <select
+                className="rounded-md border border-line bg-admin-surface px-2 py-2 text-sm text-ink"
+                value={altFilter}
+                onChange={(event) => setAltFilter(event.target.value as "all" | "missing" | "set")}
+                aria-label="Filter by alt text"
+              >
+                <option value="all">All alt states</option>
+                <option value="missing">Alt missing</option>
+                <option value="set">Alt set</option>
+              </select>
+            </label>
+            <p className="text-xs text-muted">{filtered.length} shown</p>
+          </div>
+        </TableToolbar>
+
         {assets.length === 0 ? (
-          <p className="text-sm text-muted">No media yet.</p>
+          <div className="p-4">
+            <EmptyState
+              title="No media items"
+              description="Upload an image to start building the library."
+            />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="p-4">
+            <EmptyState title="No matching media" description="Try a different search or alt filter." />
+          </div>
         ) : (
-          assets.map((asset) => {
-            const usageCount = asset.usageCount ?? (asset.inUse ? 1 : 0);
-            const used = Boolean(asset.inUse || usageCount > 0);
-            const locations = (asset.usageReferences || [])
-              .slice(0, 3)
-              .map((ref) => `${ref.entity} (${ref.field})`)
-              .join(" · ");
-            return (
-              <article key={asset.id} className="overflow-hidden rounded-xl border border-line bg-white">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={asset.secureUrl} alt={asset.alt} className="h-40 w-full object-cover" />
-                <div className="space-y-2 p-3">
-                  <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
-                  <p className="text-xs text-muted">
-                    {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format || "unknown"} ·{" "}
-                    {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
-                  </p>
-                  <p className="text-xs text-muted">
-                    {used
-                      ? `Used in ${usageCount} place${usageCount === 1 ? "" : "s"}`
-                      : "Not in use"}
-                  </p>
-                  {locations ? <p className="text-xs text-muted">{locations}</p> : null}
-                  <p className="text-xs text-muted">
-                    Alt: {asset.alt.trim() ? asset.alt : "Not set"}
-                  </p>
-                  <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
-                    Alt text
-                    <textarea
-                      value={altDrafts[asset.id] ?? asset.alt}
-                      onChange={(event) => setAltDrafts((current) => ({ ...current, [asset.id]: event.target.value }))}
-                      maxLength={MEDIA_ALT_MAX}
-                      rows={2}
-                      className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
-                      placeholder="Leave blank for decorative images"
-                    />
-                  </label>
-                  <p className="text-xs text-muted">
-                    Describe the image briefly when it adds meaningful content. Leave blank for decorative images.
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className="rounded border border-line px-2 py-1 text-xs"
-                      onClick={() => void saveAlt(asset)}
-                      disabled={busy}
-                    >
-                      Save alt
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-line px-2 py-1 text-xs"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(asset.secureUrl);
-                        setMessage({ tone: "ok", text: "Selected — URL copied. Assign it from an image field or paste the URL." });
-                      }}
-                    >
-                      Select/Use
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-line px-2 py-1 text-xs"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(asset.secureUrl);
-                        setMessage({ tone: "ok", text: "URL copied." });
-                      }}
-                    >
-                      Copy URL
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 disabled:opacity-50"
-                      onClick={() => void remove(asset)}
-                      disabled={busy || used || !configured}
-                      title={used ? "Unassign this image before deleting." : undefined}
-                    >
-                      Delete
-                    </button>
+          <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((asset) => {
+              const usageCount = asset.usageCount ?? (asset.inUse ? 1 : 0);
+              const used = Boolean(asset.inUse || usageCount > 0);
+              const locations = (asset.usageReferences || [])
+                .slice(0, 3)
+                .map((ref) => `${ref.entity} (${ref.field})`)
+                .join(" · ");
+              const hasAlt = Boolean(asset.alt.trim());
+              return (
+                <article key={asset.id} className="overflow-hidden rounded-xl border border-line bg-admin-surface">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={asset.secureUrl} alt={asset.alt} className="h-36 w-full object-cover" />
+                  <div className="space-y-2 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">{asset.originalFilename}</p>
+                      <StatusBadge tone={hasAlt ? "success" : "warning"}>
+                        {hasAlt ? "Alt set" : "Alt missing"}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {asset.width ?? "?"}×{asset.height ?? "?"} · {asset.format || "unknown"} ·{" "}
+                      {formatFileSize(asset.bytes)} · {asset.folder || "—"} · {asset.createdAt.slice(0, 10)}
+                    </p>
+                    <p className="text-xs text-muted">
+                      {used
+                        ? `Used in ${usageCount} place${usageCount === 1 ? "" : "s"}`
+                        : "Not in use"}
+                    </p>
+                    {locations ? <p className="text-xs text-muted">{locations}</p> : null}
+                    <label className="block text-xs font-semibold tracking-wide text-ink/70 uppercase">
+                      Alt text
+                      <textarea
+                        value={altDrafts[asset.id] ?? asset.alt}
+                        onChange={(event) => setAltDrafts((current) => ({ ...current, [asset.id]: event.target.value }))}
+                        maxLength={MEDIA_ALT_MAX}
+                        rows={2}
+                        className="mt-1 w-full rounded-md border border-line px-3 py-2 text-sm font-normal"
+                        placeholder="Leave blank for decorative images"
+                      />
+                    </label>
+                    <ListActions>
+                      <ListActionButton variant="secondary" onClick={() => void saveAlt(asset)} disabled={busy}>
+                        Save alt
+                      </ListActionButton>
+                      <ListActionButton
+                        variant="secondary"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(asset.secureUrl);
+                          setMessage({ tone: "ok", text: "Selected — URL copied. Assign it from an image field or paste the URL." });
+                        }}
+                      >
+                        Select/Use
+                      </ListActionButton>
+                      <ListActionButton
+                        variant="secondary"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(asset.secureUrl);
+                          setMessage({ tone: "ok", text: "URL copied." });
+                        }}
+                      >
+                        Copy URL
+                      </ListActionButton>
+                      <ListActionButton
+                        variant="danger"
+                        onClick={() => void remove(asset)}
+                        disabled={busy || used || !configured}
+                        title={used ? "Unassign this image before deleting." : "Delete from Cloudinary and library"}
+                      >
+                        Delete
+                      </ListActionButton>
+                    </ListActions>
                   </div>
-                </div>
-              </article>
-            );
-          })
+                </article>
+              );
+            })}
+          </div>
         )}
-      </div>
+      </SectionCard>
     </div>
   );
 }

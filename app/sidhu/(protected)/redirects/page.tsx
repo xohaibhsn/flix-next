@@ -16,7 +16,8 @@ export default async function SidhuRedirectsPage() {
   return (
     <AdminShell
       title="Redirects"
-      subtitle="Database-backed redirects applied at request time. `/` → `/welcome/` is managed here, not in Next.js config."
+      subtitle="Database-backed redirects applied at request time. `/` → `/welcome/` is managed here."
+      breadcrumbs={[{ label: "Site" }, { label: "Redirects" }]}
     >
       <RedirectManager initialRules={rules} knownDestinations={known} />
     </AdminShell>
