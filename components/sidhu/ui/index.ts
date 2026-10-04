@@ -23,7 +23,10 @@ export { ListActionButton, ListActionLink, ListActions } from "@/components/sidh
 export { PageHeader } from "@/components/sidhu/ui/PageHeader";
 export { SectionCard } from "@/components/sidhu/ui/SectionCard";
 export { StatusBadge, type StatusBadgeTone } from "@/components/sidhu/ui/StatusBadge";
+export { CollapsiblePreview } from "@/components/sidhu/ui/CollapsiblePreview";
+export { EditorTabPanel, EditorTabs, type EditorTabItem } from "@/components/sidhu/ui/EditorTabs";
 export { ModuleSubNav } from "@/components/sidhu/ui/ModuleSubNav";
 export type { ModuleSubNavItem } from "@/lib/cms/module-subnav";
 export { isModuleSubNavItemActive } from "@/lib/cms/module-subnav";
+export { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
 export { SubNav, type SubNavItem } from "@/components/sidhu/ui/SubNav";

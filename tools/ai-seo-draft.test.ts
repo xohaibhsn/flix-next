@@ -296,11 +296,12 @@ test("UI and actions are click-only, auth-scoped, and never write CMS/memory", (
   assert.match(action, /permissionForDraftEntity|requireAdminActor\(/);
   assert.match(action, /entityKind === "page" \? "seo" : "blog"/);
   assert.doesNotMatch(draftService, /savePage|savePost|saveCategory|saveSeoHealthState/);
-  assert.doesNotMatch(draftUi, /useEffect\(/);
+  assert.match(draftUi, /Ask Sidhu AI/);
   assert.match(draftUi, /Draft with Sidhu AI/);
   assert.match(draftUi, /Use this title/);
   assert.match(draftUi, /Use this description/);
-  assert.match(draftUi, /Save is still required|Save the editor to keep it/);
+  assert.match(draftUi, /Save is still required|Save the editor to keep it|AI suggestion applied — not saved/);
+  assert.match(draftUi, /Generate again/);
   assert.match(pagePanel, /SeoAiDraftPanel/);
   assert.match(blog, /SeoAiDraftPanel/);
   assert.match(category, /SeoAiDraftPanel/);
@@ -324,8 +325,9 @@ test("Draft with Sidhu AI control does not auto-invoke and Apply only updates lo
       },
     }),
   );
-  assert.match(html, /Draft with Sidhu AI/);
-  assert.doesNotMatch(html, /Title suggestions/);
+  assert.match(html, /Ask Sidhu AI/);
+  assert.doesNotMatch(html, /Titles/);
+  assert.doesNotMatch(html, /Use this title/);
   assert.equal(title, "About Us");
   assert.equal(description, "Old description");
 });

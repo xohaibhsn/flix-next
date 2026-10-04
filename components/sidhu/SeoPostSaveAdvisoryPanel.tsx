@@ -17,8 +17,10 @@ function severityClass(severity: SeoPostSaveFinding["severity"]) {
 
 export function SeoPostSaveAdvisoryPanel({
   advisory,
+  compact = false,
 }: {
   advisory: SeoPostSaveAdvisory | null | undefined;
+  compact?: boolean;
 }) {
   if (!advisory) return null;
 
@@ -41,29 +43,51 @@ export function SeoPostSaveAdvisoryPanel({
   }
 
   return (
-    <div className="rounded-md border border-line bg-white px-3 py-3 text-sm text-ink">
+    <div className="rounded-md border border-line bg-admin-surface px-3 py-3 text-sm text-ink">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-semibold">SEO check after save</p>
-        <Link href={advisory.healthHref} className="text-xs font-semibold text-brand hover:underline">
+        <Link href={advisory.healthHref} className="text-xs font-semibold text-ink underline-offset-2 hover:underline">
           Open SEO Health
         </Link>
       </div>
       <p className="mt-1 text-muted">{advisory.message}</p>
-      <ul className="mt-3 space-y-2">
-        {advisory.findings.map((finding) => (
-          <li
-            key={`${finding.issueCode}-${finding.field}-${finding.title}`}
-            className={`rounded-md border px-3 py-2 ${severityClass(finding.severity)}`}
-          >
-            <p className="text-xs font-semibold tracking-wide uppercase opacity-80">
-              {severityLabel(finding.severity)}
-            </p>
-            <p className="mt-1 font-medium">{finding.title}</p>
-            <p className="mt-0.5 text-xs opacity-90">{finding.explanation}</p>
-            <p className="mt-1 text-xs opacity-80">Field: {finding.field}</p>
-          </li>
-        ))}
-      </ul>
+      {compact ? (
+        <details className="mt-2">
+          <summary className="cursor-pointer text-xs font-semibold text-muted">
+            {advisory.findings.length} finding{advisory.findings.length === 1 ? "" : "s"}
+          </summary>
+          <ul className="mt-2 space-y-2">
+            {advisory.findings.map((finding) => (
+              <li
+                key={`${finding.issueCode}-${finding.field}-${finding.title}`}
+                className={`rounded-md border px-3 py-2 ${severityClass(finding.severity)}`}
+              >
+                <p className="text-xs font-semibold tracking-wide uppercase opacity-80">
+                  {severityLabel(finding.severity)}
+                </p>
+                <p className="mt-1 font-medium">{finding.title}</p>
+                <p className="mt-0.5 text-xs opacity-90">{finding.explanation}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {advisory.findings.map((finding) => (
+            <li
+              key={`${finding.issueCode}-${finding.field}-${finding.title}`}
+              className={`rounded-md border px-3 py-2 ${severityClass(finding.severity)}`}
+            >
+              <p className="text-xs font-semibold tracking-wide uppercase opacity-80">
+                {severityLabel(finding.severity)}
+              </p>
+              <p className="mt-1 font-medium">{finding.title}</p>
+              <p className="mt-0.5 text-xs opacity-90">{finding.explanation}</p>
+              <p className="mt-1 text-xs opacity-80">Field: {finding.field}</p>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
