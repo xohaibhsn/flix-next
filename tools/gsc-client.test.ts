@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -9,6 +10,7 @@ import {
   isGscConfigured,
   isValidGscSiteUrl,
   normalizeGscPrivateKey,
+  validateGscPrivateKeyRuntime,
   GSC_TIMEOUT_MS,
 } from "../lib/cms/gsc/config";
 import { getGscAccessToken, GSC_AUTH_SCOPE } from "../lib/cms/gsc/auth";
@@ -119,6 +121,27 @@ test("GSC diagnostics returns booleans only — no env string values", () => {
   assert.equal(Object.keys(d).length, 7);
   assert.equal(Object.values(d).every((v) => typeof v === "boolean"), true);
   assert.doesNotMatch(json, /PRIVATE KEY|gserviceaccount|example\.com|BEGIN|theflix|@/);
+});
+
+test("runtime private-key crypto: shallow PEM marker is not parseable", () => {
+  const shallow = normalizeGscPrivateKey(
+    "-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n",
+  );
+  assert.match(shallow, /PRIVATE KEY/);
+  assert.equal(isGscConfigured(sampleEnv()), true);
+  const runtime = validateGscPrivateKeyRuntime(shallow);
+  assert.deepEqual(runtime, { parseable: false });
+  assert.equal(Object.keys(runtime).join(","), "parseable");
+  assert.doesNotMatch(JSON.stringify(runtime), /BEGIN|PRIVATE|ABC|OpenSSL|error/i);
+});
+
+test("runtime private-key crypto: generated test PEM is parseable", () => {
+  const pem = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey
+    .export({ type: "pkcs8", format: "pem" })
+    .toString();
+  const runtime = validateGscPrivateKeyRuntime(pem);
+  assert.deepEqual(runtime, { parseable: true });
+  assert.doesNotMatch(JSON.stringify(runtime), /BEGIN|PRIVATE|MII|modulus|fingerprint/i);
 });
 
 test("valid domain property accepted", () => {
@@ -350,8 +373,10 @@ test("request body rejects invalid dates and caps rowLimit", () => {
 test("security: GSC modules are server-only; no client imports or proxy routes", () => {
   const auth = read("lib/cms/gsc/auth.ts");
   const client = read("lib/cms/gsc/search-analytics.ts");
+  const config = read("lib/cms/gsc/config.ts");
   assert.match(auth, /import ["']server-only["']/);
   assert.match(client, /import ["']server-only["']/);
+  assert.match(config, /import ["']server-only["']/);
   assert.match(auth, /google-auth-library/);
   assert.doesNotMatch(auth, /googleapis/);
   assert.doesNotMatch(client, /googleapis/);

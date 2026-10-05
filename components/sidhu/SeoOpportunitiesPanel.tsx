@@ -233,6 +233,7 @@ function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
         ? "info"
         : "error";
   const checks = probe.status === "NOT_CONFIGURED" ? probe.configChecks : undefined;
+  const authChecks = probe.status === "AUTH_FAILED" ? probe.authChecks : undefined;
 
   return (
     <div className="space-y-2 rounded-md border border-line bg-paper/40 px-3 py-3">
@@ -261,6 +262,16 @@ function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
             <li>Private key present: {yesNo(checks.privateKeyPresent)}</li>
             <li>Private key format recognized: {yesNo(checks.privateKeyLooksPem)}</li>
             <li>Project ID present (optional): {yesNo(checks.projectIdPresent)}</li>
+          </ul>
+        </div>
+      ) : null}
+      {authChecks ? (
+        <div className="space-y-1 pt-1">
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">Authentication checks</p>
+          <ul className="space-y-0.5 text-xs text-muted">
+            <li>
+              Private key cryptographically valid: {yesNo(authChecks.privateKeyCryptographicallyValid)}
+            </li>
           </ul>
         </div>
       ) : null}

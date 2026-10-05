@@ -12,6 +12,7 @@ import { getGscAccessToken } from "@/lib/cms/gsc/auth";
 import {
   getGscConfig,
   getGscConfigDiagnostics,
+  validateGscPrivateKeyRuntime,
   type GscConfig,
   type GscEnv,
 } from "@/lib/cms/gsc/config";
@@ -74,6 +75,7 @@ function baseResult(
     message: partial.message,
     ...(partial.sample ? { sample: partial.sample } : {}),
     ...(partial.configChecks ? { configChecks: partial.configChecks } : {}),
+    ...(partial.authChecks ? { authChecks: partial.authChecks } : {}),
   };
 }
 
@@ -167,6 +169,21 @@ export async function probeGscConnection(options?: {
     );
   }
 
+  const keyRuntime = validateGscPrivateKeyRuntime(config.privateKey);
+  if (!keyRuntime.parseable) {
+    return baseResult(
+      {
+        configured: true,
+        authOk: false,
+        analyticsOk: false,
+        status: "AUTH_FAILED",
+        message: "Google Search Console authentication failed.",
+        authChecks: { privateKeyCryptographicallyValid: false },
+      },
+      now,
+    );
+  }
+
   const getAccessToken = options?.getAccessToken ?? getGscAccessToken;
   const auth = await getAccessToken({ config });
   if (!auth.ok) {
@@ -190,6 +207,9 @@ export async function probeGscConnection(options?: {
               : "Google Search Console authentication failed.",
         ...(status === "NOT_CONFIGURED"
           ? { configChecks: getGscConfigDiagnostics(env) }
+          : {}),
+        ...(status === "AUTH_FAILED"
+          ? { authChecks: { privateKeyCryptographicallyValid: true } }
           : {}),
       },
       now,

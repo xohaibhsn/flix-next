@@ -4,12 +4,13 @@
  */
 
 import assert from "node:assert/strict";
+import { generateKeyPairSync } from "node:crypto";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { getGscConfig } from "../lib/cms/gsc/config";
+import { getGscConfig, isGscConfigured } from "../lib/cms/gsc/config";
 import {
   buildGscProbeSearchAnalyticsRequest,
   GSC_PROBE_ROW_LIMIT,
@@ -26,11 +27,19 @@ function read(rel: string) {
   return readFileSync(path.join(root, rel), "utf8");
 }
 
+/** Test-only generated key — never production credentials. */
+const TEST_PRIVATE_KEY_PEM = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey
+  .export({ type: "pkcs8", format: "pem" })
+  .toString();
+
+/** Shallow PEM-shaped text that passes marker check but is not cryptographically valid. */
+const SHALLOW_INVALID_PEM = "-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n";
+
 function sampleEnv(overrides: Record<string, string | undefined> = {}) {
   return {
     GSC_SITE_URL: "https://theflixiptv.com/",
     GSC_CLIENT_EMAIL: "gsc-reader@example-project.iam.gserviceaccount.com",
-    GSC_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\\nABC\\n-----END PRIVATE KEY-----\\n",
+    GSC_PRIVATE_KEY: TEST_PRIVATE_KEY_PEM,
     GSC_PROJECT_ID: "example-project",
     ...overrides,
   };
@@ -107,7 +116,7 @@ test("GSC probe NOT_CONFIGURED: configChecks reflect which validation failed (bo
   assert.doesNotMatch(json, /@example|BEGIN |access_token/i);
 });
 
-test("GSC probe success omits configChecks", async () => {
+test("GSC probe success omits configChecks and authChecks", async () => {
   const result = await probeGscConnection({
     env: sampleEnv(),
     getAccessToken: async () => ({ ok: true, value: "tok" }),
@@ -115,9 +124,10 @@ test("GSC probe success omits configChecks", async () => {
   });
   assert.equal(result.status, "NO_ROWS");
   assert.equal(result.configChecks, undefined);
+  assert.equal(result.authChecks, undefined);
 });
 
-test("GSC probe AUTH failure: sanitized, zero Search Analytics, no token leakage", async () => {
+test("GSC probe AUTH failure with valid runtime key: auth once, analytics zero, crypto valid true", async () => {
   let analyticsCalls = 0;
   let authCalls = 0;
   const result = await probeGscConnection({
@@ -136,8 +146,34 @@ test("GSC probe AUTH failure: sanitized, zero Search Analytics, no token leakage
   assert.equal(result.configured, true);
   assert.equal(result.authOk, false);
   assert.equal(result.status, "AUTH_FAILED");
+  assert.equal(result.authChecks?.privateKeyCryptographicallyValid, true);
   assert.doesNotMatch(result.message, /TRACE|token=|PRIVATE/i);
-  assert.doesNotMatch(JSON.stringify(result), /abc|PRIVATE KEY|client_email/i);
+  assert.doesNotMatch(JSON.stringify(result), /abc|PRIVATE KEY|client_email|BEGIN|modulus|fingerprint/i);
+});
+
+test("GSC probe AUTH failure with cryptographically invalid key: zero Google auth", async () => {
+  let authCalls = 0;
+  let analyticsCalls = 0;
+  const env = sampleEnv({ GSC_PRIVATE_KEY: SHALLOW_INVALID_PEM });
+  assert.equal(isGscConfigured(env), true, "shallow PEM marker still configures");
+  const result = await probeGscConnection({
+    env,
+    getAccessToken: async () => {
+      authCalls += 1;
+      return { ok: true, value: "token" };
+    },
+    query: async () => {
+      analyticsCalls += 1;
+      return { ok: true, value: { rows: [] } };
+    },
+  });
+  assert.equal(result.status, "AUTH_FAILED");
+  assert.equal(result.authOk, false);
+  assert.equal(result.analyticsOk, false);
+  assert.equal(result.authChecks?.privateKeyCryptographicallyValid, false);
+  assert.equal(authCalls, 0);
+  assert.equal(analyticsCalls, 0);
+  assert.doesNotMatch(JSON.stringify(result), /BEGIN PRIVATE|ABC\\|OpenSSL|DECODER|error:/i);
 });
 
 test("GSC probe success with one row: auth once, analytics once, factual metrics", async () => {
@@ -281,9 +317,11 @@ test("GSC probe action requires SEO admin; no OpenAI; no persistence markers", (
   assert.match(panel, /Site URL present/);
   assert.match(panel, /Private key format recognized/);
   assert.match(panel, /Project ID present \(optional\)/);
+  assert.match(panel, /Authentication checks/);
+  assert.match(panel, /Private key cryptographically valid/);
   assert.match(panel, /gscProbeAction/);
   assert.doesNotMatch(panel, /GSC_PRIVATE_KEY|getGscAccessToken|querySearchAnalytics|process\.env|BEGIN PRIVATE/);
-  assert.match(panel, /privateKeyPresent|privateKeyLooksPem/);
+  assert.match(panel, /privateKeyPresent|privateKeyLooksPem|privateKeyCryptographicallyValid/);
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/probe-types["']/);
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/gsc-actions["']/);
   assert.match(page, /probeGscConnectionAction/);

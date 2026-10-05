@@ -3,6 +3,10 @@
  * Never import from client components. Never log or return private-key material.
  */
 
+import "server-only";
+
+import { createPrivateKey } from "node:crypto";
+
 import type { GscConfigStatus } from "@/lib/cms/gsc/types";
 
 export const GSC_TIMEOUT_MS = 15_000;
@@ -34,6 +38,24 @@ export function normalizeGscPrivateKey(raw: string) {
     key = key.slice(1, -1);
   }
   return key.replace(/\\n/g, "\n");
+}
+
+/** Local offline crypto parse result. Booleans only — never key material or OpenSSL errors. */
+export type GscPrivateKeyRuntimeValidation = {
+  parseable: boolean;
+};
+
+/**
+ * Validate that a normalized PEM private key is cryptographically parseable by Node.
+ * Offline only — zero network calls. Never returns key content or crypto error details.
+ */
+export function validateGscPrivateKeyRuntime(privateKey: string): GscPrivateKeyRuntimeValidation {
+  try {
+    createPrivateKey(privateKey);
+    return { parseable: true };
+  } catch {
+    return { parseable: false };
+  }
 }
 
 /**

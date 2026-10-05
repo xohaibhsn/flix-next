@@ -34,6 +34,11 @@ export type GscProbeConfigChecks = {
   projectIdPresent: boolean;
 };
 
+/** Safe boolean-only auth checks. Never includes key material or provider errors. */
+export type GscProbeAuthChecks = {
+  privateKeyCryptographicallyValid: boolean;
+};
+
 export type GscProbeResult = {
   configured: boolean;
   authOk: boolean;
@@ -53,6 +58,8 @@ export type GscProbeResult = {
   sample?: GscProbeSampleRow;
   /** Present on NOT_CONFIGURED — booleans only, no env values. */
   configChecks?: GscProbeConfigChecks;
+  /** Present on AUTH_FAILED — booleans only, no key/provider details. */
+  authChecks?: GscProbeAuthChecks;
 };
 
 export const GSC_PROBE_ROW_LIMIT = 1;
