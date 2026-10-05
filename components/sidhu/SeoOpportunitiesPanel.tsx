@@ -272,6 +272,35 @@ function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
             <li>
               Private key cryptographically valid: {yesNo(authChecks.privateKeyCryptographicallyValid)}
             </li>
+            {!authChecks.privateKeyCryptographicallyValid ? (
+              <>
+                <li>Raw key contains actual newlines: {yesNo(!!authChecks.privateKeyRawHasActualNewline)}</li>
+                <li>
+                  Raw key contains escaped {"\\n"}: {yesNo(!!authChecks.privateKeyRawHasEscapedNewline)}
+                </li>
+                <li>
+                  Raw key contains double-escaped {"\\\\n"}:{" "}
+                  {yesNo(!!authChecks.privateKeyRawHasDoubleEscapedNewline)}
+                </li>
+                <li>
+                  Normalized key contains actual newlines:{" "}
+                  {yesNo(!!authChecks.privateKeyNormalizedHasActualNewline)}
+                </li>
+                <li>
+                  Normalized key still contains escaped {"\\n"}:{" "}
+                  {yesNo(!!authChecks.privateKeyNormalizedStillHasEscapedNewline)}
+                </li>
+                <li>
+                  Normalized PEM header recognized:{" "}
+                  {yesNo(!!authChecks.privateKeyNormalizedStartsWithPemHeader)}
+                </li>
+                <li>
+                  Normalized PEM footer recognized:{" "}
+                  {yesNo(!!authChecks.privateKeyNormalizedEndsWithPemFooter)}
+                </li>
+                <li>PEM structure looks complete: {yesNo(!!authChecks.privateKeyPemStructureLooksComplete)}</li>
+              </>
+            ) : null}
           </ul>
         </div>
       ) : null}

@@ -58,6 +58,55 @@ export function validateGscPrivateKeyRuntime(privateKey: string): GscPrivateKeyR
   }
 }
 
+const GSC_PEM_HEADER = "-----BEGIN PRIVATE KEY-----";
+const GSC_PEM_FOOTER = "-----END PRIVATE KEY-----";
+
+/** Safe boolean-only private-key encoding diagnostics. Never includes key material. */
+export type GscPrivateKeyEncodingDiagnostics = {
+  privateKeyRawHasActualNewline: boolean;
+  privateKeyRawHasEscapedNewline: boolean;
+  privateKeyRawHasDoubleEscapedNewline: boolean;
+  privateKeyNormalizedHasActualNewline: boolean;
+  privateKeyNormalizedStillHasEscapedNewline: boolean;
+  privateKeyNormalizedStartsWithPemHeader: boolean;
+  privateKeyNormalizedEndsWithPemFooter: boolean;
+  privateKeyPemStructureLooksComplete: boolean;
+};
+
+/**
+ * Observe raw vs normalized private-key newline/escaping shape.
+ * Does not change normalizeGscPrivateKey(). Never returns string values.
+ */
+export function getGscPrivateKeyEncodingDiagnostics(
+  rawInput: string | undefined,
+): GscPrivateKeyEncodingDiagnostics {
+  const raw = String(rawInput ?? "");
+  const normalized = normalizeGscPrivateKey(raw);
+  const trimmedNormalized = normalized.trimEnd();
+  const startsWithHeader = trimmedNormalized.startsWith(GSC_PEM_HEADER);
+  const endsWithFooter = trimmedNormalized.endsWith(GSC_PEM_FOOTER);
+  const headerIdx = trimmedNormalized.indexOf(GSC_PEM_HEADER);
+  const footerIdx = trimmedNormalized.lastIndexOf(GSC_PEM_FOOTER);
+  let bodyNonEmpty = false;
+  if (headerIdx === 0 && footerIdx > GSC_PEM_HEADER.length) {
+    const between = trimmedNormalized.slice(GSC_PEM_HEADER.length, footerIdx);
+    bodyNonEmpty = between.replace(/[\r\n\s]/g, "").length > 0;
+  }
+  const hasNewlineSeparator = normalized.includes("\n");
+
+  return {
+    privateKeyRawHasActualNewline: raw.includes("\n"),
+    privateKeyRawHasEscapedNewline: raw.includes("\\n"),
+    privateKeyRawHasDoubleEscapedNewline: raw.includes("\\\\n"),
+    privateKeyNormalizedHasActualNewline: normalized.includes("\n"),
+    privateKeyNormalizedStillHasEscapedNewline: normalized.includes("\\n"),
+    privateKeyNormalizedStartsWithPemHeader: startsWithHeader,
+    privateKeyNormalizedEndsWithPemFooter: endsWithFooter,
+    privateKeyPemStructureLooksComplete:
+      startsWithHeader && endsWithFooter && hasNewlineSeparator && bodyNonEmpty,
+  };
+}
+
 /**
  * Validate opaque Search Console property identifiers.
  * Accepts domain properties (`sc-domain:example.com`) and URL-prefix (`https://example.com/`).

@@ -171,9 +171,33 @@ test("GSC probe AUTH failure with cryptographically invalid key: zero Google aut
   assert.equal(result.authOk, false);
   assert.equal(result.analyticsOk, false);
   assert.equal(result.authChecks?.privateKeyCryptographicallyValid, false);
+  assert.equal(result.authChecks?.privateKeyRawHasEscapedNewline, true);
+  assert.equal(result.authChecks?.privateKeyRawHasActualNewline, false);
+  assert.equal(result.authChecks?.privateKeyNormalizedHasActualNewline, true);
+  assert.equal(result.authChecks?.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(result.authChecks?.privateKeyNormalizedEndsWithPemFooter, true);
   assert.equal(authCalls, 0);
   assert.equal(analyticsCalls, 0);
-  assert.doesNotMatch(JSON.stringify(result), /BEGIN PRIVATE|ABC\\|OpenSSL|DECODER|error:/i);
+  const json = JSON.stringify(result);
+  assert.doesNotMatch(json, /BEGIN PRIVATE|ABC\\|OpenSSL|DECODER|error:|MII|-----/i);
+  assert.equal(
+    Object.entries(result.authChecks || {})
+      .filter(([, v]) => v !== undefined)
+      .every(([, v]) => typeof v === "boolean"),
+    true,
+  );
+});
+
+test("GSC probe AUTH failure with valid runtime key omits encoding booleans", async () => {
+  const result = await probeGscConnection({
+    env: sampleEnv(),
+    getAccessToken: async () => ({ ok: false, code: "AUTH_FAILED", message: "nope" }),
+    query: async () => ({ ok: true, value: { rows: [] } }),
+  });
+  assert.equal(result.status, "AUTH_FAILED");
+  assert.equal(result.authChecks?.privateKeyCryptographicallyValid, true);
+  assert.equal(result.authChecks?.privateKeyRawHasEscapedNewline, undefined);
+  assert.equal(result.authChecks?.privateKeyPemStructureLooksComplete, undefined);
 });
 
 test("GSC probe success with one row: auth once, analytics once, factual metrics", async () => {
@@ -319,6 +343,8 @@ test("GSC probe action requires SEO admin; no OpenAI; no persistence markers", (
   assert.match(panel, /Project ID present \(optional\)/);
   assert.match(panel, /Authentication checks/);
   assert.match(panel, /Private key cryptographically valid/);
+  assert.match(panel, /Raw key contains actual newlines/);
+  assert.match(panel, /PEM structure looks complete/);
   assert.match(panel, /gscProbeAction/);
   assert.doesNotMatch(panel, /GSC_PRIVATE_KEY|getGscAccessToken|querySearchAnalytics|process\.env|BEGIN PRIVATE/);
   assert.match(panel, /privateKeyPresent|privateKeyLooksPem|privateKeyCryptographicallyValid/);

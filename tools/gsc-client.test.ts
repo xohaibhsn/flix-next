@@ -11,6 +11,7 @@ import {
   isValidGscSiteUrl,
   normalizeGscPrivateKey,
   validateGscPrivateKeyRuntime,
+  getGscPrivateKeyEncodingDiagnostics,
   GSC_TIMEOUT_MS,
 } from "../lib/cms/gsc/config";
 import { getGscAccessToken, GSC_AUTH_SCOPE } from "../lib/cms/gsc/auth";
@@ -142,6 +143,74 @@ test("runtime private-key crypto: generated test PEM is parseable", () => {
   const runtime = validateGscPrivateKeyRuntime(pem);
   assert.deepEqual(runtime, { parseable: true });
   assert.doesNotMatch(JSON.stringify(runtime), /BEGIN|PRIVATE|MII|modulus|fingerprint/i);
+});
+
+test("private-key encoding diagnostics: literal escaped newlines", () => {
+  const raw = "-----BEGIN PRIVATE KEY-----\\nLINE1\\nLINE2\\n-----END PRIVATE KEY-----\\n";
+  const d = getGscPrivateKeyEncodingDiagnostics(raw);
+  assert.equal(d.privateKeyRawHasActualNewline, false);
+  assert.equal(d.privateKeyRawHasEscapedNewline, true);
+  assert.equal(d.privateKeyRawHasDoubleEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedHasActualNewline, true);
+  assert.equal(d.privateKeyNormalizedStillHasEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(d.privateKeyNormalizedEndsWithPemFooter, true);
+  assert.equal(d.privateKeyPemStructureLooksComplete, true);
+  assert.equal(Object.values(d).every((v) => typeof v === "boolean"), true);
+  assert.doesNotMatch(JSON.stringify(d), /BEGIN|LINE1|PRIVATE KEY|\\\\n/);
+});
+
+test("private-key encoding diagnostics: actual multiline PEM", () => {
+  const raw =
+    "-----BEGIN PRIVATE KEY-----\nLINE1\nLINE2\n-----END PRIVATE KEY-----\n";
+  const d = getGscPrivateKeyEncodingDiagnostics(raw);
+  assert.equal(d.privateKeyRawHasActualNewline, true);
+  assert.equal(d.privateKeyRawHasEscapedNewline, false);
+  assert.equal(d.privateKeyRawHasDoubleEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedHasActualNewline, true);
+  assert.equal(d.privateKeyNormalizedStillHasEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(d.privateKeyNormalizedEndsWithPemFooter, true);
+  assert.equal(d.privateKeyPemStructureLooksComplete, true);
+});
+
+test("private-key encoding diagnostics: double-escaped newlines", () => {
+  const raw = "-----BEGIN PRIVATE KEY-----\\\\nLINE1\\\\n-----END PRIVATE KEY-----\\\\n";
+  const d = getGscPrivateKeyEncodingDiagnostics(raw);
+  assert.equal(d.privateKeyRawHasActualNewline, false);
+  assert.equal(d.privateKeyRawHasEscapedNewline, true);
+  assert.equal(d.privateKeyRawHasDoubleEscapedNewline, true);
+  // One-pass \\n → \n leaves a stray backslash before each newline; footer no longer exact.
+  assert.equal(d.privateKeyNormalizedHasActualNewline, true);
+  assert.equal(d.privateKeyNormalizedStillHasEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(d.privateKeyNormalizedEndsWithPemFooter, false);
+  assert.equal(d.privateKeyPemStructureLooksComplete, false);
+});
+
+test("private-key encoding diagnostics: truncated PEM-shaped input", () => {
+  const raw = "-----BEGIN PRIVATE KEY-----\\nABC";
+  const d = getGscPrivateKeyEncodingDiagnostics(raw);
+  assert.equal(d.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(d.privateKeyNormalizedEndsWithPemFooter, false);
+  assert.equal(d.privateKeyPemStructureLooksComplete, false);
+  assert.equal(d.privateKeyRawHasEscapedNewline, true);
+  assert.equal(d.privateKeyNormalizedHasActualNewline, true);
+});
+
+test("private-key encoding diagnostics: valid generated PEM", () => {
+  const pem = generateKeyPairSync("rsa", { modulusLength: 2048 }).privateKey
+    .export({ type: "pkcs8", format: "pem" })
+    .toString();
+  const d = getGscPrivateKeyEncodingDiagnostics(pem);
+  assert.equal(d.privateKeyRawHasActualNewline, true);
+  assert.equal(d.privateKeyRawHasEscapedNewline, false);
+  assert.equal(d.privateKeyNormalizedHasActualNewline, true);
+  assert.equal(d.privateKeyNormalizedStartsWithPemHeader, true);
+  assert.equal(d.privateKeyNormalizedEndsWithPemFooter, true);
+  assert.equal(d.privateKeyPemStructureLooksComplete, true);
+  assert.equal(validateGscPrivateKeyRuntime(pem).parseable, true);
+  assert.doesNotMatch(JSON.stringify(d), /BEGIN|MII|PRIVATE KEY|-----/);
 });
 
 test("valid domain property accepted", () => {

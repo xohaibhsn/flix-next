@@ -12,6 +12,7 @@ import { getGscAccessToken } from "@/lib/cms/gsc/auth";
 import {
   getGscConfig,
   getGscConfigDiagnostics,
+  getGscPrivateKeyEncodingDiagnostics,
   validateGscPrivateKeyRuntime,
   type GscConfig,
   type GscEnv,
@@ -178,7 +179,10 @@ export async function probeGscConnection(options?: {
         analyticsOk: false,
         status: "AUTH_FAILED",
         message: "Google Search Console authentication failed.",
-        authChecks: { privateKeyCryptographicallyValid: false },
+        authChecks: {
+          privateKeyCryptographicallyValid: false,
+          ...getGscPrivateKeyEncodingDiagnostics(env.GSC_PRIVATE_KEY),
+        },
       },
       now,
     );

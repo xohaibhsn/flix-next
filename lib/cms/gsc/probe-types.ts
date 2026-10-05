@@ -37,6 +37,15 @@ export type GscProbeConfigChecks = {
 /** Safe boolean-only auth checks. Never includes key material or provider errors. */
 export type GscProbeAuthChecks = {
   privateKeyCryptographicallyValid: boolean;
+  /** Present when crypto parse fails — encoding shape only, no key content. */
+  privateKeyRawHasActualNewline?: boolean;
+  privateKeyRawHasEscapedNewline?: boolean;
+  privateKeyRawHasDoubleEscapedNewline?: boolean;
+  privateKeyNormalizedHasActualNewline?: boolean;
+  privateKeyNormalizedStillHasEscapedNewline?: boolean;
+  privateKeyNormalizedStartsWithPemHeader?: boolean;
+  privateKeyNormalizedEndsWithPemFooter?: boolean;
+  privateKeyPemStructureLooksComplete?: boolean;
 };
 
 export type GscProbeResult = {
