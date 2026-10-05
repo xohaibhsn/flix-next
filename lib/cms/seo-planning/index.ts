@@ -2,6 +2,7 @@ export {
   SEO_PLANNING_ACTIONABLE_RECOMMENDATIONS,
   SEO_PLANNING_DEFAULT_WORKFLOW,
   SEO_PLANNING_FIELD_CAPS,
+  SEO_PLANNING_HUMAN_NOTES_CAP,
   isSeoPlanningActionableRecommendation,
 } from "@/lib/cms/seo-planning/constants";
 export {
@@ -23,3 +24,16 @@ export {
   type ProceedSeoPlanningResult,
   type SeoPlanningCatalog,
 } from "@/lib/cms/seo-planning/proceed";
+export {
+  allowedSeoPlanningTransitions,
+  applySeoPlanningWorkspaceUpdate,
+  isAllowedSeoPlanningWorkflowTransition,
+  isContentPlanningRecommendation,
+  isInternalLinkPlanningRecommendation,
+  parseSeoPlanningWorkspaceInput,
+  readWorkspaceHumanNotes,
+  seoPlanningTransitionButtonLabel,
+  type SeoPlanningWorkspaceApplyResult,
+  type SeoPlanningWorkspaceInput,
+  type SeoPlanningWorkspaceParseResult,
+} from "@/lib/cms/seo-planning/workspace";

@@ -6,8 +6,17 @@ import {
   proceedSeoOpportunityToPlanningDraft,
   type ProceedSeoPlanningResult,
 } from "@/lib/cms/seo-planning/proceed";
+import {
+  applySeoPlanningWorkspaceUpdate,
+  parseSeoPlanningWorkspaceInput,
+} from "@/lib/cms/seo-planning/workspace";
+import type { SeoPlanningDraft } from "@/lib/cms/types";
 
 export type ProceedSeoOpportunityActionResult = ProceedSeoPlanningResult;
+
+export type SaveSeoPlanningWorkspaceResult =
+  | { ok: true; draft: SeoPlanningDraft }
+  | { ok: false; error: string };
 
 /**
  * Create or open a private SEO planning draft from a research opportunity.
@@ -44,4 +53,36 @@ export async function proceedSeoOpportunityToPlanningDraftAction(
       saveSeoPlanningDraft: (draft) => cms.saveSeoPlanningDraft(draft),
     },
   });
+}
+
+/**
+ * Save private planning workspace fields + allowed workflow transition.
+ * No OpenAI. No GSC. No BlogPost. No redirects. No publish.
+ * Last save wins — no timestamp-based stale guard (DATETIME second precision).
+ */
+export async function saveSeoPlanningWorkspaceAction(
+  rawInput: unknown,
+): Promise<SaveSeoPlanningWorkspaceResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return { ok: false, error: actor.error };
+  }
+
+  const parsed = parseSeoPlanningWorkspaceInput(rawInput);
+  if (!parsed.ok) return parsed;
+
+  const stored = await cms.getSeoPlanningDraftById(parsed.value.id);
+  if (!stored) {
+    return { ok: false, error: "That planning draft could not be found." };
+  }
+
+  const applied = applySeoPlanningWorkspaceUpdate(stored, parsed.value);
+  if (!applied.ok) return applied;
+
+  try {
+    const saved = await cms.saveSeoPlanningDraft(applied.draft);
+    return { ok: true, draft: saved };
+  } catch {
+    return { ok: false, error: "Could not save the planning draft. Please try again." };
+  }
 }

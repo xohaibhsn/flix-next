@@ -1,6 +1,24 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { SEO_RESEARCH_INTENTS } from "@/lib/cms/ai-seo/research-schemas";
 import type { SeoResearchGscEvidence, SeoResearchSource } from "@/lib/cms/ai-seo/research-schemas";
-import type { SeoPlanningDraft } from "@/lib/cms/types";
+import {
+  saveSeoPlanningWorkspaceAction,
+  type SaveSeoPlanningWorkspaceResult,
+} from "@/lib/cms/seo-planning-actions";
+import {
+  allowedSeoPlanningTransitions,
+  isContentPlanningRecommendation,
+  isInternalLinkPlanningRecommendation,
+  readWorkspaceHumanNotes,
+  seoPlanningTransitionButtonLabel,
+} from "@/lib/cms/seo-planning/workspace";
+import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
+import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
+import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
+import { Button } from "@/components/sidhu/ui/Button";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -8,6 +26,10 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 }
 
 function recommendationLabel(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+function workflowLabel(value: string) {
   return value.replaceAll("_", " ");
 }
 
@@ -23,13 +45,47 @@ function formatUpdated(value: string) {
   });
 }
 
+function intentLabel(value: string) {
+  return value.replaceAll("_", " ");
+}
+
+type FormState = {
+  topic: string;
+  workingTitle: string;
+  searchIntent: string;
+  humanNotes: string;
+  workflowStatus: SeoPlanningWorkflowStatus;
+};
+
+function formFromDraft(draft: SeoPlanningDraft): FormState {
+  return {
+    topic: draft.topic,
+    workingTitle: draft.workingTitle,
+    searchIntent: draft.searchIntent || "INFORMATIONAL",
+    humanNotes: readWorkspaceHumanNotes(draft.payload),
+    workflowStatus: draft.workflowStatus,
+  };
+}
+
 export function SeoPlanningDetail({
-  draft,
+  draft: initialDraft,
   targetPostTitle,
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
 }) {
+  const [draft, setDraft] = useState(initialDraft);
+  const [form, setForm] = useState<FormState>(() => formFromDraft(initialDraft));
+  const [savedForm, setSavedForm] = useState<FormState>(() => formFromDraft(initialDraft));
+  const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
+
+  const contentWorkflow = isContentPlanningRecommendation(draft.recommendation);
+  const internalLink = isInternalLinkPlanningRecommendation(draft.recommendation);
+  const transitions = contentWorkflow ? allowedSeoPlanningTransitions(form.workflowStatus) : [];
+
   const payload = asRecord(draft.payload) || {};
   const opportunity = asRecord(payload.opportunity) || {};
   const sources = Array.isArray(payload.sources) ? (payload.sources as SeoResearchSource[]) : [];
@@ -38,44 +94,67 @@ export function SeoPlanningDetail({
     : [];
   const gscMeta = asRecord(payload.gsc);
 
+  function saveWithWorkflow(nextWorkflow: SeoPlanningWorkflowStatus) {
+    if (pending) return;
+    setMessage(null);
+    const payloadInput = {
+      id: draft.id,
+      topic: form.topic,
+      workingTitle: form.workingTitle,
+      searchIntent: form.searchIntent,
+      humanNotes: form.humanNotes,
+      workflowStatus: nextWorkflow,
+    };
+    startTransition(async () => {
+      const result: SaveSeoPlanningWorkspaceResult =
+        await saveSeoPlanningWorkspaceAction(payloadInput);
+      if (!result.ok) {
+        setMessage({ tone: "error", text: result.error });
+        return;
+      }
+      setDraft(result.draft);
+      const nextForm = formFromDraft(result.draft);
+      setForm(nextForm);
+      setSavedForm(nextForm);
+      setMessage({ tone: "ok", text: "Planning draft saved. Still private — nothing was published." });
+    });
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-24">
       <SectionCard className="space-y-2">
         <p className="text-xs font-semibold tracking-wide text-amber-900 uppercase">
           Private planning draft · Not published
         </p>
-        <h2 className="text-lg font-semibold text-ink">{draft.workingTitle || "Untitled plan"}</h2>
-        <p className="text-sm text-muted">{draft.topic}</p>
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide uppercase">
+          <span className="rounded-md border border-line bg-paper px-2 py-1 text-ink">
+            {recommendationLabel(draft.recommendation)}
+          </span>
+          <span className="rounded-md border border-line bg-paper px-2 py-1 text-ink">
+            {workflowLabel(form.workflowStatus)}
+          </span>
+        </div>
+        <h2 className="text-lg font-semibold text-ink">{form.workingTitle || "Untitled plan"}</h2>
+        <p className="text-sm text-muted">{form.topic}</p>
+        <p className="text-xs text-muted">Updated {formatUpdated(draft.updatedAt)}</p>
       </SectionCard>
 
+      {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+
       <SectionCard className="space-y-3">
-        <h3 className="text-sm font-semibold text-ink">Planning summary</h3>
+        <h3 className="text-sm font-semibold text-ink">Target</h3>
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Recommendation</dt>
-            <dd className="mt-1 text-ink">{recommendationLabel(draft.recommendation)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Workflow status</dt>
-            <dd className="mt-1 text-ink">{draft.workflowStatus.replaceAll("_", " ")}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Search intent</dt>
-            <dd className="mt-1 text-ink">{draft.searchIntent || "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Confidence</dt>
-            <dd className="mt-1 text-ink">{String(opportunity.confidence || "—")}</dd>
-          </div>
-          {draft.proposedSlug ? (
+          {draft.recommendation === "NEW_BLOG" ? (
             <div>
               <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Proposed slug</dt>
-              <dd className="mt-1 break-all text-ink">/blogs/{draft.proposedSlug}/</dd>
+              <dd className="mt-1 break-all text-ink">
+                {draft.proposedSlug ? `/blogs/${draft.proposedSlug}/` : "—"}
+              </dd>
             </div>
           ) : null}
-          {draft.matchedPublicUrl || targetPostTitle ? (
+          {draft.recommendation === "REFRESH_EXISTING" ? (
             <div>
-              <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Target post</dt>
+              <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Current article</dt>
               <dd className="mt-1 break-all text-ink">
                 {targetPostTitle || "—"}
                 {draft.matchedPublicUrl ? (
@@ -84,25 +163,115 @@ export function SeoPlanningDetail({
               </dd>
             </div>
           ) : null}
-          {draft.restorePath ? (
+          {draft.recommendation === "RESTORE_HISTORICAL" ? (
             <div>
               <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Restore path</dt>
-              <dd className="mt-1 break-all text-ink">{draft.restorePath}</dd>
+              <dd className="mt-1 break-all text-ink">{draft.restorePath || "—"}</dd>
             </div>
           ) : null}
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Created</dt>
-            <dd className="mt-1 text-ink">{formatUpdated(draft.createdAt)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Updated</dt>
-            <dd className="mt-1 text-ink">{formatUpdated(draft.updatedAt)}</dd>
-          </div>
+          {draft.recommendation === "INTERNAL_LINK_ONLY" ? (
+            <div>
+              <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Link target</dt>
+              <dd className="mt-1 break-all text-ink">
+                {targetPostTitle || draft.matchedPublicUrl || "—"}
+                {draft.matchedPublicUrl && targetPostTitle ? (
+                  <span className="mt-0.5 block text-xs text-muted">{draft.matchedPublicUrl}</span>
+                ) : null}
+              </dd>
+            </div>
+          ) : null}
         </dl>
+      </SectionCard>
+
+      <SectionCard className="space-y-4">
+        <h3 className="text-sm font-semibold text-ink">Planning</h3>
+        <Field label="Topic">
+          <TextInput
+            value={form.topic}
+            onChange={(event) => setForm({ ...form, topic: event.target.value })}
+            maxLength={160}
+            disabled={pending}
+          />
+        </Field>
+        <Field label="Working title">
+          <TextInput
+            value={form.workingTitle}
+            onChange={(event) => setForm({ ...form, workingTitle: event.target.value })}
+            maxLength={180}
+            disabled={pending}
+          />
+        </Field>
+        <Field label="Search intent">
+          <select
+            className={inputClass}
+            value={form.searchIntent}
+            disabled={pending}
+            onChange={(event) => setForm({ ...form, searchIntent: event.target.value })}
+          >
+            {SEO_RESEARCH_INTENTS.map((intent) => (
+              <option key={intent} value={intent}>
+                {intentLabel(intent)}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Human notes" hint="Private planning notes only. Not published.">
+          <TextArea
+            value={form.humanNotes}
+            onChange={(event) => setForm({ ...form, humanNotes: event.target.value })}
+            maxLength={4000}
+            rows={6}
+            disabled={pending}
+          />
+        </Field>
+      </SectionCard>
+
+      <SectionCard className="space-y-3">
+        <h3 className="text-sm font-semibold text-ink">Workflow</h3>
+        {internalLink ? (
+          <div className="space-y-2 text-sm">
+            <p className="font-medium text-ink">Internal-link planning task</p>
+            <p className="text-muted">
+              Status stays Planning. Link-task completion workflow comes later. Still private — nothing is
+              published.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <p>
+              <span className="text-xs font-semibold tracking-wide text-muted uppercase">Current</span>
+              <span className="mt-1 block font-medium text-ink">{workflowLabel(form.workflowStatus)}</span>
+            </p>
+            {form.workflowStatus === "READY_TO_PUBLISH" ? (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950">
+                Still private — this does not publish anything.
+              </p>
+            ) : null}
+            {transitions.length ? (
+              <div className="flex flex-wrap gap-2">
+                {transitions.map((to) => (
+                  <Button
+                    key={to}
+                    type="button"
+                    variant="secondary"
+                    className="min-h-10"
+                    disabled={pending}
+                    onClick={() => saveWithWorkflow(to)}
+                  >
+                    {seoPlanningTransitionButtonLabel(form.workflowStatus, to)}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted">No workflow moves available from this status.</p>
+            )}
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard className="space-y-3 text-sm">
         <h3 className="text-sm font-semibold text-ink">Evidence snapshot</h3>
+        <p className="text-xs text-muted">Read-only opportunity evidence from Proceed. Not editable.</p>
         {opportunity.whyNow ? (
           <div>
             <p className="text-xs font-semibold tracking-wide text-muted uppercase">Why now</p>
@@ -127,6 +296,10 @@ export function SeoPlanningDetail({
             <p className="mt-1 text-ink">{String(opportunity.nextStep)}</p>
           </div>
         ) : null}
+        <div>
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">Confidence</p>
+          <p className="mt-1 text-ink">{String(opportunity.confidence || "—")}</p>
+        </div>
         {gscMeta ? (
           <div>
             <p className="text-xs font-semibold tracking-wide text-muted uppercase">GSC run meta</p>
@@ -175,6 +348,14 @@ export function SeoPlanningDetail({
           </div>
         ) : null}
       </SectionCard>
+
+      <StickyEditorBar
+        title={form.workingTitle || "Planning draft"}
+        dirty={dirty}
+        saving={pending}
+        saveLabel="Save planning draft"
+        onSave={() => saveWithWorkflow(form.workflowStatus)}
+      />
     </div>
   );
 }

@@ -13,6 +13,9 @@ export type SeoPlanningActionableRecommendation =
 
 export const SEO_PLANNING_DEFAULT_WORKFLOW: SeoPlanningWorkflowStatus = "PLANNING";
 
+/** Phase B human notes — stored under payload.workspace.humanNotes. */
+export const SEO_PLANNING_HUMAN_NOTES_CAP = 4000;
+
 export const SEO_PLANNING_FIELD_CAPS = {
   id: 80,
   fingerprint: 320,
@@ -27,6 +30,7 @@ export const SEO_PLANNING_FIELD_CAPS = {
   workflowStatus: 40,
   createdBy: 80,
   linkedPostId: 80,
+  humanNotes: SEO_PLANNING_HUMAN_NOTES_CAP,
   whyNow: 280,
   webEvidence: 360,
   suggestedAngle: 280,
