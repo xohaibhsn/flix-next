@@ -221,6 +221,10 @@ export function SeoOpportunitiesPanel({
   );
 }
 
+function yesNo(value: boolean) {
+  return value ? "YES" : "NO";
+}
+
 function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
   const tone =
     probe.status === "AVAILABLE" || probe.status === "NO_ROWS"
@@ -228,6 +232,7 @@ function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
       : probe.status === "NOT_CONFIGURED"
         ? "info"
         : "error";
+  const checks = probe.status === "NOT_CONFIGURED" ? probe.configChecks : undefined;
 
   return (
     <div className="space-y-2 rounded-md border border-line bg-paper/40 px-3 py-3">
@@ -244,6 +249,20 @@ function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
           Clicks {probe.sample.clicks.toLocaleString()} · CTR {formatPct(probe.sample.ctr)} · Avg position{" "}
           {formatPos(probe.sample.position)}
         </p>
+      ) : null}
+      {checks ? (
+        <div className="space-y-1 pt-1">
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">Configuration checks</p>
+          <ul className="space-y-0.5 text-xs text-muted">
+            <li>Site URL present: {yesNo(checks.siteUrlPresent)}</li>
+            <li>Site URL valid: {yesNo(checks.siteUrlValid)}</li>
+            <li>Client email present: {yesNo(checks.clientEmailPresent)}</li>
+            <li>Client email valid: {yesNo(checks.clientEmailValid)}</li>
+            <li>Private key present: {yesNo(checks.privateKeyPresent)}</li>
+            <li>Private key format recognized: {yesNo(checks.privateKeyLooksPem)}</li>
+            <li>Project ID present (optional): {yesNo(checks.projectIdPresent)}</li>
+          </ul>
+        </div>
       ) : null}
     </div>
   );

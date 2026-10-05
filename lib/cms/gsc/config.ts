@@ -67,17 +67,49 @@ export function isValidGscSiteUrl(value: string) {
 
 export type GscEnv = Record<string, string | undefined>;
 
-export function isGscConfigured(env: GscEnv = process.env) {
+/** Safe boolean-only config diagnostics. Never includes env values. */
+export type GscConfigDiagnostics = {
+  siteUrlPresent: boolean;
+  siteUrlValid: boolean;
+  clientEmailPresent: boolean;
+  clientEmailValid: boolean;
+  privateKeyPresent: boolean;
+  privateKeyLooksPem: boolean;
+  projectIdPresent: boolean;
+};
+
+/**
+ * Boolean diagnostics for GSC env presence/shape.
+ * Uses the same normalization/validation as isGscConfigured().
+ * Never returns credential values.
+ */
+export function getGscConfigDiagnostics(env: GscEnv = process.env): GscConfigDiagnostics {
   const siteUrl = trimEnv(env.GSC_SITE_URL);
   const clientEmail = trimEnv(env.GSC_CLIENT_EMAIL);
-  const privateKey = normalizeGscPrivateKey(trimEnv(env.GSC_PRIVATE_KEY));
+  const privateKeyRaw = trimEnv(env.GSC_PRIVATE_KEY);
+  const privateKey = normalizeGscPrivateKey(privateKeyRaw);
+  const projectId = trimEnv(env.GSC_PROJECT_ID);
+
+  return {
+    siteUrlPresent: Boolean(siteUrl),
+    siteUrlValid: isValidGscSiteUrl(siteUrl),
+    clientEmailPresent: Boolean(clientEmail),
+    clientEmailValid: clientEmail.includes("@"),
+    privateKeyPresent: Boolean(privateKeyRaw),
+    privateKeyLooksPem: privateKey.includes("PRIVATE KEY"),
+    projectIdPresent: Boolean(projectId),
+  };
+}
+
+export function isGscConfigured(env: GscEnv = process.env) {
+  const d = getGscConfigDiagnostics(env);
   return Boolean(
-    siteUrl &&
-      clientEmail &&
-      privateKey &&
-      isValidGscSiteUrl(siteUrl) &&
-      clientEmail.includes("@") &&
-      privateKey.includes("PRIVATE KEY"),
+    d.siteUrlPresent &&
+      d.siteUrlValid &&
+      d.clientEmailPresent &&
+      d.clientEmailValid &&
+      d.privateKeyPresent &&
+      d.privateKeyLooksPem,
   );
 }
 

@@ -23,6 +23,17 @@ export type GscProbeSampleRow = {
   position: number;
 };
 
+/** Safe boolean-only config checks. Never includes env values. */
+export type GscProbeConfigChecks = {
+  siteUrlPresent: boolean;
+  siteUrlValid: boolean;
+  clientEmailPresent: boolean;
+  clientEmailValid: boolean;
+  privateKeyPresent: boolean;
+  privateKeyLooksPem: boolean;
+  projectIdPresent: boolean;
+};
+
 export type GscProbeResult = {
   configured: boolean;
   authOk: boolean;
@@ -40,6 +51,8 @@ export type GscProbeResult = {
     expression: "gbr";
   };
   sample?: GscProbeSampleRow;
+  /** Present on NOT_CONFIGURED — booleans only, no env values. */
+  configChecks?: GscProbeConfigChecks;
 };
 
 export const GSC_PROBE_ROW_LIMIT = 1;

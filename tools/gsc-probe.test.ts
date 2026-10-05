@@ -44,6 +44,7 @@ test("GSC probe NOT_CONFIGURED: zero auth and zero Search Analytics calls", asyn
   let authCalls = 0;
   let analyticsCalls = 0;
   const result = await probeGscConnection({
+    env: {},
     config: getGscConfig({}),
     getAccessToken: async () => {
       authCalls += 1;
@@ -60,7 +61,60 @@ test("GSC probe NOT_CONFIGURED: zero auth and zero Search Analytics calls", asyn
   assert.equal(result.status, "NOT_CONFIGURED");
   assert.equal(authCalls, 0);
   assert.equal(analyticsCalls, 0);
+  assert.ok(result.configChecks);
+  assert.deepEqual(result.configChecks, {
+    siteUrlPresent: false,
+    siteUrlValid: false,
+    clientEmailPresent: false,
+    clientEmailValid: false,
+    privateKeyPresent: false,
+    privateKeyLooksPem: false,
+    projectIdPresent: false,
+  });
+  assert.equal(
+    Object.values(result.configChecks!).every((v) => typeof v === "boolean"),
+    true,
+  );
   assert.doesNotMatch(JSON.stringify(result), /PRIVATE KEY|Bearer |access_token|client_email|GSC_SITE_URL/i);
+});
+
+test("GSC probe NOT_CONFIGURED: configChecks reflect which validation failed (booleans only)", async () => {
+  let authCalls = 0;
+  let analyticsCalls = 0;
+  const env = sampleEnv({ GSC_SITE_URL: "not-a-property", GSC_PRIVATE_KEY: "plain-text" });
+  const result = await probeGscConnection({
+    env,
+    getAccessToken: async () => {
+      authCalls += 1;
+      return { ok: true, value: "token" };
+    },
+    query: async () => {
+      analyticsCalls += 1;
+      return { ok: true, value: { rows: [] } };
+    },
+  });
+  assert.equal(result.status, "NOT_CONFIGURED");
+  assert.equal(authCalls, 0);
+  assert.equal(analyticsCalls, 0);
+  assert.equal(result.configChecks?.siteUrlPresent, true);
+  assert.equal(result.configChecks?.siteUrlValid, false);
+  assert.equal(result.configChecks?.privateKeyPresent, true);
+  assert.equal(result.configChecks?.privateKeyLooksPem, false);
+  assert.equal(result.configChecks?.clientEmailPresent, true);
+  assert.equal(result.configChecks?.clientEmailValid, true);
+  const json = JSON.stringify(result);
+  assert.doesNotMatch(json, /not-a-property|plain-text|PRIVATE KEY|gserviceaccount|theflixiptv/i);
+  assert.doesNotMatch(json, /@example|BEGIN |access_token/i);
+});
+
+test("GSC probe success omits configChecks", async () => {
+  const result = await probeGscConnection({
+    env: sampleEnv(),
+    getAccessToken: async () => ({ ok: true, value: "tok" }),
+    query: async () => ({ ok: true, value: { rows: [] } }),
+  });
+  assert.equal(result.status, "NO_ROWS");
+  assert.equal(result.configChecks, undefined);
 });
 
 test("GSC probe AUTH failure: sanitized, zero Search Analytics, no token leakage", async () => {
@@ -223,8 +277,13 @@ test("GSC probe action requires SEO admin; no OpenAI; no persistence markers", (
   assert.doesNotMatch(actions, /researchUk|web_search|requestOpenAi|OPENAI_/i);
   assert.doesNotMatch(probe, /web_search|requestOpenAi|OPENAI_|savePost|savePage|writeFile/i);
   assert.match(panel, /Test GSC connection/);
+  assert.match(panel, /Configuration checks/);
+  assert.match(panel, /Site URL present/);
+  assert.match(panel, /Private key format recognized/);
+  assert.match(panel, /Project ID present \(optional\)/);
   assert.match(panel, /gscProbeAction/);
-  assert.doesNotMatch(panel, /GSC_PRIVATE_KEY|getGscAccessToken|querySearchAnalytics|privateKey/);
+  assert.doesNotMatch(panel, /GSC_PRIVATE_KEY|getGscAccessToken|querySearchAnalytics|process\.env|BEGIN PRIVATE/);
+  assert.match(panel, /privateKeyPresent|privateKeyLooksPem/);
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/probe-types["']/);
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/gsc-actions["']/);
   assert.match(page, /probeGscConnectionAction/);

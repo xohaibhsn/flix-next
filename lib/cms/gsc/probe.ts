@@ -9,7 +9,12 @@
 import "server-only";
 
 import { getGscAccessToken } from "@/lib/cms/gsc/auth";
-import { getGscConfig, type GscConfig } from "@/lib/cms/gsc/config";
+import {
+  getGscConfig,
+  getGscConfigDiagnostics,
+  type GscConfig,
+  type GscEnv,
+} from "@/lib/cms/gsc/config";
 import { buildGscEvidenceDateWindows } from "@/lib/cms/gsc/date-windows";
 import {
   GSC_PROBE_ROW_LIMIT,
@@ -68,6 +73,7 @@ function baseResult(
     status: partial.status,
     message: partial.message,
     ...(partial.sample ? { sample: partial.sample } : {}),
+    ...(partial.configChecks ? { configChecks: partial.configChecks } : {}),
   };
 }
 
@@ -138,12 +144,14 @@ export function buildGscProbeSearchAnalyticsRequest(now: Date = new Date()): Gsc
 export async function probeGscConnection(options?: {
   now?: Date;
   config?: GscConfig;
+  env?: GscEnv;
   getAccessToken?: GscProbeAuthFn;
   query?: GscProbeAnalyticsFn;
   fetchImpl?: GscFetch;
 }): Promise<GscProbeResult> {
   const now = options?.now ?? new Date();
-  const config = options?.config ?? getGscConfig();
+  const env = options?.env ?? process.env;
+  const config = options?.config ?? getGscConfig(env);
 
   if (!config.configured) {
     return baseResult(
@@ -153,6 +161,7 @@ export async function probeGscConnection(options?: {
         analyticsOk: false,
         status: "NOT_CONFIGURED",
         message: "Google Search Console is not configured yet.",
+        configChecks: getGscConfigDiagnostics(env),
       },
       now,
     );
@@ -179,6 +188,9 @@ export async function probeGscConnection(options?: {
             : status === "NOT_CONFIGURED"
               ? "Google Search Console is not configured yet."
               : "Google Search Console authentication failed.",
+        ...(status === "NOT_CONFIGURED"
+          ? { configChecks: getGscConfigDiagnostics(env) }
+          : {}),
       },
       now,
     );

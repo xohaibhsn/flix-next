@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   getGscConfig,
+  getGscConfigDiagnostics,
   getGscConfigStatus,
   isGscConfigured,
   isValidGscSiteUrl,
@@ -50,6 +51,74 @@ test("missing config reports NOT_CONFIGURED / configured=false safely", () => {
   assert.equal(config.privateKey, "");
   assert.equal(config.clientEmail, "");
   assert.equal(config.siteUrl, "");
+});
+
+test("GSC diagnostics: all missing → required booleans false, configured false", () => {
+  const d = getGscConfigDiagnostics({});
+  assert.deepEqual(d, {
+    siteUrlPresent: false,
+    siteUrlValid: false,
+    clientEmailPresent: false,
+    clientEmailValid: false,
+    privateKeyPresent: false,
+    privateKeyLooksPem: false,
+    projectIdPresent: false,
+  });
+  assert.equal(isGscConfigured({}), false);
+  assert.equal(Object.values(d).every((v) => typeof v === "boolean"), true);
+});
+
+test("GSC diagnostics: invalid site URL → present true, valid false, configured false", () => {
+  const env = sampleEnv({ GSC_SITE_URL: "not-a-property" });
+  const d = getGscConfigDiagnostics(env);
+  assert.equal(d.siteUrlPresent, true);
+  assert.equal(d.siteUrlValid, false);
+  assert.equal(isGscConfigured(env), false);
+});
+
+test("GSC diagnostics: email without @ → present true, valid false, configured false", () => {
+  const env = sampleEnv({ GSC_CLIENT_EMAIL: "not-an-email" });
+  const d = getGscConfigDiagnostics(env);
+  assert.equal(d.clientEmailPresent, true);
+  assert.equal(d.clientEmailValid, false);
+  assert.equal(isGscConfigured(env), false);
+});
+
+test("GSC diagnostics: private key non-empty but not PEM-looking → configured false", () => {
+  const env = sampleEnv({ GSC_PRIVATE_KEY: "not-a-pem-blob" });
+  const d = getGscConfigDiagnostics(env);
+  assert.equal(d.privateKeyPresent, true);
+  assert.equal(d.privateKeyLooksPem, false);
+  assert.equal(isGscConfigured(env), false);
+});
+
+test("GSC diagnostics: valid escaped-\\\\n private key looks PEM", () => {
+  const env = sampleEnv();
+  const d = getGscConfigDiagnostics(env);
+  assert.equal(d.privateKeyPresent, true);
+  assert.equal(d.privateKeyLooksPem, true);
+  assert.equal(isGscConfigured(env), true);
+});
+
+test("GSC diagnostics: missing project ID optional — required three still configured", () => {
+  const env = sampleEnv({ GSC_PROJECT_ID: "" });
+  const d = getGscConfigDiagnostics(env);
+  assert.equal(d.projectIdPresent, false);
+  assert.equal(d.siteUrlPresent, true);
+  assert.equal(d.siteUrlValid, true);
+  assert.equal(d.clientEmailPresent, true);
+  assert.equal(d.clientEmailValid, true);
+  assert.equal(d.privateKeyPresent, true);
+  assert.equal(d.privateKeyLooksPem, true);
+  assert.equal(isGscConfigured(env), true);
+});
+
+test("GSC diagnostics returns booleans only — no env string values", () => {
+  const d = getGscConfigDiagnostics(sampleEnv());
+  const json = JSON.stringify(d);
+  assert.equal(Object.keys(d).length, 7);
+  assert.equal(Object.values(d).every((v) => typeof v === "boolean"), true);
+  assert.doesNotMatch(json, /PRIVATE KEY|gserviceaccount|example\.com|BEGIN|theflix|@/);
 });
 
 test("valid domain property accepted", () => {
