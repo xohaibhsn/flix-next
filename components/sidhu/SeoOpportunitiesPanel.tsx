@@ -75,6 +75,7 @@ export function SeoOpportunitiesPanel({
   const [pending, startTransition] = useTransition();
   const [probePending, startProbeTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<string | null>(null);
   const [research, setResearch] = useState<SeoResearchResult | null>(null);
   const [probe, setProbe] = useState<GscProbeResult | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
@@ -93,14 +94,17 @@ export function SeoOpportunitiesPanel({
   function runResearch() {
     if (pending || probePending) return;
     setError(null);
+    setDiagnostic(null);
     startTransition(async () => {
       const result = await researchAction();
       if (!result.ok) {
         setResearch(null);
         setError(result.error);
+        setDiagnostic(result.diagnostic || null);
         return;
       }
       setError(null);
+      setDiagnostic(null);
       setResearch(result.research);
     });
   }
@@ -151,6 +155,11 @@ export function SeoOpportunitiesPanel({
         ) : null}
 
         {error ? <Banner tone="error">{error}</Banner> : null}
+        {diagnostic ? (
+          <p className="text-xs text-muted">
+            Diagnostic: {diagnostic}
+          </p>
+        ) : null}
         {probeError ? <Banner tone="error">{probeError}</Banner> : null}
         {probe ? <GscProbeResultCard probe={probe} /> : null}
 

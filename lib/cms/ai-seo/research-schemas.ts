@@ -9,6 +9,17 @@ export const SEO_RESEARCH_RECOMMENDATIONS = [
 ] as const;
 export type SeoResearchRecommendation = (typeof SEO_RESEARCH_RECOMMENDATIONS)[number];
 
+/** Safe admin-only research failure stage codes — never include raw provider text. */
+export const SEO_RESEARCH_INVALID_DIAGNOSTICS = [
+  "RESPONSE_JSON_INVALID",
+  "OUTPUT_TEXT_MISSING",
+  "OUTPUT_JSON_INVALID",
+  "SEMANTIC_PAYLOAD_INVALID",
+  "RESPONSE_INCOMPLETE",
+  "RESPONSE_REFUSAL",
+] as const;
+export type SeoResearchInvalidDiagnostic = (typeof SEO_RESEARCH_INVALID_DIAGNOSTICS)[number];
+
 /** GSC run statuses (GSC-2) — client-safe labels come from the server result. */
 export const SEO_RESEARCH_GSC_STATUSES = [
   "AVAILABLE",
@@ -304,7 +315,10 @@ export type NormalizeSeoResearchOptions = {
  * Normalize model JSON against the allowlisted Flix public URLs.
  * GSC evidence refs are resolved against the server catalog when provided.
  * RESTORE_HISTORICAL is server-gated via restorationPathAllowlist.
- * Returns null when the payload is malformed.
+ *
+ * Fail-closed RESTORE rules drop that opportunity only (never coerce to another
+ * recommendation). Malformed top-level/schema-unusable data still returns null.
+ * An empty opportunities array is a valid result when every RESTORE was dropped.
  */
 export function normalizeSeoResearchResult(
   raw: unknown,
@@ -356,13 +370,11 @@ export function normalizeSeoResearchResult(
     if (!isEnum(row.confidence, SEO_RESEARCH_CONFIDENCE)) return null;
 
     if (typeof row.restorePath !== "string") return null;
-    const restorePathRaw = normalizePublicPath(
-      trimTo(row.restorePath, SEO_RESEARCH_FIELD_CAPS.restorePath),
-    );
-    // Empty restorePath stays ""; non-empty must normalize to a path.
-    const restorePath =
-      String(row.restorePath).replace(/\s+/g, " ").trim() === "" ? "" : restorePathRaw;
-    if (String(row.restorePath).replace(/\s+/g, " ").trim() !== "" && !restorePath) return null;
+    const restoreTrimmed = String(row.restorePath).replace(/\s+/g, " ").trim();
+    const restorePathNormalized =
+      restoreTrimmed === ""
+        ? ""
+        : normalizePublicPath(trimTo(row.restorePath, SEO_RESEARCH_FIELD_CAPS.restorePath));
 
     const matchedTitleRaw = trimTo(row.matchedTitle, SEO_RESEARCH_FIELD_CAPS.matchedTitle);
     const matchedUrlRaw = normalizePublicPath(
@@ -371,15 +383,19 @@ export function normalizeSeoResearchResult(
 
     let matchedTitle: string | null = matchedTitleRaw || null;
     let matchedPublicUrl: string | null = null;
+    let restorePath = "";
 
     if (row.recommendation === "RESTORE_HISTORICAL") {
-      if (!restorePath || !restoreAllowlist.has(restorePath)) return null;
-      if (matchedUrlRaw) return null;
-      if (row.existingCoverage === "STRONG") return null;
+      // Fail-closed: drop this opportunity only — never coerce to another recommendation.
+      if (!restorePathNormalized || !restoreAllowlist.has(restorePathNormalized)) continue;
+      if (matchedUrlRaw) continue;
+      if (row.existingCoverage === "STRONG") continue;
+      restorePath = restorePathNormalized;
       matchedTitle = matchedTitleRaw || null;
       matchedPublicUrl = null;
     } else {
-      if (restorePath !== "") return null;
+      // restorePath is non-authoritative outside RESTORE — canonical empty string.
+      restorePath = "";
       if (
         row.recommendation === "REFRESH_EXISTING" ||
         row.recommendation === "INTERNAL_LINK_ONLY"
@@ -408,7 +424,7 @@ export function normalizeSeoResearchResult(
           (record.kind === "page" || record.kind === "query_page") &&
           (record.normalizedPath || "") === restorePath,
       );
-      if (!pageBearingMatch) return null;
+      if (!pageBearingMatch) continue;
     }
 
     opportunities.push({

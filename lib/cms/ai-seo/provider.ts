@@ -10,6 +10,7 @@ import {
   normalizeSeoResearchSources,
   SEO_RESEARCH_JSON_SCHEMA,
   SEO_RESEARCH_SYSTEM_INSTRUCTION,
+  type SeoResearchInvalidDiagnostic,
   type SeoResearchResult,
 } from "@/lib/cms/ai-seo/research-schemas";
 import {
@@ -43,7 +44,13 @@ export type OpenAiDraftProviderResult =
 
 export type OpenAiResearchProviderResult =
   | { ok: true; research: SeoResearchResult; model: string }
-  | { ok: false; code: OpenAiProviderErrorCode; message: string };
+  | {
+      ok: false;
+      code: OpenAiProviderErrorCode;
+      message: string;
+      /** Safe stage code for Sidhu admin diagnosis — never raw provider content. */
+      diagnostic?: SeoResearchInvalidDiagnostic;
+    };
 
 export type OpenAiFetch = typeof fetch;
 
@@ -113,6 +120,55 @@ export function extractResponsesOutputText(payload: unknown): string {
     }
   }
   return chunks.join("\n").trim();
+}
+
+const RESEARCH_UNUSABLE_MESSAGE = "AI returned an unusable response. Please try again.";
+
+/**
+ * Inspect Responses API metadata for research failures without leaking content.
+ * Refusal/incomplete text is never returned — only safe diagnostic codes.
+ */
+export function inspectOpenAiResearchResponsesPayload(
+  payload: unknown,
+):
+  | { ok: true }
+  | { ok: false; diagnostic: SeoResearchInvalidDiagnostic } {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return { ok: false, diagnostic: "RESPONSE_JSON_INVALID" };
+  }
+
+  const root = payload as Record<string, unknown>;
+  const status = typeof root.status === "string" ? root.status.toLowerCase() : "";
+
+  if (status === "incomplete") {
+    return { ok: false, diagnostic: "RESPONSE_INCOMPLETE" };
+  }
+
+  if (typeof root.refusal === "string" && root.refusal.trim()) {
+    return { ok: false, diagnostic: "RESPONSE_REFUSAL" };
+  }
+
+  const output = Array.isArray(root.output) ? root.output : [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (row.type === "refusal") {
+      return { ok: false, diagnostic: "RESPONSE_REFUSAL" };
+    }
+    if (typeof row.refusal === "string" && row.refusal.trim()) {
+      return { ok: false, diagnostic: "RESPONSE_REFUSAL" };
+    }
+    const content = Array.isArray(row.content) ? row.content : [];
+    for (const part of content) {
+      if (!part || typeof part !== "object") continue;
+      const block = part as Record<string, unknown>;
+      if (block.type === "refusal") {
+        return { ok: false, diagnostic: "RESPONSE_REFUSAL" };
+      }
+    }
+  }
+
+  return { ok: true };
 }
 
 export function buildOpenAiExplainRequestBody(finding: SeoExplainFindingInput, config: OpenAiSeoConfig) {
@@ -463,7 +519,12 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
   unavailableMessage: string;
 }): Promise<
   | { ok: true; json: unknown; payload: unknown; model: string }
-  | { ok: false; code: OpenAiProviderErrorCode; message: string }
+  | {
+      ok: false;
+      code: OpenAiProviderErrorCode;
+      message: string;
+      diagnostic?: SeoResearchInvalidDiagnostic;
+    }
 > {
   if (!args.config.configured || !args.config.apiKey) {
     return {
@@ -511,7 +572,18 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
       return {
         ok: false,
         code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
+        message: RESEARCH_UNUSABLE_MESSAGE,
+        diagnostic: "RESPONSE_JSON_INVALID",
+      };
+    }
+
+    const inspected = inspectOpenAiResearchResponsesPayload(payload);
+    if (!inspected.ok) {
+      return {
+        ok: false,
+        code: "invalid_response",
+        message: RESEARCH_UNUSABLE_MESSAGE,
+        diagnostic: inspected.diagnostic,
       };
     }
 
@@ -520,7 +592,8 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
       return {
         ok: false,
         code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
+        message: RESEARCH_UNUSABLE_MESSAGE,
+        diagnostic: "OUTPUT_TEXT_MISSING",
       };
     }
 
@@ -530,7 +603,8 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
       return {
         ok: false,
         code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
+        message: RESEARCH_UNUSABLE_MESSAGE,
+        diagnostic: "OUTPUT_JSON_INVALID",
       };
     }
   } catch (error) {
@@ -582,7 +656,8 @@ export async function requestOpenAiUkOpportunityResearch(
     return {
       ok: false,
       code: "invalid_response",
-      message: "AI returned an unusable response. Please try again.",
+      message: RESEARCH_UNUSABLE_MESSAGE,
+      diagnostic: "SEMANTIC_PAYLOAD_INVALID",
     };
   }
 

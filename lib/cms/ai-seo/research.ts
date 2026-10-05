@@ -5,7 +5,10 @@ import {
   buildSeoResearchInventory,
   type SeoResearchInventory,
 } from "@/lib/cms/ai-seo/research-inventory";
-import type { SeoResearchResult } from "@/lib/cms/ai-seo/research-schemas";
+import type {
+  SeoResearchInvalidDiagnostic,
+  SeoResearchResult,
+} from "@/lib/cms/ai-seo/research-schemas";
 import type { GscResearchFusionContext } from "@/lib/cms/gsc/research-fusion";
 import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
 
@@ -25,6 +28,8 @@ export type ResearchUkOpportunitiesFailure = {
     | "unavailable"
     | "invalid_response"
     | "empty";
+  /** Safe admin diagnostic stage — never raw provider content. */
+  diagnostic?: SeoResearchInvalidDiagnostic;
 };
 
 export type ResearchUkOpportunitiesResult =
@@ -61,6 +66,7 @@ export async function researchUkContentOpportunities(args: {
       ok: false,
       code: "invalid_response",
       error: "Research inventory was not provided.",
+      diagnostic: "SEMANTIC_PAYLOAD_INVALID",
     };
   }
 
@@ -78,7 +84,12 @@ export async function researchUkContentOpportunities(args: {
     gscFusion: args.gscFusion,
   });
   if (!provider.ok) {
-    return { ok: false, code: provider.code, error: provider.message };
+    return {
+      ok: false,
+      code: provider.code,
+      error: provider.message,
+      ...(provider.diagnostic ? { diagnostic: provider.diagnostic } : {}),
+    };
   }
 
   if (!provider.research.opportunities.length) {

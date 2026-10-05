@@ -323,44 +323,42 @@ test("10b. PARTIAL coverage also accepted for RESTORE", () => {
   assert.ok(ok);
 });
 
-test("11. forged/non-eligible restorePath → fails", () => {
-  assert.equal(
-    normalizeRestore({
-      restorePath: B1G,
-      gscEvidenceRefs: ["P1"],
-    }),
-    null,
-  );
+test("11. forged/non-eligible restorePath → opportunity dropped (payload ok)", () => {
+  const result = normalizeRestore({
+    restorePath: B1G,
+    gscEvidenceRefs: ["P1"],
+  });
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 0);
 });
 
-test("12. AI RESTORE with only Q# evidence → fails", () => {
+test("12. AI RESTORE with only Q# evidence → opportunity dropped", () => {
   const fusion = fusionForPack(
     packWith({
       recentQueries: [row(["iptv buffering"], 1, 10, 0.1, 5)],
       recentPages: [row([`https://theflixiptv.com${BUFFERING}`], 0, 40, 0, 18)],
     }),
   );
-  assert.equal(
-    normalizeSeoResearchResult(
-      {
-        opportunities: [
-          opportunityBase({
-            restorePath: BUFFERING,
-            gscEvidenceRefs: ["Q1"],
-          }),
-        ],
-      },
-      new Set(),
-      {
-        gscEvidenceById: fusion.byId,
-        restorationPathAllowlist: gscRestorationPathAllowlist(fusion.restorationCandidates),
-      },
-    ),
-    null,
+  const result = normalizeSeoResearchResult(
+    {
+      opportunities: [
+        opportunityBase({
+          restorePath: BUFFERING,
+          gscEvidenceRefs: ["Q1"],
+        }),
+      ],
+    },
+    new Set(),
+    {
+      gscEvidenceById: fusion.byId,
+      restorationPathAllowlist: gscRestorationPathAllowlist(fusion.restorationCandidates),
+    },
   );
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 0);
 });
 
-test("13. P#/QP# belonging to another path → fails", () => {
+test("13. P#/QP# belonging to another path → opportunity dropped", () => {
   const fusion = fusionForPack(
     packWith({
       recentPages: [
@@ -369,57 +367,55 @@ test("13. P#/QP# belonging to another path → fails", () => {
       ],
     }),
   );
-  assert.equal(
-    normalizeSeoResearchResult(
-      {
-        opportunities: [
-          opportunityBase({
-            restorePath: BUFFERING,
-            gscEvidenceRefs: ["P2"],
-          }),
-        ],
-      },
-      new Set(),
-      {
-        gscEvidenceById: fusion.byId,
-        restorationPathAllowlist: gscRestorationPathAllowlist(fusion.restorationCandidates),
-      },
-    ),
-    null,
+  const result = normalizeSeoResearchResult(
+    {
+      opportunities: [
+        opportunityBase({
+          restorePath: BUFFERING,
+          gscEvidenceRefs: ["P2"],
+        }),
+      ],
+    },
+    new Set(),
+    {
+      gscEvidenceById: fusion.byId,
+      restorationPathAllowlist: gscRestorationPathAllowlist(fusion.restorationCandidates),
+    },
   );
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 0);
 });
 
-test("14. existingCoverage STRONG → fails", () => {
-  assert.equal(
-    normalizeRestore({
-      existingCoverage: "STRONG",
-      restorePath: BUFFERING,
-      gscEvidenceRefs: ["P1"],
-    }),
-    null,
-  );
+test("14. existingCoverage STRONG → opportunity dropped", () => {
+  const result = normalizeRestore({
+    existingCoverage: "STRONG",
+    restorePath: BUFFERING,
+    gscEvidenceRefs: ["P1"],
+  });
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 0);
 });
 
-test("15. non-empty matchedPublicUrl → fails", () => {
-  assert.equal(
-    normalizeRestore({
-      matchedPublicUrl: "/welcome/",
-      restorePath: BUFFERING,
-      gscEvidenceRefs: ["P1"],
-    }),
-    null,
-  );
+test("15. non-empty matchedPublicUrl → opportunity dropped", () => {
+  const result = normalizeRestore({
+    matchedPublicUrl: "/welcome/",
+    restorePath: BUFFERING,
+    gscEvidenceRefs: ["P1"],
+  });
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 0);
 });
 
-test("16. non-RESTORE with non-empty restorePath → fails", () => {
-  assert.equal(
-    normalizeRestore({
-      recommendation: "NEW_BLOG",
-      restorePath: BUFFERING,
-      gscEvidenceRefs: [],
-    }),
-    null,
-  );
+test("16. non-RESTORE with non-empty restorePath → kept; restorePath canonicalized to empty", () => {
+  const result = normalizeRestore({
+    recommendation: "NEW_BLOG",
+    restorePath: BUFFERING,
+    gscEvidenceRefs: [],
+  });
+  assert.ok(result);
+  assert.equal(result?.opportunities.length, 1);
+  assert.equal(result?.opportunities[0]?.recommendation, "NEW_BLOG");
+  assert.equal(result?.opportunities[0]?.restorePath, "");
 });
 
 test("17. REFRESH_EXISTING behavior unchanged", () => {
