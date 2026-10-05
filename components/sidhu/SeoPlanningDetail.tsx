@@ -16,6 +16,12 @@ import {
 } from "@/lib/cms/seo-planning/workspace";
 import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
 import { SeoPlanningSuggestions } from "@/components/sidhu/SeoPlanningSuggestions";
+import { SeoPlanningWritingBrief } from "@/components/sidhu/SeoPlanningWritingBrief";
+import {
+  buildWritingBrief,
+  SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE,
+  type WritingArticleContext,
+} from "@/lib/cms/seo-planning/writing-brief";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -71,9 +77,11 @@ function formFromDraft(draft: SeoPlanningDraft): FormState {
 export function SeoPlanningDetail({
   draft: initialDraft,
   targetPostTitle,
+  writingArticle = { status: "skipped" },
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
+  writingArticle?: WritingArticleContext;
 }) {
   const [draft, setDraft] = useState(initialDraft);
   const [form, setForm] = useState<FormState>(() => formFromDraft(initialDraft));
@@ -84,6 +92,10 @@ export function SeoPlanningDetail({
   const controlsLocked = pending || suggestionBusy;
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
+  const writingBrief = useMemo(
+    () => buildWritingBrief(draft, writingArticle),
+    [draft, writingArticle],
+  );
 
   const contentWorkflow = isContentPlanningRecommendation(draft.recommendation);
   const internalLink = isInternalLinkPlanningRecommendation(draft.recommendation);
@@ -243,6 +255,12 @@ export function SeoPlanningDetail({
         onBusy={setSuggestionBusy}
         onDraft={adoptSuggestionDraft}
         onMessage={setMessage}
+      />
+
+      <SeoPlanningWritingBrief
+        brief={writingBrief}
+        dirty={dirty}
+        dirtyMessage={SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE}
       />
 
       <SectionCard className="space-y-3">
