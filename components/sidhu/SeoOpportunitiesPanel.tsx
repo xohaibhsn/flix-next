@@ -4,6 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
 import type {
   SeoResearchConfidence,
+  SeoResearchGscEvidence,
+  SeoResearchGscMeta,
+  SeoResearchGscUrlClass,
   SeoResearchIntent,
   SeoResearchOpportunity,
   SeoResearchRecommendation,
@@ -37,6 +40,23 @@ function coverageLabel(value: SeoResearchOpportunity["existingCoverage"]) {
 
 function confidenceLabel(value: SeoResearchConfidence) {
   return `Research confidence: ${value}`;
+}
+
+function classificationLabel(value: SeoResearchGscUrlClass | undefined) {
+  if (value === "CURRENT_CMS") return "Current published page";
+  if (value === "CURRENT_PUBLIC_NON_CMS") return "Current public route";
+  if (value === "REDIRECTED_HISTORICAL") return "Historical redirect source";
+  if (value === "REMOVED_OR_404") return "Historical / not currently live";
+  if (value === "UNKNOWN") return "Unclassified in this index";
+  return null;
+}
+
+function formatPct(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatPos(value: number) {
+  return value.toFixed(1);
 }
 
 export function SeoOpportunitiesPanel({
@@ -83,12 +103,8 @@ export function SeoOpportunitiesPanel({
           <div className="min-w-0 max-w-3xl">
             <h2 className="text-base font-semibold text-ink">UK Content Opportunities</h2>
             <p className="mt-1 text-sm leading-relaxed text-muted">
-              Find current UK content opportunities using live web research and compare them against existing Flix
-              IPTV content before deciding whether to create or update an article.
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              Search-volume, impression and ranking evidence will be added separately through Google Search Console
-              data.
+              Find current UK content opportunities using live web research, existing Flix IPTV coverage, and Search
+              Console evidence when connected — before deciding whether to create or update an article.
             </p>
           </div>
           <Button type="button" variant="primary" disabled={pending || !aiConfigured} onClick={runResearch}>
@@ -113,6 +129,8 @@ export function SeoOpportunitiesPanel({
 
       {research ? (
         <>
+          {research.gsc ? <GscRunStatus gsc={research.gsc} /> : null}
+
           <div className="flex flex-wrap items-end gap-3">
             <label className="text-sm text-ink">
               <span className="mb-1 block text-xs font-semibold text-muted">Recommendation</span>
@@ -166,6 +184,29 @@ export function SeoOpportunitiesPanel({
         </>
       ) : null}
     </div>
+  );
+}
+
+function GscRunStatus({ gsc }: { gsc: SeoResearchGscMeta }) {
+  const showWindow =
+    (gsc.status === "AVAILABLE" || gsc.status === "NO_ROWS") &&
+    gsc.window?.recentStart &&
+    gsc.window?.recentEnd;
+
+  return (
+    <SectionCard padding="sm" className="space-y-1">
+      <p className="text-xs font-semibold tracking-wide text-muted uppercase">GSC Evidence</p>
+      <p className="text-sm text-ink">{gsc.statusLabel}</p>
+      <p className="text-sm text-muted">{gsc.helperText}</p>
+      {showWindow ? (
+        <p className="text-xs text-muted">
+          Evidence window: {gsc.window!.recentStart} → {gsc.window!.recentEnd} (UK)
+          {gsc.window!.previousStart && gsc.window!.previousEnd
+            ? `; prior: ${gsc.window!.previousStart} → ${gsc.window!.previousEnd}`
+            : ""}
+        </p>
+      ) : null}
+    </SectionCard>
   );
 }
 
@@ -229,16 +270,86 @@ function OpportunityCard({ item }: { item: SeoResearchOpportunity }) {
             </p>
           ) : null}
         </div>
+
+        <OpportunityGscEvidence item={item} />
+
         <div>
           <p className="text-xs font-semibold tracking-wide text-muted uppercase">Suggested content angle</p>
           <p className="mt-1 text-ink">{item.suggestedAngle}</p>
         </div>
         <div>
-          <p className="text-xs font-semibold tracking-wide text-muted uppercase">Next step</p>
+          <p className="text-xs font-semibold tracking-wide text-muted uppercase">AI assessment / next step</p>
           <p className="mt-1 text-ink">{item.nextStep}</p>
         </div>
       </div>
     </SectionCard>
+  );
+}
+
+function OpportunityGscEvidence({ item }: { item: SeoResearchOpportunity }) {
+  const rows = item.gscEvidence || [];
+  if (!rows.length) {
+    return (
+      <div>
+        <p className="text-xs font-semibold tracking-wide text-muted uppercase">GSC Evidence</p>
+        <p className="mt-1 text-sm text-muted">No linked Search Console evidence for this opportunity.</p>
+      </div>
+    );
+  }
+
+  return (
+    <details className="rounded-md border border-line bg-paper/40 open:pb-0">
+      <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold tracking-wide text-muted uppercase marker:content-none [&::-webkit-details-marker]:hidden">
+        GSC Evidence ({rows.length})
+        {item.historicalSignal ? " · Historical GSC URL detected" : ""}
+      </summary>
+      <div className="space-y-3 border-t border-line px-3 py-3">
+        {rows.map((row) => (
+          <GscEvidenceRow key={row.id} row={row} />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function GscEvidenceRow({ row }: { row: SeoResearchGscEvidence }) {
+  const classLabel = classificationLabel(row.classification);
+  const isHistorical =
+    row.classification === "REDIRECTED_HISTORICAL" || row.classification === "REMOVED_OR_404";
+
+  return (
+    <div className="space-y-1 text-sm">
+      <p className="font-medium text-ink">
+        {row.kind === "query" ? "Query" : row.kind === "page" ? "Page" : "Query × Page"} · {row.id}
+      </p>
+      {row.query ? <p className="text-ink">“{row.query}”</p> : null}
+      {row.pageUrl ? (
+        <p className="break-all text-muted">
+          {row.pageUrl}
+          {row.normalizedPath ? ` → ${row.normalizedPath}` : ""}
+        </p>
+      ) : null}
+      {classLabel ? <p className="text-xs text-muted">Classification: {classLabel}</p> : null}
+      {isHistorical ? (
+        <p className="text-xs text-muted">
+          {row.classification === "REMOVED_OR_404"
+            ? "Historical GSC URL detected · Current state: 404 / not live"
+            : row.redirectDestination
+              ? `Historical GSC URL detected · Current state: redirects to ${row.redirectDestination}`
+              : "Historical GSC URL detected"}
+          {row.normalizedPath === "/"
+            ? " (root redirect is current site architecture, not a restore signal)."
+            : ""}
+        </p>
+      ) : null}
+      <p className="text-xs text-muted">
+        Impressions {row.impressions.toLocaleString()} · Clicks {row.clicks.toLocaleString()} · CTR{" "}
+        {formatPct(row.ctr)} · Avg position {formatPos(row.position)}
+        {row.clickDelta != null || row.impressionDelta != null
+          ? ` · Δ clicks ${row.clickDelta ?? "—"} / Δ impr. ${row.impressionDelta ?? "—"}`
+          : ""}
+      </p>
+    </div>
   );
 }
 

@@ -115,6 +115,7 @@ function goodOpportunityPayload() {
         suggestedAngle: "Add a focused buffering checklist without duplicating the whole setup guide.",
         nextStep: "Review the existing setup guide and expand the troubleshooting section.",
         confidence: "MEDIUM",
+        gscEvidenceRefs: [],
       },
       {
         topic: "Best IPTV apps for Smart TV",
@@ -129,6 +130,7 @@ function goodOpportunityPayload() {
         suggestedAngle: "Compare legitimate player options and setup expectations.",
         nextStep: "Draft an outline for editorial review only.",
         confidence: "HIGH",
+        gscEvidenceRefs: [],
       },
     ],
   };
@@ -402,10 +404,13 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
   assert.match(panel, /Research UK opportunities/);
   assert.match(panel, /Current web evidence/);
   assert.match(panel, /Existing Flix coverage/);
+  assert.match(panel, /GSC Evidence/);
   assert.match(panel, /Research sources/);
   assert.match(panel, /noopener noreferrer/);
-  assert.match(panel, /Search-volume, impression and ranking evidence/);
+  assert.doesNotMatch(panel, /lib\/cms\/gsc\//);
   assert.doesNotMatch(panel, /Google trending searches|monthly searches|keyword difficulty|CPC/i);
+  assert.doesNotMatch(panel, /RESTORE_HISTORICAL|Create Blog|Save opportunity/);
+  assert.doesNotMatch(nav, /\/sidhu\/seo\/gsc\//);
   assert.match(provider, /tool_choice: "required"/);
   assert.match(provider, /web_search/);
   assert.match(provider, /external_web_access: true/);

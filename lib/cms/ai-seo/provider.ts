@@ -24,6 +24,7 @@ import {
   type SeoExplainFindingInput,
   type SeoExplainResult,
 } from "@/lib/cms/ai-seo/schemas";
+import type { GscResearchFusionContext } from "@/lib/cms/gsc/research-fusion";
 
 export type OpenAiProviderErrorCode =
   | "not_configured"
@@ -322,15 +323,20 @@ export async function requestOpenAiSeoDraft(
   return { ok: true, draft, model: result.model };
 }
 
-function buildResearchUserPayload(inventory: SeoResearchInventory) {
+function buildResearchUserPayload(
+  inventory: SeoResearchInventory,
+  gscFusion?: GscResearchFusionContext,
+) {
   return {
     task: "uk_content_opportunity_research",
     market: "GB",
     siteName: inventory.siteName,
     guidance: [
-      "Use live UK-relevant web research.",
-      "Compare opportunities against the inventory before recommending NEW_BLOG.",
+      "Use live UK-relevant web research (Current Web Evidence).",
+      "Compare opportunities against the inventory (Existing Flix Coverage) before recommending NEW_BLOG.",
       "Prefer REFRESH_EXISTING or INTERNAL_LINK_ONLY when coverage already exists.",
+      "When gscEvidence is present, use those factual rows by evidence ID only — do not invent GSC metrics.",
+      "Absence from bounded GSC rows does not prove zero search demand.",
       "Do not invent search volume, rankings, Google Trends, or GSC metrics.",
     ],
     inventory: inventory.items.map((item) => ({
@@ -342,6 +348,14 @@ function buildResearchUserPayload(inventory: SeoResearchInventory) {
       status: item.status || null,
       categoryName: item.categoryName || null,
     })),
+    gscEvidence: gscFusion
+      ? gscFusion.aiPayload
+      : {
+          status: "NOT_CONFIGURED",
+          statusLabel: "GSC not connected yet",
+          evidence: [],
+          notes: ["GSC evidence was not supplied for this run."],
+        },
   };
 }
 
@@ -349,6 +363,7 @@ function buildResearchUserPayload(inventory: SeoResearchInventory) {
 export function buildOpenAiUkOpportunityResearchRequestBody(
   inventory: SeoResearchInventory,
   config: OpenAiSeoConfig,
+  gscFusion?: GscResearchFusionContext,
 ) {
   return {
     model: config.model,
@@ -382,7 +397,12 @@ export function buildOpenAiUkOpportunityResearchRequestBody(
       },
       {
         role: "user",
-        content: [{ type: "input_text", text: JSON.stringify(buildResearchUserPayload(inventory)) }],
+        content: [
+          {
+            type: "input_text",
+            text: JSON.stringify(buildResearchUserPayload(inventory, gscFusion)),
+          },
+        ],
       },
     ],
   };
@@ -533,11 +553,13 @@ export async function requestOpenAiUkOpportunityResearch(
   options?: {
     fetchImpl?: OpenAiFetch;
     config?: OpenAiSeoConfig;
+    gscFusion?: GscResearchFusionContext;
   },
 ): Promise<OpenAiResearchProviderResult> {
   const config = options?.config ?? getOpenAiSeoResearchConfig();
+  const gscFusion = options?.gscFusion;
   const result = await requestOpenAiStructuredJsonWithPayload({
-    body: buildOpenAiUkOpportunityResearchRequestBody(inventory, config),
+    body: buildOpenAiUkOpportunityResearchRequestBody(inventory, config, gscFusion),
     config,
     fetchImpl: options?.fetchImpl,
     timeoutMessage: "UK opportunity research took too long. Please try again later.",
@@ -546,7 +568,10 @@ export async function requestOpenAiUkOpportunityResearch(
   if (!result.ok) return result;
 
   const allowlisted = new Set(inventory.allowlistedPublicUrls);
-  const research = normalizeSeoResearchResult(result.json, allowlisted);
+  const research = normalizeSeoResearchResult(result.json, allowlisted, {
+    gscEvidenceById: gscFusion?.byId,
+    gscMeta: gscFusion?.meta,
+  });
   if (!research) {
     return {
       ok: false,

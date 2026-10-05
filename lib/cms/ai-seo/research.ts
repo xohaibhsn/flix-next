@@ -6,6 +6,7 @@ import {
   type SeoResearchInventory,
 } from "@/lib/cms/ai-seo/research-inventory";
 import type { SeoResearchResult } from "@/lib/cms/ai-seo/research-schemas";
+import type { GscResearchFusionContext } from "@/lib/cms/gsc/research-fusion";
 import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
 
 export type ResearchUkOpportunitiesSuccess = {
@@ -43,6 +44,8 @@ export async function researchUkContentOpportunities(args: {
   settings?: SiteSettings;
   posts?: BlogPost[];
   categories?: BlogCategory[];
+  /** Optional GSC-4 fusion context (built by research-run). */
+  gscFusion?: GscResearchFusionContext;
 }): Promise<ResearchUkOpportunitiesResult> {
   const limited = checkAiSeoResearchRateLimit(args.adminId, args.ip);
   if (!limited.ok) {
@@ -72,6 +75,7 @@ export async function researchUkContentOpportunities(args: {
   const provider = await requestOpenAiUkOpportunityResearch(inventory, {
     fetchImpl: args.fetchImpl,
     config: args.config,
+    gscFusion: args.gscFusion,
   });
   if (!provider.ok) {
     return { ok: false, code: provider.code, error: provider.message };

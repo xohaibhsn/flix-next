@@ -1,4 +1,4 @@
-/** UK Content Opportunity Research — structured output contract (V1). */
+/** UK Content Opportunity Research — structured output contract (V1 + GSC-4 fusion). */
 
 export const SEO_RESEARCH_RECOMMENDATIONS = [
   "NEW_BLOG",
@@ -7,6 +7,67 @@ export const SEO_RESEARCH_RECOMMENDATIONS = [
   "SKIP",
 ] as const;
 export type SeoResearchRecommendation = (typeof SEO_RESEARCH_RECOMMENDATIONS)[number];
+
+/** GSC run statuses (GSC-2) — client-safe labels come from the server result. */
+export const SEO_RESEARCH_GSC_STATUSES = [
+  "AVAILABLE",
+  "NOT_CONFIGURED",
+  "UNAVAILABLE",
+  "NO_ROWS",
+] as const;
+export type SeoResearchGscStatus = (typeof SEO_RESEARCH_GSC_STATUSES)[number];
+
+export const SEO_RESEARCH_GSC_EVIDENCE_KINDS = ["query", "page", "query_page"] as const;
+export type SeoResearchGscEvidenceKind = (typeof SEO_RESEARCH_GSC_EVIDENCE_KINDS)[number];
+
+export const SEO_RESEARCH_GSC_URL_CLASSES = [
+  "CURRENT_CMS",
+  "CURRENT_PUBLIC_NON_CMS",
+  "REDIRECTED_HISTORICAL",
+  "REMOVED_OR_404",
+  "UNKNOWN",
+] as const;
+export type SeoResearchGscUrlClass = (typeof SEO_RESEARCH_GSC_URL_CLASSES)[number];
+
+export type SeoResearchGscEvidence = {
+  id: string;
+  kind: SeoResearchGscEvidenceKind;
+  query?: string;
+  pageUrl?: string;
+  normalizedPath?: string | null;
+  classification?: SeoResearchGscUrlClass;
+  redirectDestination?: string;
+  historicalKey?: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+  clickDelta?: number | null;
+  impressionDelta?: number | null;
+  ctrDelta?: number | null;
+  positionDelta?: number | null;
+  clicksDirection?: "UP" | "DOWN" | "FLAT" | null;
+  impressionsDirection?: "UP" | "DOWN" | "FLAT" | null;
+  ctrDirection?: "UP" | "DOWN" | "FLAT" | null;
+  positionDirection?: "UP" | "DOWN" | "FLAT" | null;
+};
+
+export type SeoResearchGscMeta = {
+  status: SeoResearchGscStatus;
+  statusLabel: string;
+  helperText: string;
+  window?: {
+    recentStart: string;
+    recentEnd: string;
+    previousStart: string;
+    previousEnd: string;
+    reportingLagDays: number;
+  };
+  country?: {
+    code: "GB";
+    expression: "gbr";
+  };
+};
 
 export const SEO_RESEARCH_INTENTS = [
   "INFORMATIONAL",
@@ -42,6 +103,7 @@ export const SEO_RESEARCH_FIELD_CAPS = {
   sourceTitle: 160,
   sourceUrl: 400,
   sourceCount: 24,
+  gscEvidenceRefs: 8,
 } as const;
 
 export type SeoResearchOpportunity = {
@@ -57,6 +119,12 @@ export type SeoResearchOpportunity = {
   suggestedAngle: string;
   nextStep: string;
   confidence: SeoResearchConfidence;
+  /** Validated server-side GSC evidence IDs (Q# / P# / QP#). */
+  gscEvidenceRefs: string[];
+  /** Server-resolved factual GSC rows for UI — never model-authored metrics. */
+  gscEvidence: SeoResearchGscEvidence[];
+  /** Deterministic historical URL signal (not a restore recommendation). */
+  historicalSignal: boolean;
 };
 
 export type SeoResearchSource = {
@@ -68,15 +136,23 @@ export type SeoResearchSource = {
 export type SeoResearchResult = {
   opportunities: SeoResearchOpportunity[];
   sources: SeoResearchSource[];
+  /** Compact GSC run meta — present after GSC-4 research fusion. */
+  gsc?: SeoResearchGscMeta;
 };
 
 export const SEO_RESEARCH_SYSTEM_INSTRUCTION = [
   "You are Sidhu AI SEO Assistant researching current UK content opportunities for The Flix IPTV.",
-  "Use live web research and the supplied current-site content inventory.",
+  "Use live web research (Current Web Evidence), the supplied current-site content inventory (Existing Flix Coverage), and supplied GSC evidence when available.",
   "Find useful topics relevant to legitimate IPTV/streaming setup, compatible devices/apps, playback quality, troubleshooting, product education and related UK user needs.",
-  "Do not manufacture search volume, ranking data, Google Trends values, GSC data, traffic or competitor analytics.",
-  "Do not recommend a new article when existing Flix content substantially covers the same search intent; prefer refresh or internal-link recommendations.",
-  "Distinguish current web evidence from inference.",
+  "Do not manufacture search volume, ranking data, Google Trends values, GSC metrics (clicks, impressions, CTR, position), traffic or competitor analytics.",
+  "When GSC evidence is supplied, treat those metrics as factual. Reference them only by the supplied evidence IDs (Q#, P#, QP#).",
+  "Attach only materially related GSC evidence IDs in gscEvidenceRefs (maximum 8 per opportunity). Do not attach every top GSC row to every opportunity.",
+  "Absence from the bounded GSC rows does NOT prove zero search demand.",
+  "Do not recommend a new article when existing Flix content or overlapping GSC intent substantially covers the same search intent; prefer refresh or internal-link recommendations.",
+  "Historical or redirected GSC URL evidence may affect assessment, but REDIRECTED_HISTORICAL does NOT automatically mean restore content.",
+  "There is no RESTORE_HISTORICAL recommendation in this phase. Root / redirecting to /welcome/ is current site architecture, not content to restore.",
+  "When discussing GSC in narrative fields, stay qualitative and reference evidence IDs rather than inventing numeric values.",
+  "Distinguish current web evidence, existing Flix coverage, and GSC evidence from inference.",
   "Avoid keyword stuffing, sensational clickbait and unsupported claims.",
   "Return a small number of actionable opportunities for human editorial review.",
   "Nothing you return is permission to publish automatically.",
@@ -107,6 +183,7 @@ export const SEO_RESEARCH_JSON_SCHEMA = {
           "suggestedAngle",
           "nextStep",
           "confidence",
+          "gscEvidenceRefs",
         ],
         properties: {
           topic: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.topic },
@@ -121,6 +198,11 @@ export const SEO_RESEARCH_JSON_SCHEMA = {
           suggestedAngle: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.suggestedAngle },
           nextStep: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.nextStep },
           confidence: { type: "string", enum: [...SEO_RESEARCH_CONFIDENCE] },
+          gscEvidenceRefs: {
+            type: "array",
+            maxItems: SEO_RESEARCH_FIELD_CAPS.gscEvidenceRefs,
+            items: { type: "string", maxLength: 12 },
+          },
         },
       },
     },
@@ -194,19 +276,32 @@ export function normalizeSeoResearchSources(raw: unknown): SeoResearchSource[] {
   return out;
 }
 
+export type NormalizeSeoResearchOptions = {
+  /**
+   * Server GSC evidence catalog for this run (id → factual row).
+   * When omitted, any model gscEvidenceRefs are discarded.
+   */
+  gscEvidenceById?: ReadonlyMap<string, SeoResearchGscEvidence>;
+  /** Compact GSC run meta attached to the normalized result. */
+  gscMeta?: SeoResearchGscMeta;
+};
+
 /**
  * Normalize model JSON against the allowlisted Flix public URLs.
+ * GSC evidence refs are resolved against the server catalog when provided.
  * Returns null when the payload is malformed.
  */
 export function normalizeSeoResearchResult(
   raw: unknown,
   allowlistedPublicUrls: ReadonlySet<string>,
+  options?: NormalizeSeoResearchOptions,
 ): SeoResearchResult | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const data = raw as Record<string, unknown>;
   if (!Array.isArray(data.opportunities)) return null;
   if (Object.keys(data).some((key) => key !== "opportunities")) return null;
 
+  const gscById = options?.gscEvidenceById;
   const opportunities: SeoResearchOpportunity[] = [];
   for (const item of data.opportunities.slice(0, SEO_RESEARCH_FIELD_CAPS.opportunityCount)) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return null;
@@ -226,6 +321,7 @@ export function normalizeSeoResearchResult(
           "suggestedAngle",
           "nextStep",
           "confidence",
+          "gscEvidenceRefs",
         ].includes(key),
     );
     if (unexpected.length) return null;
@@ -269,6 +365,8 @@ export function normalizeSeoResearchResult(
       }
     }
 
+    const resolved = resolveOpportunityGscRefs(row.gscEvidenceRefs, gscById);
+
     opportunities.push({
       topic,
       workingTitle,
@@ -282,8 +380,50 @@ export function normalizeSeoResearchResult(
       suggestedAngle,
       nextStep,
       confidence: row.confidence,
+      gscEvidenceRefs: resolved.refs,
+      gscEvidence: resolved.resolved,
+      historicalSignal: resolved.historicalSignal,
     });
   }
 
-  return { opportunities, sources: [] };
+  return {
+    opportunities,
+    sources: [],
+    ...(options?.gscMeta ? { gsc: options.gscMeta } : {}),
+  };
+}
+
+function resolveOpportunityGscRefs(
+  rawRefs: unknown,
+  byId: ReadonlyMap<string, SeoResearchGscEvidence> | undefined,
+): { refs: string[]; resolved: SeoResearchGscEvidence[]; historicalSignal: boolean } {
+  if (!Array.isArray(rawRefs) || !byId || byId.size === 0) {
+    return { refs: [], resolved: [], historicalSignal: false };
+  }
+
+  const seen = new Set<string>();
+  const refs: string[] = [];
+  const resolved: SeoResearchGscEvidence[] = [];
+  const max = SEO_RESEARCH_FIELD_CAPS.gscEvidenceRefs;
+
+  for (const item of rawRefs) {
+    if (refs.length >= max) break;
+    if (typeof item !== "string") continue;
+    const id = item.trim();
+    if (!id || seen.has(id)) continue;
+    const record = byId.get(id);
+    if (!record) continue;
+    seen.add(id);
+    refs.push(id);
+    resolved.push(record);
+  }
+
+  const historicalSignal = resolved.some((record) => {
+    if (record.classification === "REMOVED_OR_404") return true;
+    if (record.classification !== "REDIRECTED_HISTORICAL") return false;
+    // Root `/` → `/welcome/` is architecture, not restore-worthy historical content.
+    return (record.normalizedPath || "") !== "/";
+  });
+
+  return { refs, resolved, historicalSignal };
 }
