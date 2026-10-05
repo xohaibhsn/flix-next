@@ -15,6 +15,7 @@ import {
   seoPlanningTransitionButtonLabel,
 } from "@/lib/cms/seo-planning/workspace";
 import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
+import { SeoPlanningSuggestions } from "@/components/sidhu/SeoPlanningSuggestions";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -78,7 +79,9 @@ export function SeoPlanningDetail({
   const [form, setForm] = useState<FormState>(() => formFromDraft(initialDraft));
   const [savedForm, setSavedForm] = useState<FormState>(() => formFromDraft(initialDraft));
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  const [suggestionBusy, setSuggestionBusy] = useState(false);
   const [pending, startTransition] = useTransition();
+  const controlsLocked = pending || suggestionBusy;
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
 
@@ -95,7 +98,7 @@ export function SeoPlanningDetail({
   const gscMeta = asRecord(payload.gsc);
 
   function saveWithWorkflow(nextWorkflow: SeoPlanningWorkflowStatus) {
-    if (pending) return;
+    if (pending || suggestionBusy) return;
     setMessage(null);
     const payloadInput = {
       id: draft.id,
@@ -118,6 +121,13 @@ export function SeoPlanningDetail({
       setSavedForm(nextForm);
       setMessage({ tone: "ok", text: "Planning draft saved. Still private — nothing was published." });
     });
+  }
+
+  function adoptSuggestionDraft(next: SeoPlanningDraft) {
+    const nextForm = formFromDraft(next);
+    setDraft(next);
+    setForm(nextForm);
+    setSavedForm(nextForm);
   }
 
   return (
@@ -190,7 +200,7 @@ export function SeoPlanningDetail({
             value={form.topic}
             onChange={(event) => setForm({ ...form, topic: event.target.value })}
             maxLength={160}
-            disabled={pending}
+            disabled={controlsLocked}
           />
         </Field>
         <Field label="Working title">
@@ -198,14 +208,14 @@ export function SeoPlanningDetail({
             value={form.workingTitle}
             onChange={(event) => setForm({ ...form, workingTitle: event.target.value })}
             maxLength={180}
-            disabled={pending}
+            disabled={controlsLocked}
           />
         </Field>
         <Field label="Search intent">
           <select
             className={inputClass}
             value={form.searchIntent}
-            disabled={pending}
+            disabled={controlsLocked}
             onChange={(event) => setForm({ ...form, searchIntent: event.target.value })}
           >
             {SEO_RESEARCH_INTENTS.map((intent) => (
@@ -221,10 +231,19 @@ export function SeoPlanningDetail({
             onChange={(event) => setForm({ ...form, humanNotes: event.target.value })}
             maxLength={4000}
             rows={6}
-            disabled={pending}
+            disabled={controlsLocked}
           />
         </Field>
       </SectionCard>
+
+      <SeoPlanningSuggestions
+        draft={draft}
+        blocked={dirty || controlsLocked}
+        unsavedWorkspace={dirty}
+        onBusy={setSuggestionBusy}
+        onDraft={adoptSuggestionDraft}
+        onMessage={setMessage}
+      />
 
       <SectionCard className="space-y-3">
         <h3 className="text-sm font-semibold text-ink">Workflow</h3>
@@ -255,7 +274,7 @@ export function SeoPlanningDetail({
                     type="button"
                     variant="secondary"
                     className="min-h-10"
-                    disabled={pending}
+                    disabled={controlsLocked}
                     onClick={() => saveWithWorkflow(to)}
                   >
                     {seoPlanningTransitionButtonLabel(form.workflowStatus, to)}
@@ -352,7 +371,7 @@ export function SeoPlanningDetail({
       <StickyEditorBar
         title={form.workingTitle || "Planning draft"}
         dirty={dirty}
-        saving={pending}
+        saving={controlsLocked}
         saveLabel="Save planning draft"
         onSave={() => saveWithWorkflow(form.workflowStatus)}
       />
