@@ -13,6 +13,8 @@ import type {
   SeoResearchResult,
   SeoResearchSource,
 } from "@/lib/cms/ai-seo/research-schemas";
+import type { ProbeGscConnectionActionResult } from "@/lib/cms/gsc/gsc-actions";
+import type { GscProbeResult } from "@/lib/cms/gsc/probe-types";
 import { Banner } from "@/components/sidhu/fields";
 import { Button, sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
@@ -61,14 +63,19 @@ function formatPos(value: number) {
 
 export function SeoOpportunitiesPanel({
   researchAction,
+  gscProbeAction,
   aiConfigured,
 }: {
   researchAction: () => Promise<ResearchUkOpportunitiesResult & { configured?: boolean }>;
+  gscProbeAction: () => Promise<ProbeGscConnectionActionResult>;
   aiConfigured: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const [probePending, startProbeTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [research, setResearch] = useState<SeoResearchResult | null>(null);
+  const [probe, setProbe] = useState<GscProbeResult | null>(null);
+  const [probeError, setProbeError] = useState<string | null>(null);
   const [recommendationFilter, setRecommendationFilter] = useState<"ALL" | SeoResearchRecommendation>("ALL");
   const [intentFilter, setIntentFilter] = useState<"ALL" | SeoResearchIntent>("ALL");
 
@@ -82,7 +89,7 @@ export function SeoOpportunitiesPanel({
   }, [research, recommendationFilter, intentFilter]);
 
   function runResearch() {
-    if (pending) return;
+    if (pending || probePending) return;
     setError(null);
     startTransition(async () => {
       const result = await researchAction();
@@ -93,6 +100,21 @@ export function SeoOpportunitiesPanel({
       }
       setError(null);
       setResearch(result.research);
+    });
+  }
+
+  function runGscProbe() {
+    if (pending || probePending) return;
+    setProbeError(null);
+    startProbeTransition(async () => {
+      const result = await gscProbeAction();
+      if (!result.ok) {
+        setProbe(null);
+        setProbeError(result.error);
+        return;
+      }
+      setProbeError(null);
+      setProbe(result.probe);
     });
   }
 
@@ -107,9 +129,19 @@ export function SeoOpportunitiesPanel({
               Console evidence when connected — before deciding whether to create or update an article.
             </p>
           </div>
-          <Button type="button" variant="primary" disabled={pending || !aiConfigured} onClick={runResearch}>
-            {pending ? "Researching…" : "Research UK opportunities"}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={pending || probePending}
+              onClick={runGscProbe}
+            >
+              {probePending ? "Testing GSC…" : "Test GSC connection"}
+            </Button>
+            <Button type="button" variant="primary" disabled={pending || probePending || !aiConfigured} onClick={runResearch}>
+              {pending ? "Researching…" : "Research UK opportunities"}
+            </Button>
+          </div>
         </div>
 
         {!aiConfigured ? (
@@ -117,6 +149,8 @@ export function SeoOpportunitiesPanel({
         ) : null}
 
         {error ? <Banner tone="error">{error}</Banner> : null}
+        {probeError ? <Banner tone="error">{probeError}</Banner> : null}
+        {probe ? <GscProbeResultCard probe={probe} /> : null}
 
         {!research && !error && !pending ? (
           <p className="text-sm text-muted">
@@ -182,6 +216,34 @@ export function SeoOpportunitiesPanel({
 
           <ResearchSources sources={research.sources} />
         </>
+      ) : null}
+    </div>
+  );
+}
+
+function GscProbeResultCard({ probe }: { probe: GscProbeResult }) {
+  const tone =
+    probe.status === "AVAILABLE" || probe.status === "NO_ROWS"
+      ? "info"
+      : probe.status === "NOT_CONFIGURED"
+        ? "info"
+        : "error";
+
+  return (
+    <div className="space-y-2 rounded-md border border-line bg-paper/40 px-3 py-3">
+      <p className="text-xs font-semibold tracking-wide text-muted uppercase">GSC connection test</p>
+      <Banner tone={tone}>{probe.message}</Banner>
+      <p className="text-xs text-muted">
+        Window: {probe.window.start} → {probe.window.end} (UK · lag {probe.window.reportingLagDays}d) · Status{" "}
+        {probe.status}
+        {probe.analyticsOk ? ` · rows ${probe.rowCount}` : ""}
+      </p>
+      {probe.sample ? (
+        <p className="text-xs text-muted">
+          Sample query: “{probe.sample.query || "(empty)"}” · Impressions {probe.sample.impressions.toLocaleString()} ·
+          Clicks {probe.sample.clicks.toLocaleString()} · CTR {formatPct(probe.sample.ctr)} · Avg position{" "}
+          {formatPos(probe.sample.position)}
+        </p>
       ) : null}
     </div>
   );

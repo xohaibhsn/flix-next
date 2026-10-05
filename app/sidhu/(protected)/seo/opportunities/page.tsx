@@ -3,6 +3,7 @@ import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoOpportunitiesPanel } from "@/components/sidhu/SeoOpportunitiesPanel";
 import { researchUkContentOpportunitiesAction } from "@/lib/cms/ai-seo-actions";
 import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
+import { probeGscConnectionAction } from "@/lib/cms/gsc/gsc-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function SidhuSeoOpportunitiesPage() {
       <SeoModuleChrome>
         <SeoOpportunitiesPanel
           researchAction={researchUkContentOpportunitiesAction}
+          gscProbeAction={probeGscConnectionAction}
           aiConfigured={isOpenAiSeoConfigured()}
         />
       </SeoModuleChrome>

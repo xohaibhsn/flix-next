@@ -93,6 +93,11 @@ test("Opportunities Research UK opportunities CTA remains primary and deliberate
         code: "unavailable" as const,
         error: "unused",
       }),
+      gscProbeAction: async () => ({
+        ok: false as const,
+        code: "unauthorized" as const,
+        error: "unused",
+      }),
     }),
   );
   assert.match(html, /Research UK opportunities/);

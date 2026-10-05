@@ -507,7 +507,9 @@ test("GSC-4 UI renders GSC status and resolved evidence; no standalone GSC nav",
   assert.match(panel, /Current web evidence/i);
   assert.match(panel, /Existing Flix coverage/i);
   assert.match(panel, /AI assessment/i);
-  assert.doesNotMatch(panel, /from ["']@\/lib\/cms\/gsc/);
+  assert.match(panel, /from ["']@\/lib\/cms\/gsc\/probe-types["']/);
+  assert.match(panel, /from ["']@\/lib\/cms\/gsc\/gsc-actions["']/);
+  assert.doesNotMatch(panel, /from ["']@\/lib\/cms\/gsc\/(auth|search-analytics|evidence-pack|probe)["']/);
   assert.doesNotMatch(panel, /Create Blog|Save opportunity|Publish|RESTORE_HISTORICAL/);
   assert.doesNotMatch(nav, /\/sidhu\/seo\/gsc\//);
   assert.doesNotMatch(page, /buildUkGscEvidencePack|querySearchAnalytics/);
@@ -519,6 +521,11 @@ test("GSC-4 UI renders GSC status and resolved evidence; no standalone GSC nav",
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
       aiConfigured: true,
+      gscProbeAction: async () => ({
+        ok: false as const,
+        code: "unauthorized" as const,
+        error: "unused",
+      }),
       researchAction: async () => ({
         ok: true as const,
         research: {

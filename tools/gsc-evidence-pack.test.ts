@@ -487,14 +487,13 @@ test("GSC-2 resource safety: no OpenAI, CMS, persistence, timers, or real networ
 });
 
 test("GSC-2 does not wire into Opportunities / UI / API routes", () => {
-  for (const file of [
-    "components/sidhu/SeoOpportunitiesPanel.tsx",
-    "components/sidhu/SeoOverviewHub.tsx",
-  ]) {
-    const source = read(file);
-    assert.doesNotMatch(source, /evidence-pack|buildUkGscEvidencePack|request-plan|compare-pages/);
-    assert.doesNotMatch(source, /lib\/cms\/gsc|@\/lib\/cms\/gsc/);
-  }
+  // Opportunities may import the admin probe action/types; evidence-pack remains server-only.
+  const panel = read("components/sidhu/SeoOpportunitiesPanel.tsx");
+  assert.doesNotMatch(panel, /evidence-pack|buildUkGscEvidencePack|request-plan|compare-pages/);
+  assert.doesNotMatch(panel, /getGscAccessToken|querySearchAnalytics|GSC_PRIVATE_KEY/);
+  const overview = read("components/sidhu/SeoOverviewHub.tsx");
+  assert.doesNotMatch(overview, /evidence-pack|buildUkGscEvidencePack|request-plan|compare-pages/);
+  assert.doesNotMatch(overview, /lib\/cms\/gsc|@\/lib\/cms\/gsc/);
 
   const apiDir = path.join(root, "app/api");
   const walk = (dir: string): string[] => {

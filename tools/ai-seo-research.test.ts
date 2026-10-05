@@ -407,7 +407,9 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
   assert.match(panel, /GSC Evidence/);
   assert.match(panel, /Research sources/);
   assert.match(panel, /noopener noreferrer/);
-  assert.doesNotMatch(panel, /lib\/cms\/gsc\//);
+  assert.match(panel, /Test GSC connection/);
+  assert.match(panel, /gsc\/probe-types|gsc\/gsc-actions/);
+  assert.doesNotMatch(panel, /getGscAccessToken|querySearchAnalytics|GSC_PRIVATE_KEY|evidence-pack/);
   assert.doesNotMatch(panel, /Google trending searches|monthly searches|keyword difficulty|CPC/i);
   assert.doesNotMatch(panel, /RESTORE_HISTORICAL|Create Blog|Save opportunity/);
   assert.doesNotMatch(nav, /\/sidhu\/seo\/gsc\//);
@@ -423,9 +425,15 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
         code: "unavailable" as const,
         error: "unavailable",
       }),
+      gscProbeAction: async () => ({
+        ok: false as const,
+        code: "unauthorized" as const,
+        error: "unused",
+      }),
     }),
   );
   assert.match(html, /Research UK opportunities/);
+  assert.match(html, /Test GSC connection/);
   assert.match(html, /does not run automatically/i);
   assert.doesNotMatch(html, /Create Blog|Save opportunity/);
 });

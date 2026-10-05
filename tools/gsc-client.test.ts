@@ -297,12 +297,12 @@ test("security: GSC modules are server-only; no client imports or proxy routes",
   assert.doesNotMatch(envExample, /GOOGLE_APPLICATION_CREDENTIALS/);
   assert.doesNotMatch(envExample, /NEXT_PUBLIC_GSC/);
 
-  for (const file of [
-    "components/sidhu/SeoOpportunitiesPanel.tsx",
-    "components/sidhu/SeoOverviewHub.tsx",
-  ]) {
-    assert.doesNotMatch(read(file), /lib\/cms\/gsc|@\/lib\/cms\/gsc/);
-  }
+  // Panel may import admin probe action/types only — not auth/analytics/config secrets.
+  const panel = read("components/sidhu/SeoOpportunitiesPanel.tsx");
+  assert.match(panel, /@\/lib\/cms\/gsc\/(probe-types|gsc-actions)/);
+  assert.doesNotMatch(panel, /@\/lib\/cms\/gsc\/(auth|search-analytics|config|evidence-pack)/);
+  assert.doesNotMatch(panel, /GSC_PRIVATE_KEY|getGscAccessToken|querySearchAnalytics/);
+  assert.doesNotMatch(read("components/sidhu/SeoOverviewHub.tsx"), /lib\/cms\/gsc|@\/lib\/cms\/gsc/);
 
   const apiDir = path.join(root, "app/api");
   const walk = (dir: string): string[] => {
