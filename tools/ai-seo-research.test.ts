@@ -424,6 +424,7 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
 
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
+      proceedAction: async () => ({ ok: false as const, error: "unused" }),
       aiConfigured: true,
       researchAction: async () => ({
         ok: false as const,

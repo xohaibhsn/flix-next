@@ -4,7 +4,7 @@
  * starts can skip a verified full ensureCmsSchema pass. Forgetting to bump leaves
  * new tables/columns unverified on DBs that already hold the previous version.
  */
-export const CURRENT_CMS_SCHEMA_VERSION = 2;
+export const CURRENT_CMS_SCHEMA_VERSION = 3;
 
 export const CMS_SCHEMA_STATEMENTS = [
   // Tables are created IF NOT EXISTS. Missing columns are added at runtime in ensureCmsSchema().
@@ -179,5 +179,27 @@ export const CMS_SCHEMA_STATEMENTS = [
     created_by VARCHAR(80) NULL,
     PRIMARY KEY (id),
     UNIQUE KEY admin_users_username_unique (username)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS seo_planning_drafts (
+    id VARCHAR(80) NOT NULL,
+    recommendation VARCHAR(40) NOT NULL,
+    workflow_status VARCHAR(40) NOT NULL DEFAULT 'PLANNING',
+    fingerprint VARCHAR(320) NOT NULL,
+    topic VARCHAR(160) NOT NULL DEFAULT '',
+    working_title VARCHAR(180) NOT NULL DEFAULT '',
+    proposed_slug VARCHAR(180) NOT NULL DEFAULT '',
+    target_post_id VARCHAR(80) NULL,
+    matched_public_url VARCHAR(300) NOT NULL DEFAULT '',
+    restore_path VARCHAR(300) NOT NULL DEFAULT '',
+    search_intent VARCHAR(40) NOT NULL DEFAULT '',
+    linked_post_id VARCHAR(80) NULL,
+    created_by VARCHAR(80) NOT NULL DEFAULT '',
+    payload LONGTEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY seo_planning_drafts_fingerprint_unique (fingerprint),
+    KEY seo_planning_drafts_workflow (workflow_status),
+    KEY seo_planning_drafts_target_post (target_post_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ] as const;

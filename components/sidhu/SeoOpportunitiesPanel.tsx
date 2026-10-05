@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
 import type {
   SeoResearchConfidence,
@@ -15,10 +16,30 @@ import type {
 } from "@/lib/cms/ai-seo/research-schemas";
 import type { ProbeGscConnectionActionResult } from "@/lib/cms/gsc/gsc-actions";
 import type { GscProbeResult } from "@/lib/cms/gsc/probe-types";
+import type { ProceedSeoOpportunityActionResult } from "@/lib/cms/seo-planning-actions";
+import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
+import { slugify } from "@/lib/cms/slug";
 import { Banner } from "@/components/sidhu/fields";
 import { Button, sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { cn } from "@/components/sidhu/ui/cn";
+
+function proceedTargetSummary(item: SeoResearchOpportunity) {
+  if (item.recommendation === "NEW_BLOG") {
+    const slug = slugify(item.workingTitle) || "(untitled)";
+    return `Proposed slug: /blogs/${slug}/`;
+  }
+  if (item.recommendation === "REFRESH_EXISTING") {
+    return `Current article: ${item.matchedTitle || item.matchedPublicUrl || "(unresolved)"}`;
+  }
+  if (item.recommendation === "RESTORE_HISTORICAL") {
+    return `Historical path: ${item.restorePath || "(missing)"}`;
+  }
+  if (item.recommendation === "INTERNAL_LINK_ONLY") {
+    return `Target: ${item.matchedPublicUrl || item.topic}`;
+  }
+  return "";
+}
 
 function recommendationLabel(value: SeoResearchRecommendation) {
   if (value === "NEW_BLOG") return "NEW BLOG";
@@ -66,10 +87,12 @@ function formatPos(value: number) {
 export function SeoOpportunitiesPanel({
   researchAction,
   gscProbeAction,
+  proceedAction,
   aiConfigured,
 }: {
   researchAction: () => Promise<ResearchUkOpportunitiesResult & { configured?: boolean }>;
   gscProbeAction: () => Promise<ProbeGscConnectionActionResult>;
+  proceedAction: (input: unknown) => Promise<ProceedSeoOpportunityActionResult>;
   aiConfigured: boolean;
 }) {
   const [pending, startTransition] = useTransition();
@@ -217,7 +240,13 @@ export function SeoOpportunitiesPanel({
 
           <div className="space-y-4">
             {opportunities.map((item) => (
-              <OpportunityCard key={`${item.recommendation}:${item.workingTitle}`} item={item} />
+              <OpportunityCard
+                key={`${item.recommendation}:${item.workingTitle}`}
+                item={item}
+                sources={research.sources}
+                gsc={research.gsc}
+                proceedAction={proceedAction}
+              />
             ))}
             {!opportunities.length ? (
               <SectionCard padding="sm">
@@ -343,7 +372,46 @@ function GscRunStatus({ gsc }: { gsc: SeoResearchGscMeta }) {
   );
 }
 
-function OpportunityCard({ item }: { item: SeoResearchOpportunity }) {
+function OpportunityCard({
+  item,
+  sources,
+  gsc,
+  proceedAction,
+}: {
+  item: SeoResearchOpportunity;
+  sources: SeoResearchSource[];
+  gsc?: SeoResearchGscMeta;
+  proceedAction: (input: unknown) => Promise<ProceedSeoOpportunityActionResult>;
+}) {
+  const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [proceedError, setProceedError] = useState<string | null>(null);
+  const [proceedNotice, setProceedNotice] = useState<string | null>(null);
+  const [proceedPending, startProceedTransition] = useTransition();
+  const canProceed = isSeoPlanningActionableRecommendation(item.recommendation);
+
+  function confirmProceed() {
+    if (proceedPending || !canProceed) return;
+    setProceedError(null);
+    setProceedNotice(null);
+    startProceedTransition(async () => {
+      const result = await proceedAction({
+        opportunity: item,
+        sources,
+        gsc,
+      });
+      if (!result.ok) {
+        setProceedError(result.error);
+        return;
+      }
+      if (!result.created) {
+        setProceedNotice("Opening existing planning draft for this target.");
+      }
+      setConfirmOpen(false);
+      router.push(`/sidhu/seo/planning/${result.id}/`);
+    });
+  }
+
   return (
     <SectionCard className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -424,6 +492,68 @@ function OpportunityCard({ item }: { item: SeoResearchOpportunity }) {
           <p className="mt-1 text-ink">{item.nextStep}</p>
         </div>
       </div>
+
+      {canProceed ? (
+        <div className="space-y-2 border-t border-line pt-3">
+          {!confirmOpen ? (
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={proceedPending}
+              onClick={() => {
+                setProceedError(null);
+                setProceedNotice(null);
+                setConfirmOpen(true);
+              }}
+            >
+              Proceed with this
+            </Button>
+          ) : (
+            <div className="space-y-3 rounded-md border border-line bg-paper/50 px-3 py-3">
+              <p className="text-sm font-semibold text-ink">Create private planning draft?</p>
+              <dl className="space-y-1 text-sm">
+                <div>
+                  <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Recommendation</dt>
+                  <dd className="text-ink">{recommendationLabel(item.recommendation)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Topic / title</dt>
+                  <dd className="text-ink">
+                    {item.workingTitle}
+                    <span className="block text-muted">{item.topic}</span>
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Effective target</dt>
+                  <dd className="break-all text-ink">{proceedTargetSummary(item)}</dd>
+                </div>
+              </dl>
+              <p className="text-sm text-muted">
+                This creates a private planning draft. Nothing will be published.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={proceedPending}
+                  onClick={() => {
+                    if (proceedPending) return;
+                    setConfirmOpen(false);
+                    setProceedError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" disabled={proceedPending} onClick={confirmProceed}>
+                  {proceedPending ? "Creating…" : "Create planning draft"}
+                </Button>
+              </div>
+            </div>
+          )}
+          {proceedError ? <Banner tone="error">{proceedError}</Banner> : null}
+          {proceedNotice ? <p className="text-xs text-muted">{proceedNotice}</p> : null}
+        </div>
+      ) : null}
     </SectionCard>
   );
 }

@@ -471,3 +471,38 @@ export type CmsDashboardStats = {
   redirects: number;
   messages: number;
 };
+
+/** Planning workflow states — Phase A creates PLANNING only; transitions come later. */
+export const SEO_PLANNING_WORKFLOW_STATUSES = [
+  "PLANNING",
+  "CONTENT_NEEDED",
+  "IMAGE_NEEDED",
+  "SEO_REVIEW",
+  "READY_TO_PUBLISH",
+] as const;
+export type SeoPlanningWorkflowStatus = (typeof SEO_PLANNING_WORKFLOW_STATUSES)[number];
+
+/**
+ * Private admin-only SEO planning draft (Hybrid architecture).
+ * Never public. Never a BlogPost. Proceed does not publish.
+ */
+export type SeoPlanningDraft = {
+  id: string;
+  recommendation: string;
+  workflowStatus: SeoPlanningWorkflowStatus;
+  fingerprint: string;
+  topic: string;
+  workingTitle: string;
+  proposedSlug: string;
+  targetPostId: string | null;
+  matchedPublicUrl: string;
+  restorePath: string;
+  searchIntent: string;
+  /** Reserved for later content handoff; unused in Phase A. */
+  linkedPostId: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Bounded evidence/planning snapshot — not authoritative for publish. */
+  payload: Record<string, unknown>;
+};

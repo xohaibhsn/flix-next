@@ -250,10 +250,10 @@ test("mysql-migrate exports ensureCmsSchemaCurrent wrapping the version gate", (
 
 test("schema version constant lives next to schema statements", () => {
   const schema = readFileSync(path.join(process.cwd(), "lib/db/schema.ts"), "utf8");
-  assert.match(schema, /export const CURRENT_CMS_SCHEMA_VERSION\s*=\s*2/);
+  assert.match(schema, /export const CURRENT_CMS_SCHEMA_VERSION\s*=\s*3/);
   assert.match(schema, /bump CURRENT_CMS_SCHEMA_VERSION/i);
   assert.equal(CMS_SCHEMA_VERSION_KEY, "cms_schema_version");
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 2);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
 });
 
 test("BEFORE/AFTER cold-start operation counts (instrumented)", async () => {

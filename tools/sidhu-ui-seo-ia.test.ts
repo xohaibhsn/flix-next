@@ -18,7 +18,17 @@ function read(rel: string) {
 test("SEO nav exposes current subsections only", () => {
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.label),
-    ["Overview", "Issues", "Opportunities", "Content", "Metadata", "Links", "Media", "Advanced"],
+    [
+      "Overview",
+      "Issues",
+      "Opportunities",
+      "Planning",
+      "Content",
+      "Metadata",
+      "Links",
+      "Media",
+      "Advanced",
+    ],
   );
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.href),
@@ -26,6 +36,7 @@ test("SEO nav exposes current subsections only", () => {
       "/sidhu/seo/",
       "/sidhu/seo/health/",
       "/sidhu/seo/opportunities/",
+      "/sidhu/seo/planning/",
       "/sidhu/seo/content/",
       "/sidhu/seo/metadata-diagnostics/",
       "/sidhu/seo/internal-links/",
@@ -35,6 +46,7 @@ test("SEO nav exposes current subsections only", () => {
   );
   const src = read("lib/cms/sidhu-seo-nav.ts");
   assert.match(src, /Opportunities/);
+  assert.match(src, /Planning/);
   assert.doesNotMatch(src, /Performance|History|GSC|AI Content/i);
 });
 

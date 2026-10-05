@@ -10,6 +10,7 @@ import { MANAGED_REDIRECT_SEED_KEY, MANAGED_REDIRECTS, toRedirectRule } from "@/
 import { applySubscriptionRedirectMigration } from "@/lib/cms/subscription-url-migrate";
 import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
+import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -35,6 +36,7 @@ import type {
   FaqItem,
   PricingPlan,
   RedirectRule,
+  SeoPlanningDraft,
 } from "@/lib/cms/types";
 import { isProductionBuildPhase } from "@/lib/db/config";
 
@@ -45,6 +47,23 @@ const POSTS_FILE = "blog-posts.json";
 const REDIRECTS_FILE = "redirects.json";
 const REDIRECT_SEED_FILE = "redirect-seeds.json";
 const MESSAGES_FILE = "contact-messages.json";
+const SEO_PLANNING_FILE = "seo-planning-drafts.json";
+
+/**
+ * Process-local queue for seo-planning-drafts.json read/check/write.
+ * Prevents last-writer-wins races on concurrent same/different fingerprints.
+ * Failures never permanently poison the queue (next waiter still runs).
+ */
+let seoPlanningJsonWriteChain: Promise<void> = Promise.resolve();
+
+function withSeoPlanningJsonWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  const run = seoPlanningJsonWriteChain.then(operation, operation);
+  seoPlanningJsonWriteChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
 
 async function ensureJsonManagedRedirects(items: RedirectRule[]) {
   const flag = await readJsonFile<{ seeded?: boolean }>(REDIRECT_SEED_FILE, {});
@@ -239,6 +258,43 @@ export class JsonCatalogRepository implements CatalogRepository {
     const items = await this.listMessages();
     await saveList(MESSAGES_FILE, [safe, ...items]);
     return safe;
+  }
+  async listSeoPlanningDrafts() {
+    const items = await readJsonFile<SeoPlanningDraft[]>(SEO_PLANNING_FILE, []);
+    return (Array.isArray(items) ? items : [])
+      .map(sanitizeSeoPlanningDraft)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  }
+  async getSeoPlanningDraftById(id: string) {
+    const items = await this.listSeoPlanningDrafts();
+    return items.find((item) => item.id === id) || null;
+  }
+  async getSeoPlanningDraftByFingerprint(fingerprint: string) {
+    const fp = String(fingerprint || "").trim();
+    if (!fp) return null;
+    const items = await this.listSeoPlanningDrafts();
+    return items.find((item) => item.fingerprint === fp) || null;
+  }
+  async saveSeoPlanningDraft(draft: SeoPlanningDraft) {
+    const safe = sanitizeSeoPlanningDraft(draft);
+    if (!safe.id || !safe.fingerprint) {
+      throw new Error("Planning draft requires id and fingerprint.");
+    }
+    return withSeoPlanningJsonWriteLock(async () => {
+      // Re-read inside the lock so waiters observe the prior writer's commit.
+      const items = await this.listSeoPlanningDrafts();
+      const fingerprintOwner = items.find(
+        (item) => item.fingerprint === safe.fingerprint && item.id !== safe.id,
+      );
+      if (fingerprintOwner) {
+        throw new Error("Planning draft fingerprint already exists.");
+      }
+      const next = items.some((item) => item.id === safe.id)
+        ? items.map((item) => (item.id === safe.id ? safe : item))
+        : [...items, safe];
+      await saveList(SEO_PLANNING_FILE, next);
+      return safe;
+    });
   }
   async dashboardStats(): Promise<CmsDashboardStats> {
     const [pages, posts, faqs, plans, media, redirects, messages] = await Promise.all([

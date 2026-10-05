@@ -169,7 +169,7 @@ test("category preview and overview reflect overrides", () => {
 });
 
 test("schema version bumped for category SEO columns", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 2);
+  assert.ok(CURRENT_CMS_SCHEMA_VERSION >= 2);
   const schema = readFileSync(path.join(process.cwd(), "lib/db/schema.ts"), "utf8");
   assert.match(schema, /seo_title VARCHAR\(200\)/);
   assert.match(schema, /sitemap_include TINYINT\(1\) NULL/);

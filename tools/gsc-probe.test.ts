@@ -355,6 +355,7 @@ test("GSC probe action requires SEO admin; no OpenAI; no persistence markers", (
 
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
+      proceedAction: async () => ({ ok: false as const, error: "unused" }),
       aiConfigured: true,
       researchAction: async () => ({
         ok: false as const,

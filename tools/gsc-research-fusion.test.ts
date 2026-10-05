@@ -528,6 +528,7 @@ test("GSC-4 UI renders GSC status and resolved evidence; no standalone GSC nav",
 
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
+      proceedAction: async () => ({ ok: false as const, error: "unused" }),
       aiConfigured: true,
       gscProbeAction: async () => ({
         ok: false as const,

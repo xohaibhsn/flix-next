@@ -472,6 +472,7 @@ test("19–20. UI renders RESTORE + historical path; no mutation actions", () =>
 
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
+      proceedAction: async () => ({ ok: false as const, error: "unused" }),
       aiConfigured: true,
       gscProbeAction: async () => ({
         ok: false as const,

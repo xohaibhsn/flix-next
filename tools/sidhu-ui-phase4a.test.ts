@@ -87,6 +87,7 @@ test("editor Sticky Save action remains primary button wording", () => {
 test("Opportunities Research UK opportunities CTA remains primary and deliberate", () => {
   const html = renderToStaticMarkup(
     createElement(SeoOpportunitiesPanel, {
+      proceedAction: async () => ({ ok: false as const, error: "unused" }),
       aiConfigured: true,
       researchAction: async () => ({
         ok: false as const,
@@ -117,10 +118,20 @@ test("SEO diagnostic reports use RelatedWorkspaces instead of brand underline du
   }
 });
 
-test("SEO subnav remains unchanged", () => {
+test("SEO subnav includes Planning after Opportunities", () => {
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.id),
-    ["overview", "issues", "opportunities", "content", "metadata", "links", "media", "advanced"],
+    [
+      "overview",
+      "issues",
+      "opportunities",
+      "planning",
+      "content",
+      "metadata",
+      "links",
+      "media",
+      "advanced",
+    ],
   );
 });
 

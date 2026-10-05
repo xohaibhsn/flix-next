@@ -5,6 +5,7 @@ import {
   parseJsonColumn,
   toMysqlDateTime,
 } from "@/lib/cms/mysql-migrate";
+import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -31,6 +32,7 @@ import type {
   MediaRef,
   PricingPlan,
   RedirectRule,
+  SeoPlanningDraft,
 } from "@/lib/cms/types";
 
 type PlanRow = RowDataPacket & {
@@ -128,6 +130,25 @@ type MessageRow = RowDataPacket & {
   subject: string;
   message: string;
   created_at: unknown;
+};
+
+type PlanningRow = RowDataPacket & {
+  id: string;
+  recommendation: string;
+  workflow_status: string;
+  fingerprint: string;
+  topic: string;
+  working_title: string;
+  proposed_slug: string;
+  target_post_id: string | null;
+  matched_public_url: string;
+  restore_path: string;
+  search_intent: string;
+  linked_post_id: string | null;
+  created_by: string;
+  payload: unknown;
+  created_at: unknown;
+  updated_at: unknown;
 };
 
 function mapPlan(row: PlanRow): PricingPlan {
@@ -232,6 +253,27 @@ function mapMessage(row: MessageRow): ContactMessage {
     subject: row.subject,
     message: row.message,
     createdAt: fromMysqlDateTime(row.created_at),
+  });
+}
+
+function mapPlanningDraft(row: PlanningRow): SeoPlanningDraft {
+  return sanitizeSeoPlanningDraft({
+    id: row.id,
+    recommendation: row.recommendation,
+    workflowStatus: row.workflow_status as SeoPlanningDraft["workflowStatus"],
+    fingerprint: row.fingerprint,
+    topic: row.topic,
+    workingTitle: row.working_title,
+    proposedSlug: row.proposed_slug,
+    targetPostId: row.target_post_id,
+    matchedPublicUrl: row.matched_public_url,
+    restorePath: row.restore_path,
+    searchIntent: row.search_intent,
+    linkedPostId: row.linked_post_id,
+    createdBy: row.created_by,
+    createdAt: fromMysqlDateTime(row.created_at),
+    updatedAt: fromMysqlDateTime(row.updated_at),
+    payload: parseJsonColumn<Record<string, unknown>>(row.payload, {}),
   });
 }
 
@@ -474,6 +516,95 @@ export class MysqlCatalogRepository implements CatalogRepository {
       `INSERT INTO contact_messages (id, name, email, phone, subject, message, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [safe.id, safe.name, safe.email, safe.phone, safe.subject, safe.message, toMysqlDateTime(safe.createdAt)],
+    );
+    return safe;
+  }
+  async listSeoPlanningDrafts() {
+    await this.ready();
+    const [rows] = await getDbPool().query<PlanningRow[]>(
+      "SELECT * FROM seo_planning_drafts ORDER BY updated_at DESC",
+    );
+    return rows.map(mapPlanningDraft);
+  }
+  async getSeoPlanningDraftById(id: string) {
+    await this.ready();
+    const [rows] = await getDbPool().query<PlanningRow[]>(
+      "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1",
+      [id],
+    );
+    return rows[0] ? mapPlanningDraft(rows[0]) : null;
+  }
+  async getSeoPlanningDraftByFingerprint(fingerprint: string) {
+    await this.ready();
+    const fp = String(fingerprint || "").trim();
+    if (!fp) return null;
+    const [rows] = await getDbPool().query<PlanningRow[]>(
+      "SELECT * FROM seo_planning_drafts WHERE fingerprint = ? LIMIT 1",
+      [fp],
+    );
+    return rows[0] ? mapPlanningDraft(rows[0]) : null;
+  }
+  async saveSeoPlanningDraft(draft: SeoPlanningDraft) {
+    await this.ready();
+    const safe = sanitizeSeoPlanningDraft(draft);
+    if (!safe.id || !safe.fingerprint) {
+      throw new Error("Planning draft requires id and fingerprint.");
+    }
+    const fingerprintOwner = await this.getSeoPlanningDraftByFingerprint(safe.fingerprint);
+    if (fingerprintOwner && fingerprintOwner.id !== safe.id) {
+      throw new Error("Planning draft fingerprint already exists.");
+    }
+    const existing = await this.getSeoPlanningDraftById(safe.id);
+    if (existing) {
+      await getDbPool().execute(
+        `UPDATE seo_planning_drafts SET
+          recommendation = ?, workflow_status = ?, fingerprint = ?, topic = ?, working_title = ?,
+          proposed_slug = ?, target_post_id = ?, matched_public_url = ?, restore_path = ?,
+          search_intent = ?, linked_post_id = ?, payload = ?, updated_at = ?
+         WHERE id = ?`,
+        [
+          safe.recommendation,
+          safe.workflowStatus,
+          safe.fingerprint,
+          safe.topic,
+          safe.workingTitle,
+          safe.proposedSlug,
+          safe.targetPostId,
+          safe.matchedPublicUrl,
+          safe.restorePath,
+          safe.searchIntent,
+          safe.linkedPostId,
+          JSON.stringify(safe.payload || {}),
+          toMysqlDateTime(safe.updatedAt),
+          safe.id,
+        ],
+      );
+      return safe;
+    }
+    await getDbPool().execute(
+      `INSERT INTO seo_planning_drafts (
+        id, recommendation, workflow_status, fingerprint, topic, working_title, proposed_slug,
+        target_post_id, matched_public_url, restore_path, search_intent, linked_post_id,
+        created_by, payload, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        safe.id,
+        safe.recommendation,
+        safe.workflowStatus,
+        safe.fingerprint,
+        safe.topic,
+        safe.workingTitle,
+        safe.proposedSlug,
+        safe.targetPostId,
+        safe.matchedPublicUrl,
+        safe.restorePath,
+        safe.searchIntent,
+        safe.linkedPostId,
+        safe.createdBy,
+        JSON.stringify(safe.payload || {}),
+        toMysqlDateTime(safe.createdAt),
+        toMysqlDateTime(safe.updatedAt),
+      ],
     );
     return safe;
   }

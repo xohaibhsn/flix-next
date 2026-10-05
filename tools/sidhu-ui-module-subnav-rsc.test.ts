@@ -46,10 +46,20 @@ test("ModuleSubNav public props stay JSON-serializable", () => {
 test("SEO nav active matching covers all subsections with Overview exact", () => {
   type SidhuSeoId = (typeof SIDHU_SEO_NAV)[number]["id"];
 
-  assert.equal(SIDHU_SEO_NAV.length, 8);
+  assert.equal(SIDHU_SEO_NAV.length, 9);
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.label),
-    ["Overview", "Issues", "Opportunities", "Content", "Metadata", "Links", "Media", "Advanced"],
+    [
+      "Overview",
+      "Issues",
+      "Opportunities",
+      "Planning",
+      "Content",
+      "Metadata",
+      "Links",
+      "Media",
+      "Advanced",
+    ],
   );
   assert.equal(SIDHU_SEO_NAV[0]?.exact, true);
 
@@ -58,6 +68,8 @@ test("SEO nav active matching covers all subsections with Overview exact", () =>
     { path: "/sidhu/seo", activeId: "overview" },
     { path: "/sidhu/seo/health/", activeId: "issues" },
     { path: "/sidhu/seo/opportunities/", activeId: "opportunities" },
+    { path: "/sidhu/seo/planning/", activeId: "planning" },
+    { path: "/sidhu/seo/planning/demo/", activeId: "planning" },
     { path: "/sidhu/seo/content/", activeId: "content" },
     { path: "/sidhu/seo/metadata-diagnostics/", activeId: "metadata" },
     { path: "/sidhu/seo/internal-links/", activeId: "links" },

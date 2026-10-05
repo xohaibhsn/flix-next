@@ -6,6 +6,7 @@ import type {
   FaqItem,
   PricingPlan,
   RedirectRule,
+  SeoPlanningDraft,
 } from "@/lib/cms/types";
 
 export interface CatalogRepository {
@@ -30,5 +31,9 @@ export interface CatalogRepository {
   deleteRedirect(id: string): Promise<void>;
   listMessages(): Promise<ContactMessage[]>;
   addMessage(message: ContactMessage): Promise<ContactMessage>;
+  listSeoPlanningDrafts(): Promise<SeoPlanningDraft[]>;
+  getSeoPlanningDraftById(id: string): Promise<SeoPlanningDraft | null>;
+  getSeoPlanningDraftByFingerprint(fingerprint: string): Promise<SeoPlanningDraft | null>;
+  saveSeoPlanningDraft(draft: SeoPlanningDraft): Promise<SeoPlanningDraft>;
   dashboardStats(): Promise<CmsDashboardStats>;
 }
