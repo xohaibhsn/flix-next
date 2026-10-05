@@ -5,6 +5,7 @@ export const SEO_RESEARCH_RECOMMENDATIONS = [
   "REFRESH_EXISTING",
   "INTERNAL_LINK_ONLY",
   "SKIP",
+  "RESTORE_HISTORICAL",
 ] as const;
 export type SeoResearchRecommendation = (typeof SEO_RESEARCH_RECOMMENDATIONS)[number];
 
@@ -97,6 +98,7 @@ export const SEO_RESEARCH_FIELD_CAPS = {
   existingCoverageNote: 280,
   matchedTitle: 160,
   matchedPublicUrl: 300,
+  restorePath: 300,
   suggestedAngle: 280,
   nextStep: 220,
   opportunityCount: 5,
@@ -116,6 +118,8 @@ export type SeoResearchOpportunity = {
   matchedTitle: string | null;
   matchedPublicUrl: string | null;
   recommendation: SeoResearchRecommendation;
+  /** Normalized historical path when recommendation is RESTORE_HISTORICAL; otherwise "". */
+  restorePath: string;
   suggestedAngle: string;
   nextStep: string;
   confidence: SeoResearchConfidence;
@@ -150,7 +154,10 @@ export const SEO_RESEARCH_SYSTEM_INSTRUCTION = [
   "Absence from the bounded GSC rows does NOT prove zero search demand.",
   "Do not recommend a new article when existing Flix content or overlapping GSC intent substantially covers the same search intent; prefer refresh or internal-link recommendations.",
   "Historical or redirected GSC URL evidence may affect assessment, but REDIRECTED_HISTORICAL does NOT automatically mean restore content.",
-  "There is no RESTORE_HISTORICAL recommendation in this phase. Root / redirecting to /welcome/ is current site architecture, not content to restore.",
+  "UNKNOWN does not mean 404. Root / redirecting to /welcome/ is current site architecture, never a restoration candidate.",
+  "RESTORE_HISTORICAL may only be used when restorePath exactly matches one of the supplied restorationCandidates. Do not infer another historical path.",
+  "restorationCandidates are eligibility possibilities, not commands to restore. Prefer REFRESH_EXISTING or INTERNAL_LINK_ONLY when strong current coverage exists.",
+  "For RESTORE_HISTORICAL, include relevant page-bearing evidence IDs (P# / QP#) for that restorePath. For all other recommendations, restorePath must be an empty string.",
   "When discussing GSC in narrative fields, stay qualitative and reference evidence IDs rather than inventing numeric values.",
   "Distinguish current web evidence, existing Flix coverage, and GSC evidence from inference.",
   "Avoid keyword stuffing, sensational clickbait and unsupported claims.",
@@ -180,6 +187,7 @@ export const SEO_RESEARCH_JSON_SCHEMA = {
           "matchedTitle",
           "matchedPublicUrl",
           "recommendation",
+          "restorePath",
           "suggestedAngle",
           "nextStep",
           "confidence",
@@ -195,6 +203,7 @@ export const SEO_RESEARCH_JSON_SCHEMA = {
           matchedTitle: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.matchedTitle },
           matchedPublicUrl: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.matchedPublicUrl },
           recommendation: { type: "string", enum: [...SEO_RESEARCH_RECOMMENDATIONS] },
+          restorePath: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.restorePath },
           suggestedAngle: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.suggestedAngle },
           nextStep: { type: "string", maxLength: SEO_RESEARCH_FIELD_CAPS.nextStep },
           confidence: { type: "string", enum: [...SEO_RESEARCH_CONFIDENCE] },
@@ -284,11 +293,17 @@ export type NormalizeSeoResearchOptions = {
   gscEvidenceById?: ReadonlyMap<string, SeoResearchGscEvidence>;
   /** Compact GSC run meta attached to the normalized result. */
   gscMeta?: SeoResearchGscMeta;
+  /**
+   * Server-owned RESTORE_HISTORICAL path allowlist for this run.
+   * When omitted/empty, RESTORE_HISTORICAL cannot validate.
+   */
+  restorationPathAllowlist?: ReadonlySet<string>;
 };
 
 /**
  * Normalize model JSON against the allowlisted Flix public URLs.
  * GSC evidence refs are resolved against the server catalog when provided.
+ * RESTORE_HISTORICAL is server-gated via restorationPathAllowlist.
  * Returns null when the payload is malformed.
  */
 export function normalizeSeoResearchResult(
@@ -302,6 +317,7 @@ export function normalizeSeoResearchResult(
   if (Object.keys(data).some((key) => key !== "opportunities")) return null;
 
   const gscById = options?.gscEvidenceById;
+  const restoreAllowlist = options?.restorationPathAllowlist ?? new Set<string>();
   const opportunities: SeoResearchOpportunity[] = [];
   for (const item of data.opportunities.slice(0, SEO_RESEARCH_FIELD_CAPS.opportunityCount)) {
     if (!item || typeof item !== "object" || Array.isArray(item)) return null;
@@ -318,6 +334,7 @@ export function normalizeSeoResearchResult(
           "matchedTitle",
           "matchedPublicUrl",
           "recommendation",
+          "restorePath",
           "suggestedAngle",
           "nextStep",
           "confidence",
@@ -338,6 +355,15 @@ export function normalizeSeoResearchResult(
     if (!isEnum(row.recommendation, SEO_RESEARCH_RECOMMENDATIONS)) return null;
     if (!isEnum(row.confidence, SEO_RESEARCH_CONFIDENCE)) return null;
 
+    if (typeof row.restorePath !== "string") return null;
+    const restorePathRaw = normalizePublicPath(
+      trimTo(row.restorePath, SEO_RESEARCH_FIELD_CAPS.restorePath),
+    );
+    // Empty restorePath stays ""; non-empty must normalize to a path.
+    const restorePath =
+      String(row.restorePath).replace(/\s+/g, " ").trim() === "" ? "" : restorePathRaw;
+    if (String(row.restorePath).replace(/\s+/g, " ").trim() !== "" && !restorePath) return null;
+
     const matchedTitleRaw = trimTo(row.matchedTitle, SEO_RESEARCH_FIELD_CAPS.matchedTitle);
     const matchedUrlRaw = normalizePublicPath(
       trimTo(row.matchedPublicUrl, SEO_RESEARCH_FIELD_CAPS.matchedPublicUrl),
@@ -346,26 +372,44 @@ export function normalizeSeoResearchResult(
     let matchedTitle: string | null = matchedTitleRaw || null;
     let matchedPublicUrl: string | null = null;
 
-    if (
-      row.recommendation === "REFRESH_EXISTING" ||
-      row.recommendation === "INTERNAL_LINK_ONLY"
-    ) {
-      if (!matchedUrlRaw || !allowlistedPublicUrls.has(matchedUrlRaw)) {
-        // Unsupported internal mapping — reject the whole payload rather than invent coverage.
-        return null;
-      }
-      matchedPublicUrl = matchedUrlRaw;
-      if (!matchedTitle) matchedTitle = matchedUrlRaw;
-    } else if (matchedUrlRaw) {
-      if (!allowlistedPublicUrls.has(matchedUrlRaw)) {
-        matchedTitle = null;
-        matchedPublicUrl = null;
-      } else {
+    if (row.recommendation === "RESTORE_HISTORICAL") {
+      if (!restorePath || !restoreAllowlist.has(restorePath)) return null;
+      if (matchedUrlRaw) return null;
+      if (row.existingCoverage === "STRONG") return null;
+      matchedTitle = matchedTitleRaw || null;
+      matchedPublicUrl = null;
+    } else {
+      if (restorePath !== "") return null;
+      if (
+        row.recommendation === "REFRESH_EXISTING" ||
+        row.recommendation === "INTERNAL_LINK_ONLY"
+      ) {
+        if (!matchedUrlRaw || !allowlistedPublicUrls.has(matchedUrlRaw)) {
+          // Unsupported internal mapping — reject the whole payload rather than invent coverage.
+          return null;
+        }
         matchedPublicUrl = matchedUrlRaw;
+        if (!matchedTitle) matchedTitle = matchedUrlRaw;
+      } else if (matchedUrlRaw) {
+        if (!allowlistedPublicUrls.has(matchedUrlRaw)) {
+          matchedTitle = null;
+          matchedPublicUrl = null;
+        } else {
+          matchedPublicUrl = matchedUrlRaw;
+        }
       }
     }
 
     const resolved = resolveOpportunityGscRefs(row.gscEvidenceRefs, gscById);
+
+    if (row.recommendation === "RESTORE_HISTORICAL") {
+      const pageBearingMatch = resolved.resolved.some(
+        (record) =>
+          (record.kind === "page" || record.kind === "query_page") &&
+          (record.normalizedPath || "") === restorePath,
+      );
+      if (!pageBearingMatch) return null;
+    }
 
     opportunities.push({
       topic,
@@ -377,6 +421,7 @@ export function normalizeSeoResearchResult(
       matchedTitle,
       matchedPublicUrl,
       recommendation: row.recommendation,
+      restorePath,
       suggestedAngle,
       nextStep,
       confidence: row.confidence,

@@ -172,6 +172,7 @@ function opportunityBase(overrides: Record<string, unknown> = {}) {
     matchedTitle: "",
     matchedPublicUrl: "",
     recommendation: "NEW_BLOG",
+    restorePath: "",
     suggestedAngle: "Add a focused buffering checklist.",
     nextStep: "Draft an outline for editorial review only.",
     confidence: "MEDIUM",
@@ -311,23 +312,23 @@ test("GSC-4 historical signal for removed/redirected; root / is not restore-wort
   assert.equal(removed.historicalSignal, true);
 });
 
-test("GSC-4 recommendation enum unchanged and RESTORE_HISTORICAL absent", () => {
+test("GSC-4 recommendation enum includes server-gated RESTORE_HISTORICAL", () => {
   assert.deepEqual([...SEO_RESEARCH_RECOMMENDATIONS], [
     "NEW_BLOG",
     "REFRESH_EXISTING",
     "INTERNAL_LINK_ONLY",
     "SKIP",
+    "RESTORE_HISTORICAL",
   ]);
   const schemas = read("lib/cms/ai-seo/research-schemas.ts");
-  // Instruction may mention the future enum by name; the recommendation enum must not include it.
-  const enumBlock = schemas.slice(
-    schemas.indexOf("export const SEO_RESEARCH_RECOMMENDATIONS"),
-    schemas.indexOf("export type SeoResearchRecommendation"),
-  );
-  assert.doesNotMatch(enumBlock, /RESTORE_HISTORICAL/);
-  assert.match(schemas, /There is no RESTORE_HISTORICAL recommendation/);
+  assert.match(schemas, /RESTORE_HISTORICAL/);
+  assert.match(schemas, /restorePath/);
+  assert.doesNotMatch(schemas, /There is no RESTORE_HISTORICAL recommendation/);
+  assert.match(schemas, /RESTORE_HISTORICAL may only be used when restorePath exactly matches/);
   const panel = read("components/sidhu/SeoOpportunitiesPanel.tsx");
-  assert.doesNotMatch(panel, /RESTORE_HISTORICAL/);
+  assert.match(panel, /RESTORE_HISTORICAL/);
+  assert.match(panel, /Restore historical/);
+  assert.doesNotMatch(panel, /Create Blog|Save opportunity|Publish/);
 });
 
 // ---------------------------------------------------------------------------
@@ -477,10 +478,16 @@ test("GSC-4 request body keeps web_search required and includes gscEvidence", ()
   assert.equal(body.tool_choice, "required");
   assert.equal(body.tools[0]?.type, "web_search");
   const user = JSON.parse(body.input[1].content[0].text as string) as {
-    gscEvidence: { evidence: Array<{ id: string }>; notes: string[] };
+    gscEvidence: {
+      evidence: Array<{ id: string }>;
+      notes: string[];
+      restorationCandidates: unknown[];
+    };
   };
   assert.ok(user.gscEvidence.evidence.some((e) => e.id === "Q1"));
+  assert.ok(Array.isArray(user.gscEvidence.restorationCandidates));
   assert.ok(user.gscEvidence.notes.some((n) => /factual/i.test(n)));
+  assert.ok(user.gscEvidence.notes.some((n) => /restorationCandidates/i.test(n)));
 });
 
 test("GSC-4 rate limiter unchanged (2/min burst, 10/day)", () => {
@@ -510,7 +517,8 @@ test("GSC-4 UI renders GSC status and resolved evidence; no standalone GSC nav",
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/probe-types["']/);
   assert.match(panel, /from ["']@\/lib\/cms\/gsc\/gsc-actions["']/);
   assert.doesNotMatch(panel, /from ["']@\/lib\/cms\/gsc\/(auth|search-analytics|evidence-pack|probe)["']/);
-  assert.doesNotMatch(panel, /Create Blog|Save opportunity|Publish|RESTORE_HISTORICAL/);
+  assert.doesNotMatch(panel, /Create Blog|Save opportunity|Publish/);
+  assert.match(panel, /RESTORE_HISTORICAL/);
   assert.doesNotMatch(nav, /\/sidhu\/seo\/gsc\//);
   assert.doesNotMatch(page, /buildUkGscEvidencePack|querySearchAnalytics/);
   assert.match(run, /buildUkGscEvidencePack/);
@@ -571,6 +579,7 @@ test("GSC-4 UI renders GSC status and resolved evidence; no standalone GSC nav",
               confidence: "MEDIUM" as const,
               matchedTitle: null,
               matchedPublicUrl: null,
+              restorePath: "",
             },
           ],
           sources: [],

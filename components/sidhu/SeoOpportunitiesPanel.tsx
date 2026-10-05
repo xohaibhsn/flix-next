@@ -24,6 +24,7 @@ function recommendationLabel(value: SeoResearchRecommendation) {
   if (value === "NEW_BLOG") return "NEW BLOG";
   if (value === "REFRESH_EXISTING") return "REFRESH EXISTING";
   if (value === "INTERNAL_LINK_ONLY") return "INTERNAL LINK";
+  if (value === "RESTORE_HISTORICAL") return "RESTORE HISTORICAL";
   return "SKIP";
 }
 
@@ -31,6 +32,7 @@ function recommendationClass(value: SeoResearchRecommendation) {
   if (value === "NEW_BLOG") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (value === "REFRESH_EXISTING") return "border-sky-200 bg-sky-50 text-sky-950";
   if (value === "INTERNAL_LINK_ONLY") return "border-line bg-paper text-ink";
+  if (value === "RESTORE_HISTORICAL") return "border-amber-200 bg-amber-50 text-amber-950";
   return "border-line bg-admin-surface text-muted";
 }
 
@@ -179,6 +181,7 @@ export function SeoOpportunitiesPanel({
                 <option value="NEW_BLOG">New blog</option>
                 <option value="REFRESH_EXISTING">Refresh existing</option>
                 <option value="INTERNAL_LINK_ONLY">Internal link</option>
+                <option value="RESTORE_HISTORICAL">Restore historical</option>
                 <option value="SKIP">Skip</option>
               </select>
             </label>
@@ -359,6 +362,15 @@ function OpportunityCard({ item }: { item: SeoResearchOpportunity }) {
           <dd className="mt-1 text-ink">{confidenceLabel(item.confidence)}</dd>
           <p className="mt-0.5 text-xs text-muted">Confidence in this research recommendation — not a ranking score.</p>
         </div>
+        {item.recommendation === "RESTORE_HISTORICAL" && item.restorePath ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-semibold tracking-wide text-muted uppercase">Historical path</dt>
+            <dd className="mt-1 break-all font-medium text-ink">{item.restorePath}</dd>
+            <p className="mt-0.5 text-xs text-muted">
+              Server-eligible restoration candidate for editorial review only — not saved and not published.
+            </p>
+          </div>
+        ) : null}
       </dl>
 
       <div className="space-y-2 text-sm">

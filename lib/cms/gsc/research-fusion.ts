@@ -9,6 +9,10 @@ import type { GscEvidenceStatus, GscUkEvidencePack } from "@/lib/cms/gsc/evidenc
 import type { GscUrlClass, GscUrlClassification } from "@/lib/cms/gsc/url-classes";
 import type { GscSearchAnalyticsRow } from "@/lib/cms/gsc/types";
 import type { GscMetricDirection } from "@/lib/cms/gsc/compare-pages";
+import {
+  buildGscRestorationCandidates,
+  type GscRestorationCandidate,
+} from "@/lib/cms/gsc/restore-eligibility";
 
 export const GSC_AI_QUERY_LIMIT = 25;
 export const GSC_AI_PAGE_LIMIT = 25;
@@ -89,10 +93,14 @@ export type GscResearchFusionContext = {
       impressionDelta?: number | null;
       positionDirection?: GscMetricDirection | null;
     }>;
+    /** Server-gated RESTORE_HISTORICAL eligibility — not a command to restore. */
+    restorationCandidates: GscRestorationCandidate[];
     notes: string[];
   };
   /** Lookup for post-model reference resolution. */
   byId: Map<string, GscAiEvidenceRecord>;
+  /** Server-owned restore path allowlist for this run (Phase 1). */
+  restorationCandidates: GscRestorationCandidate[];
 };
 
 function metricsFromRow(row: GscSearchAnalyticsRow) {
@@ -197,9 +205,14 @@ export function buildGscResearchFusionContext(args: {
     country: pack.country,
   };
 
+  // Phase 1: candidates only from current evidence IDs (recent P#/QP#). Previous-only
+  // pages never receive IDs here and cannot become restore candidates.
+  const restorationCandidates = buildGscRestorationCandidates(byId);
+
   return {
     meta,
     byId,
+    restorationCandidates,
     aiPayload: {
       status: pack.status,
       statusLabel: meta.statusLabel,
@@ -220,12 +233,19 @@ export function buildGscResearchFusionContext(args: {
         impressionDelta: record.impressionDelta,
         positionDirection: record.positionDirection,
       })),
+      restorationCandidates,
       notes: [
         "GSC metrics are factual provider values for the supplied evidence IDs only.",
         "Reference evidence by ID (Q#, P#, QP#). Do not invent clicks, impressions, CTR, or position.",
         "Absence from this bounded GSC set does not prove zero search demand.",
+        "UNKNOWN means unclassified in this index — it does not mean 404.",
         "REDIRECTED_HISTORICAL means a known redirect source — not an automatic restore recommendation.",
         "Root / redirecting to /welcome/ is current site architecture, not content to restore.",
+        "restorationCandidates are server eligibility possibilities, not commands to restore.",
+        "RESTORE_HISTORICAL may only be used when restorePath exactly matches one of restorationCandidates.",
+        "Do not infer another historical path. RESTORE requires relevant page-bearing evidence IDs (P# / QP#).",
+        "Prefer REFRESH_EXISTING or INTERNAL_LINK_ONLY when strong current coverage already exists.",
+        "Previous-period-only GSC pages have no evidence IDs in this payload and are not restore-eligible in Phase 1.",
       ],
     },
   };

@@ -116,6 +116,7 @@ function goodOpportunityPayload() {
         nextStep: "Review the existing setup guide and expand the troubleshooting section.",
         confidence: "MEDIUM",
         gscEvidenceRefs: [],
+        restorePath: "",
       },
       {
         topic: "Best IPTV apps for Smart TV",
@@ -131,6 +132,7 @@ function goodOpportunityPayload() {
         nextStep: "Draft an outline for editorial review only.",
         confidence: "HIGH",
         gscEvidenceRefs: [],
+        restorePath: "",
       },
     ],
   };
@@ -401,6 +403,8 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
   assert.match(actions, /researchUkContentOpportunitiesAction/);
   assert.doesNotMatch(research, /savePage|savePost|saveCategory|saveSeoHealthState|createPost|publish/);
   assert.doesNotMatch(panel, /Create Blog|Create Draft|Save opportunity|Publish/);
+  assert.match(panel, /RESTORE_HISTORICAL/);
+  assert.match(panel, /Restore historical/);
   assert.match(panel, /Research UK opportunities/);
   assert.match(panel, /Current web evidence/);
   assert.match(panel, /Existing Flix coverage/);
@@ -411,7 +415,8 @@ test("UI is deliberate, mutation-free, and Overview/nav expose Opportunities", (
   assert.match(panel, /gsc\/probe-types|gsc\/gsc-actions/);
   assert.doesNotMatch(panel, /getGscAccessToken|querySearchAnalytics|GSC_PRIVATE_KEY|evidence-pack/);
   assert.doesNotMatch(panel, /Google trending searches|monthly searches|keyword difficulty|CPC/i);
-  assert.doesNotMatch(panel, /RESTORE_HISTORICAL|Create Blog|Save opportunity/);
+  assert.doesNotMatch(panel, /Create Blog|Save opportunity/);
+  assert.match(panel, /RESTORE_HISTORICAL/);
   assert.doesNotMatch(nav, /\/sidhu\/seo\/gsc\//);
   assert.match(provider, /tool_choice: "required"/);
   assert.match(provider, /web_search/);

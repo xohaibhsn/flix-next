@@ -338,6 +338,8 @@ function buildResearchUserPayload(
       "When gscEvidence is present, use those factual rows by evidence ID only — do not invent GSC metrics.",
       "Absence from bounded GSC rows does not prove zero search demand.",
       "Do not invent search volume, rankings, Google Trends, or GSC metrics.",
+      "RESTORE_HISTORICAL only when restorePath exactly matches a restorationCandidates path; otherwise restorePath must be \"\".",
+      "restorationCandidates are eligibility possibilities, not commands to restore.",
     ],
     inventory: inventory.items.map((item) => ({
       kind: item.kind,
@@ -354,6 +356,7 @@ function buildResearchUserPayload(
           status: "NOT_CONFIGURED",
           statusLabel: "GSC not connected yet",
           evidence: [],
+          restorationCandidates: [],
           notes: ["GSC evidence was not supplied for this run."],
         },
   };
@@ -571,6 +574,9 @@ export async function requestOpenAiUkOpportunityResearch(
   const research = normalizeSeoResearchResult(result.json, allowlisted, {
     gscEvidenceById: gscFusion?.byId,
     gscMeta: gscFusion?.meta,
+    restorationPathAllowlist: new Set(
+      (gscFusion?.restorationCandidates || []).map((candidate) => candidate.path),
+    ),
   });
   if (!research) {
     return {
