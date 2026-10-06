@@ -81,6 +81,18 @@ export {
 export { fingerprintWritingBrief } from "@/lib/cms/seo-planning/writing-fingerprint";
 export { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
 export {
+  SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
+  SEO_PLANNING_IMAGE_BRIEF_SPEC,
+  IMAGE_PROMPT_INPUT_MAX,
+  buildImageBrief,
+  buildImagePromptInput,
+  type ExistingFeaturedDisposition,
+  type ExistingFeaturedImage,
+  type ImageBrief,
+  type ImageBriefTask,
+} from "@/lib/cms/seo-planning/image-brief";
+export { fingerprintImageBrief } from "@/lib/cms/seo-planning/image-fingerprint";
+export {
   buildGeminiWritingPromptCacheEntry,
   buildOpenAiWritingPromptCacheEntry,
   buildWritingPromptCacheEntry,

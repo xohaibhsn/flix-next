@@ -17,6 +17,7 @@ import {
 import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
 import { SeoPlanningSuggestions } from "@/components/sidhu/SeoPlanningSuggestions";
 import { SeoPlanningWritingBrief } from "@/components/sidhu/SeoPlanningWritingBrief";
+import { SeoPlanningImageBrief } from "@/components/sidhu/SeoPlanningImageBrief";
 import {
   markWritingPromptStale,
   SeoPlanningWritingPrompt,
@@ -27,6 +28,10 @@ import {
   SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE,
   type WritingArticleContext,
 } from "@/lib/cms/seo-planning/writing-brief";
+import {
+  buildImageBrief,
+  SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
+} from "@/lib/cms/seo-planning/image-brief";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -111,6 +116,10 @@ export function SeoPlanningDetail({
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
   const writingBrief = useMemo(
     () => buildWritingBrief(draft, writingArticle),
+    [draft, writingArticle],
+  );
+  const imageBrief = useMemo(
+    () => buildImageBrief(draft, writingArticle),
     [draft, writingArticle],
   );
 
@@ -293,6 +302,12 @@ export function SeoPlanningDetail({
         onState={setWritingPromptState}
         onDraft={setDraft}
         onMessage={setMessage}
+      />
+
+      <SeoPlanningImageBrief
+        brief={imageBrief}
+        dirty={dirty}
+        dirtyMessage={SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE}
       />
 
       <SectionCard className="space-y-3">
