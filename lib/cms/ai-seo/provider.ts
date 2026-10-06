@@ -229,22 +229,40 @@ function buildStructuredRequestBody(args: {
   };
 }
 
-async function requestOpenAiStructuredJson(args: {
+/** Exported for Phase D3 Blog Prompt — same body shape as SEO explain/draft (no tools). */
+export function buildOpenAiStructuredRequestBody(args: {
+  config: OpenAiSeoConfig;
+  schemaName: string;
+  jsonSchema: object;
+  systemInstruction: string;
+  userPayload: unknown;
+  maxOutputTokens: number;
+}) {
+  return buildStructuredRequestBody(args);
+}
+
+/** Shared Responses structured-json transport (SEO explain/draft + Blog Prompt). */
+export async function requestOpenAiStructuredJson(args: {
   body: object;
   config: OpenAiSeoConfig;
   fetchImpl?: OpenAiFetch;
+  notConfiguredMessage?: string;
+  timeoutMessage?: string;
+  unavailableMessage?: string;
 }): Promise<{ ok: true; json: unknown; model: string } | { ok: false; code: OpenAiProviderErrorCode; message: string }> {
   if (!args.config.configured || !args.config.apiKey) {
     return {
       ok: false,
       code: "not_configured",
-      message: "Sidhu AI SEO Assistant is not configured yet.",
+      message: args.notConfiguredMessage || "Sidhu AI SEO Assistant is not configured yet.",
     };
   }
 
   const fetchImpl = args.fetchImpl ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), args.config.timeoutMs);
+  const unavailableMessage = args.unavailableMessage || "AI explanation is temporarily unavailable.";
+  const timeoutMessage = args.timeoutMessage || "AI explanation took too long. Please try again.";
 
   try {
     const response = await fetchImpl(args.config.endpoint, {
@@ -269,7 +287,7 @@ async function requestOpenAiStructuredJson(args: {
       return {
         ok: false,
         code: "unavailable",
-        message: "AI explanation is temporarily unavailable.",
+        message: unavailableMessage,
       };
     }
 
@@ -307,13 +325,13 @@ async function requestOpenAiStructuredJson(args: {
       return {
         ok: false,
         code: "timeout",
-        message: "AI explanation took too long. Please try again.",
+        message: timeoutMessage,
       };
     }
     return {
       ok: false,
       code: "unavailable",
-      message: "AI explanation is temporarily unavailable.",
+      message: unavailableMessage,
     };
   } finally {
     clearTimeout(timer);

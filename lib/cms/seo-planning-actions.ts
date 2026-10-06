@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { requireAdminActor } from "@/lib/auth/guards";
-import { isGeminiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
+import { isGeminiBlogPromptConfigured, isOpenAiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import {
   proceedSeoOpportunityToPlanningDraft,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/cms/seo-planning/suggestions";
 import {
   generateChatgptWritingPromptWithGemini,
+  generateChatgptWritingPromptWithOpenAi,
   type GenerateChatgptWritingPromptResult,
 } from "@/lib/cms/seo-planning/writing-prompt";
 import {
@@ -28,6 +29,20 @@ function clientIp(headerStore: Headers) {
     return forwarded.split(",")[0]?.trim() || "unknown";
   }
   return headerStore.get("x-real-ip")?.trim() || "unknown";
+}
+
+function writingPromptCatalog() {
+  return {
+    getSeoPlanningDraftById: (id: string) => cms.getSeoPlanningDraftById(id),
+    mergeSeoPlanningWritingPromptCache: (
+      args: Parameters<typeof cms.mergeSeoPlanningWritingPromptCache>[0],
+    ) => cms.mergeSeoPlanningWritingPromptCache(args),
+    mergeSeoPlanningGeminiWritingPromptCache: (
+      args: Parameters<typeof cms.mergeSeoPlanningGeminiWritingPromptCache>[0],
+    ) => cms.mergeSeoPlanningGeminiWritingPromptCache(args),
+    getPostById: (id: string) => cms.getPostById(id),
+    listCategories: () => cms.listCategories(),
+  };
 }
 
 export type ProceedSeoOpportunityActionResult = ProceedSeoPlanningResult;
@@ -150,6 +165,7 @@ export async function updateSeoPlanningSuggestionAction(
 
 export type GenerateChatgptWritingPromptActionResult = GenerateChatgptWritingPromptResult & {
   geminiBlogPromptConfigured?: boolean;
+  openaiBlogPromptConfigured?: boolean;
 };
 
 /**
@@ -160,10 +176,17 @@ export type GenerateChatgptWritingPromptActionResult = GenerateChatgptWritingPro
 export async function generateChatgptWritingPromptWithGeminiAction(
   rawInput: unknown,
 ): Promise<GenerateChatgptWritingPromptActionResult> {
-  const configured = isGeminiBlogPromptConfigured();
+  const geminiBlogPromptConfigured = isGeminiBlogPromptConfigured();
+  const openaiBlogPromptConfigured = isOpenAiBlogPromptConfigured();
   const actor = await requireAdminActor("seo");
   if (!actor.ok) {
-    return { ok: false, code: "unauthorized", error: actor.error, geminiBlogPromptConfigured: configured };
+    return {
+      ok: false,
+      code: "unauthorized",
+      error: actor.error,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
   }
 
   const input =
@@ -176,16 +199,18 @@ export async function generateChatgptWritingPromptWithGeminiAction(
       ok: false,
       code: "invalid_input",
       error: "Planning draft id is required.",
-      geminiBlogPromptConfigured: configured,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
     };
   }
 
-  if (!configured) {
+  if (!geminiBlogPromptConfigured) {
     return {
       ok: false,
       code: "not_configured",
       error: "Gemini writing-prompt generation is not configured yet.",
-      geminiBlogPromptConfigured: configured,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
     };
   }
 
@@ -194,14 +219,65 @@ export async function generateChatgptWritingPromptWithGeminiAction(
     planningDraftId,
     adminId: actor.user.id,
     ip: clientIp(headerStore),
-    catalog: {
-      getSeoPlanningDraftById: (id) => cms.getSeoPlanningDraftById(id),
-      mergeSeoPlanningGeminiWritingPromptCache: (args) =>
-        cms.mergeSeoPlanningGeminiWritingPromptCache(args),
-      getPostById: (id) => cms.getPostById(id),
-      listCategories: () => cms.listCategories(),
-    },
+    catalog: writingPromptCatalog(),
   });
 
-  return { ...result, geminiBlogPromptConfigured: configured };
+  return { ...result, geminiBlogPromptConfigured, openaiBlogPromptConfigured };
+}
+
+/**
+ * Explicit Generate with OpenAI — creates a private ChatGPT writing prompt from the D1 Writing Brief.
+ * Does not write BlogPosts, publish, change Planning workspace fields, call Gemini, or call GSC.
+ * One click = one OpenAI request (never a silent cache return). No live web research tools.
+ */
+export async function generateChatgptWritingPromptWithOpenAiAction(
+  rawInput: unknown,
+): Promise<GenerateChatgptWritingPromptActionResult> {
+  const geminiBlogPromptConfigured = isGeminiBlogPromptConfigured();
+  const openaiBlogPromptConfigured = isOpenAiBlogPromptConfigured();
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      code: "unauthorized",
+      error: actor.error,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
+  }
+
+  const input =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>)
+      : null;
+  const planningDraftId = typeof input?.planningDraftId === "string" ? input.planningDraftId.trim() : "";
+  if (!planningDraftId || Object.keys(input || {}).some((key) => key !== "planningDraftId")) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "Planning draft id is required.",
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
+  }
+
+  if (!openaiBlogPromptConfigured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "OpenAI writing-prompt generation is not configured yet.",
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
+  }
+
+  const headerStore = await headers();
+  const result = await generateChatgptWritingPromptWithOpenAi({
+    planningDraftId,
+    adminId: actor.user.id,
+    ip: clientIp(headerStore),
+    catalog: writingPromptCatalog(),
+  });
+
+  return { ...result, geminiBlogPromptConfigured, openaiBlogPromptConfigured };
 }

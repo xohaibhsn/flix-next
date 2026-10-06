@@ -1,4 +1,7 @@
-import type { WritingPromptCacheEntry } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import type {
+  WritingPromptCacheEntry,
+  WritingPromptProvider,
+} from "@/lib/cms/seo-planning/writing-prompt-cache";
 import type {
   BlogCategory,
   BlogPost,
@@ -10,10 +13,13 @@ import type {
   SeoPlanningDraft,
 } from "@/lib/cms/types";
 
-/** Result of an atomic Planning writing-prompt cache merge (payload.writingPrompts.gemini only). */
-export type MergeSeoPlanningGeminiWritingPromptResult =
+/** Result of an atomic Planning writing-prompt cache merge. */
+export type MergeSeoPlanningWritingPromptResult =
   | { ok: true; draft: SeoPlanningDraft }
   | { ok: false; reason: "not_found" | "rejected" };
+
+/** @deprecated Prefer MergeSeoPlanningWritingPromptResult — kept for D2 compatibility. */
+export type MergeSeoPlanningGeminiWritingPromptResult = MergeSeoPlanningWritingPromptResult;
 
 export interface CatalogRepository {
   listPlans(): Promise<PricingPlan[]>;
@@ -42,8 +48,17 @@ export interface CatalogRepository {
   getSeoPlanningDraftByFingerprint(fingerprint: string): Promise<SeoPlanningDraft | null>;
   saveSeoPlanningDraft(draft: SeoPlanningDraft): Promise<SeoPlanningDraft>;
   /**
-   * Atomic D2 prompt-cache write: re-read latest under write lock/transaction,
-   * merge ONLY payload.writingPrompts.gemini, preserve all other latest fields/siblings.
+   * Atomic prompt-cache write: re-read latest under write lock/transaction,
+   * merge ONLY the selected writingPrompts provider sibling.
+   */
+  mergeSeoPlanningWritingPromptCache(args: {
+    id: string;
+    provider: WritingPromptProvider;
+    entry: WritingPromptCacheEntry;
+    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningWritingPromptResult>;
+  /**
+   * D2 compatibility wrapper — merges ONLY payload.writingPrompts.gemini.
    */
   mergeSeoPlanningGeminiWritingPromptCache(args: {
     id: string;

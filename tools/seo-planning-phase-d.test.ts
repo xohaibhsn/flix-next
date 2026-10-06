@@ -531,5 +531,5 @@ test("writing brief UI is read-only and has no provider buttons", () => {
   assert.doesNotMatch(detail, /Generate with OpenAI/);
   const promptUi = read("components/sidhu/SeoPlanningWritingPrompt.tsx");
   assert.match(promptUi, /Generate with Gemini/);
-  assert.doesNotMatch(promptUi, /Generate with OpenAI/);
+  assert.match(promptUi, /Generate with OpenAI/);
 });

@@ -40,6 +40,7 @@ import {
   buildGeminiWritingPromptCacheEntry,
   geminiWritingPromptCacheStatus,
   mergeGeminiWritingPromptCache,
+  mergeWritingPromptCache,
   readGeminiWritingPromptCache,
   readWritingPromptsPayload,
   type WritingPromptCacheEntry,
@@ -158,6 +159,52 @@ function memoryCatalog(initial: SeoPlanningDraft) {
   let store = structuredClone(initial);
   const posts = new Map<string, BlogPost>();
   const categories: BlogCategory[] = [];
+  const catalog = {
+    async getSeoPlanningDraftById(id: string) {
+      return store.id === id ? structuredClone(store) : null;
+    },
+    async mergeSeoPlanningWritingPromptCache(args: {
+      id: string;
+      provider: "gemini" | "openai";
+      entry: WritingPromptCacheEntry;
+      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    }) {
+      if (store.id !== args.id) return { ok: false as const, reason: "not_found" as const };
+      const latest = structuredClone(store);
+      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+        return { ok: false as const, reason: "rejected" as const };
+      }
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeWritingPromptCache(basePayload, args.provider, args.entry);
+      store = {
+        ...latest,
+        payload: nextPayload,
+        updatedAt: new Date().toISOString(),
+      };
+      return { ok: true as const, draft: structuredClone(store) };
+    },
+    async mergeSeoPlanningGeminiWritingPromptCache(args: {
+      id: string;
+      entry: WritingPromptCacheEntry;
+      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    }) {
+      return catalog.mergeSeoPlanningWritingPromptCache({
+        id: args.id,
+        provider: "gemini",
+        entry: args.entry,
+        acceptLatest: args.acceptLatest,
+      });
+    },
+    async getPostById(id: string) {
+      return posts.get(id) || null;
+    },
+    async listCategories() {
+      return categories.slice();
+    },
+  };
   return {
     get store() {
       return store;
@@ -168,39 +215,7 @@ function memoryCatalog(initial: SeoPlanningDraft) {
     setPost(post: BlogPost) {
       posts.set(post.id, post);
     },
-    catalog: {
-      async getSeoPlanningDraftById(id: string) {
-        return store.id === id ? structuredClone(store) : null;
-      },
-      async mergeSeoPlanningGeminiWritingPromptCache(args: {
-        id: string;
-        entry: WritingPromptCacheEntry;
-        acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
-      }) {
-        if (store.id !== args.id) return { ok: false as const, reason: "not_found" as const };
-        const latest = structuredClone(store);
-        if (args.acceptLatest && !(await args.acceptLatest(latest))) {
-          return { ok: false as const, reason: "rejected" as const };
-        }
-        const basePayload =
-          latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
-            ? { ...(latest.payload as Record<string, unknown>) }
-            : {};
-        const nextPayload = mergeGeminiWritingPromptCache(basePayload, args.entry);
-        store = {
-          ...latest,
-          payload: nextPayload,
-          updatedAt: new Date().toISOString(),
-        };
-        return { ok: true as const, draft: structuredClone(store) };
-      },
-      async getPostById(id: string) {
-        return posts.get(id) || null;
-      },
-      async listCategories() {
-        return categories.slice();
-      },
-    },
+    catalog,
   };
 }
 
@@ -550,7 +565,7 @@ test("CONCURRENCY: atomic merge preserves newer siblings; write-boundary reject;
     ip: "10.1.0.3",
     catalog: {
       ...mem.catalog,
-      async mergeSeoPlanningGeminiWritingPromptCache(args) {
+      async mergeSeoPlanningWritingPromptCache(args) {
         mergeCalls += 1;
         // Concurrent save after F2: siblings that do NOT change the Writing Brief fingerprint.
         const payload = mem.store.payload as Record<string, unknown>;
@@ -569,7 +584,7 @@ test("CONCURRENCY: atomic merge preserves newer siblings; write-boundary reject;
             writingPrompts: { openai: openaiSibling },
           },
         };
-        return mem.catalog.mergeSeoPlanningGeminiWritingPromptCache(args);
+        return mem.catalog.mergeSeoPlanningWritingPromptCache(args);
       },
     },
     config: blogPromptConfig(),
@@ -607,10 +622,10 @@ test("CONCURRENCY: atomic merge preserves newer siblings; write-boundary reject;
     ip: "10.1.0.4",
     catalog: {
       ...boundary.catalog,
-      async mergeSeoPlanningGeminiWritingPromptCache(args) {
+      async mergeSeoPlanningWritingPromptCache(args) {
         boundaryMerges += 1;
         boundary.store = { ...boundary.store, topic: "Changed at write boundary" };
-        return boundary.catalog.mergeSeoPlanningGeminiWritingPromptCache(args);
+        return boundary.catalog.mergeSeoPlanningWritingPromptCache(args);
       },
     },
     config: blogPromptConfig(),
@@ -623,19 +638,20 @@ test("CONCURRENCY: atomic merge preserves newer siblings; write-boundary reject;
   assert.equal(boundary.store.topic, "Changed at write boundary");
 
   const serviceSrc = read("lib/cms/seo-planning/writing-prompt.ts");
-  assert.match(serviceSrc, /mergeSeoPlanningGeminiWritingPromptCache/);
+  assert.match(serviceSrc, /mergeSeoPlanningWritingPromptCache/);
   assert.doesNotMatch(serviceSrc, /saveSeoPlanningDraft/);
   const actionSrc = read("lib/cms/seo-planning-actions.ts");
-  assert.match(actionSrc, /mergeSeoPlanningGeminiWritingPromptCache/);
+  assert.match(actionSrc, /mergeSeoPlanningWritingPromptCache|mergeSeoPlanningGeminiWritingPromptCache/);
   const mysqlSrc = read("lib/cms/mysql-catalog.ts");
   assert.match(mysqlSrc, /FOR UPDATE/);
   assert.match(
     mysqlSrc,
     /UPDATE seo_planning_drafts SET payload = \?, updated_at = \? WHERE id = \?/,
   );
+  assert.match(mysqlSrc, /mergeSeoPlanningWritingPromptCache/);
   assert.match(mysqlSrc, /mergeSeoPlanningGeminiWritingPromptCache/);
   const jsonSrc = read("lib/cms/json-catalog.ts");
-  assert.match(jsonSrc, /mergeSeoPlanningGeminiWritingPromptCache/);
+  assert.match(jsonSrc, /mergeSeoPlanningWritingPromptCache/);
   assert.match(jsonSrc, /withSeoPlanningJsonWriteLock/);
 });
 
@@ -751,11 +767,12 @@ test("SERVICE: one Gemini call; OpenAI 0; no BlogPost helpers in module", async 
 
   const src = read("lib/cms/seo-planning/writing-prompt.ts");
   assert.doesNotMatch(src, /\b(?:savePost|updatePost|createPost|publish)\b/);
-  assert.doesNotMatch(src, /requestOpenAi|openai\.com|web_search|GSC_/);
+  assert.doesNotMatch(src, /web_search|GSC_/);
+  assert.doesNotMatch(src, /openai\.com/);
   assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
 });
 
-test("UI / ACTION / ENV: Generate with Gemini only; copy/render safety; schema 3", () => {
+test("UI / ACTION / ENV: Generate with Gemini and OpenAI; copy/render safety; schema 3", () => {
   const ui = read("components/sidhu/SeoPlanningWritingPrompt.tsx");
   const detail = read("components/sidhu/SeoPlanningDetail.tsx");
   const actions = read("lib/cms/seo-planning-actions.ts");
@@ -764,16 +781,20 @@ test("UI / ACTION / ENV: Generate with Gemini only; copy/render safety; schema 3
 
   assert.match(ui, /Generate with Gemini/);
   assert.match(ui, /Generate again with Gemini/);
+  assert.match(ui, /Generate with OpenAI/);
+  assert.match(ui, /Generate again with OpenAI/);
   assert.match(ui, /Copy Prompt/);
-  assert.doesNotMatch(ui, /Generate with OpenAI|Draft with OpenAI/);
   assert.doesNotMatch(ui, /useEffect\(/);
   assert.match(detail, /SeoPlanningWritingPrompt/);
   assert.match(actions, /generateChatgptWritingPromptWithGeminiAction/);
+  assert.match(actions, /generateChatgptWritingPromptWithOpenAiAction/);
   assert.match(actions, /planningDraftId/);
-  assert.doesNotMatch(actions, /apiKey|GEMINI_BLOG_PROMPT_MODEL|endpoint/);
+  assert.doesNotMatch(actions, /apiKey|GEMINI_BLOG_PROMPT_MODEL|OPENAI_BLOG_PROMPT_MODEL|endpoint/);
   assert.match(page, /geminiBlogPromptConfigured|isGeminiBlogPromptConfigured/);
-  assert.match(page, /readGeminiWritingPromptCache|geminiWritingPromptCacheStatus/);
+  assert.match(page, /openaiBlogPromptConfigured|isOpenAiBlogPromptConfigured/);
+  assert.match(page, /readGeminiWritingPromptCache|readOpenAiWritingPromptCache/);
   assert.match(env, /^GEMINI_BLOG_PROMPT_MODEL=$/m);
+  assert.match(env, /^OPENAI_BLOG_PROMPT_MODEL=$/m);
   assert.doesNotMatch(read("db/cms-schema.sql"), /writing_prompt|writingPrompts/);
   assert.doesNotMatch(read("lib/db/schema.ts"), /writing_prompt|writingPrompts/);
 });

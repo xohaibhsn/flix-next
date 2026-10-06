@@ -56,13 +56,25 @@ export function readWritingPromptsPayload(payload: unknown): WritingPromptsPaylo
   return out;
 }
 
+export function readWritingPromptCache(
+  payload: unknown,
+  provider: WritingPromptProvider,
+): WritingPromptCacheEntry | null {
+  const block = readWritingPromptsPayload(payload);
+  return block[provider] || null;
+}
+
 export function readGeminiWritingPromptCache(payload: unknown): WritingPromptCacheEntry | null {
-  return readWritingPromptsPayload(payload).gemini || null;
+  return readWritingPromptCache(payload, "gemini");
+}
+
+export function readOpenAiWritingPromptCache(payload: unknown): WritingPromptCacheEntry | null {
+  return readWritingPromptCache(payload, "openai");
 }
 
 export type WritingPromptCacheStatus = "none" | "current" | "stale" | "unusable";
 
-export function geminiWritingPromptCacheStatus(args: {
+export function writingPromptCacheStatus(args: {
   entry: WritingPromptCacheEntry | null;
   currentFingerprint: string;
   providerEligible: boolean;
@@ -73,27 +85,60 @@ export function geminiWritingPromptCacheStatus(args: {
   return "stale";
 }
 
+export function geminiWritingPromptCacheStatus(args: {
+  entry: WritingPromptCacheEntry | null;
+  currentFingerprint: string;
+  providerEligible: boolean;
+}): WritingPromptCacheStatus {
+  return writingPromptCacheStatus(args);
+}
+
+export function openAiWritingPromptCacheStatus(args: {
+  entry: WritingPromptCacheEntry | null;
+  currentFingerprint: string;
+  providerEligible: boolean;
+}): WritingPromptCacheStatus {
+  return writingPromptCacheStatus(args);
+}
+
 /**
- * Merge gemini cache into a fresh payload without clobbering openai or other siblings.
+ * Merge one provider cache into a fresh payload without clobbering the other provider or siblings.
  */
+export function mergeWritingPromptCache(
+  payload: Record<string, unknown>,
+  provider: WritingPromptProvider,
+  entry: WritingPromptCacheEntry,
+): Record<string, unknown> {
+  const existing = readWritingPromptsPayload(payload);
+  const next: WritingPromptsPayload = {
+    ...(existing.gemini ? { gemini: existing.gemini } : {}),
+    ...(existing.openai ? { openai: existing.openai } : {}),
+  };
+  next[provider] = {
+    ...entry,
+    briefSpec: entry.briefSpec || SEO_PLANNING_WRITING_BRIEF_SPEC,
+  };
+  return {
+    ...payload,
+    writingPrompts: next,
+  };
+}
+
 export function mergeGeminiWritingPromptCache(
   payload: Record<string, unknown>,
   entry: WritingPromptCacheEntry,
 ): Record<string, unknown> {
-  const existing = readWritingPromptsPayload(payload);
-  return {
-    ...payload,
-    writingPrompts: {
-      ...(existing.openai ? { openai: existing.openai } : {}),
-      gemini: {
-        ...entry,
-        briefSpec: entry.briefSpec || SEO_PLANNING_WRITING_BRIEF_SPEC,
-      },
-    },
-  };
+  return mergeWritingPromptCache(payload, "gemini", entry);
 }
 
-export function buildGeminiWritingPromptCacheEntry(args: {
+export function mergeOpenAiWritingPromptCache(
+  payload: Record<string, unknown>,
+  entry: WritingPromptCacheEntry,
+): Record<string, unknown> {
+  return mergeWritingPromptCache(payload, "openai", entry);
+}
+
+export function buildWritingPromptCacheEntry(args: {
   chatgptPrompt: string;
   writingFingerprint: string;
   model: string;
@@ -106,4 +151,48 @@ export function buildGeminiWritingPromptCacheEntry(args: {
     generatedAt: args.generatedAt || new Date().toISOString(),
     briefSpec: SEO_PLANNING_WRITING_BRIEF_SPEC,
   };
+}
+
+export function buildGeminiWritingPromptCacheEntry(args: {
+  chatgptPrompt: string;
+  writingFingerprint: string;
+  model: string;
+  generatedAt?: string;
+}): WritingPromptCacheEntry {
+  return buildWritingPromptCacheEntry(args);
+}
+
+export function buildOpenAiWritingPromptCacheEntry(args: {
+  chatgptPrompt: string;
+  writingFingerprint: string;
+  model: string;
+  generatedAt?: string;
+}): WritingPromptCacheEntry {
+  return buildWritingPromptCacheEntry(args);
+}
+
+/**
+ * Pick which provider's prompt to display on first load when both are current.
+ * Prefer newer generatedAt; on invalid/equal timestamps, prefer gemini (deterministic).
+ */
+export function selectInitialWritingPromptProvider(args: {
+  gemini: { entry: WritingPromptCacheEntry | null; status: WritingPromptCacheStatus };
+  openai: { entry: WritingPromptCacheEntry | null; status: WritingPromptCacheStatus };
+}): WritingPromptProvider | null {
+  const geminiOk = args.gemini.status === "current" && args.gemini.entry;
+  const openaiOk = args.openai.status === "current" && args.openai.entry;
+  if (geminiOk && !openaiOk) return "gemini";
+  if (openaiOk && !geminiOk) return "openai";
+  if (!geminiOk && !openaiOk) {
+    if (args.gemini.entry) return "gemini";
+    if (args.openai.entry) return "openai";
+    return null;
+  }
+  const gAt = Date.parse(args.gemini.entry!.generatedAt);
+  const oAt = Date.parse(args.openai.entry!.generatedAt);
+  if (Number.isFinite(gAt) && Number.isFinite(oAt)) {
+    if (oAt > gAt) return "openai";
+    if (gAt > oAt) return "gemini";
+  }
+  return "gemini";
 }

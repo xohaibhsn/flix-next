@@ -1,13 +1,16 @@
 import type { RowDataPacket } from "mysql2/promise";
-import type { CatalogRepository, MergeSeoPlanningGeminiWritingPromptResult } from "@/lib/cms/catalog";
+import type { CatalogRepository, MergeSeoPlanningWritingPromptResult } from "@/lib/cms/catalog";
 import {
   fromMysqlDateTime,
   parseJsonColumn,
   toMysqlDateTime,
 } from "@/lib/cms/mysql-migrate";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
-import { mergeGeminiWritingPromptCache } from "@/lib/cms/seo-planning/writing-prompt-cache";
-import type { WritingPromptCacheEntry } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import {
+  mergeWritingPromptCache,
+  type WritingPromptCacheEntry,
+  type WritingPromptProvider,
+} from "@/lib/cms/seo-planning/writing-prompt-cache";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -610,14 +613,18 @@ export class MysqlCatalogRepository implements CatalogRepository {
     );
     return safe;
   }
-  async mergeSeoPlanningGeminiWritingPromptCache(args: {
+  async mergeSeoPlanningWritingPromptCache(args: {
     id: string;
+    provider: WritingPromptProvider;
     entry: WritingPromptCacheEntry;
     acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
-  }): Promise<MergeSeoPlanningGeminiWritingPromptResult> {
+  }): Promise<MergeSeoPlanningWritingPromptResult> {
     await this.ready();
     const id = String(args.id || "").trim();
     if (!id) return { ok: false, reason: "not_found" };
+    if (args.provider !== "gemini" && args.provider !== "openai") {
+      return { ok: false, reason: "rejected" };
+    }
 
     return withTransaction(async (conn) => {
       const [rows] = await conn.query<PlanningRow[]>(
@@ -635,7 +642,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
         latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
           ? { ...(latest.payload as Record<string, unknown>) }
           : {};
-      const nextPayload = mergeGeminiWritingPromptCache(basePayload, args.entry);
+      const nextPayload = mergeWritingPromptCache(basePayload, args.provider, args.entry);
       const updatedAt = new Date().toISOString();
       await conn.execute(
         "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",
@@ -650,6 +657,18 @@ export class MysqlCatalogRepository implements CatalogRepository {
           updatedAt,
         }),
       };
+    });
+  }
+  async mergeSeoPlanningGeminiWritingPromptCache(args: {
+    id: string;
+    entry: WritingPromptCacheEntry;
+    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningWritingPromptResult> {
+    return this.mergeSeoPlanningWritingPromptCache({
+      id: args.id,
+      provider: "gemini",
+      entry: args.entry,
+      acceptLatest: args.acceptLatest,
     });
   }
   async dashboardStats() {

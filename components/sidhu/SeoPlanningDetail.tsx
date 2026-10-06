@@ -84,12 +84,18 @@ export function SeoPlanningDetail({
   targetPostTitle,
   writingArticle = { status: "skipped" },
   geminiBlogPromptConfigured = false,
-  initialWritingPromptState = { status: "none", cache: null },
+  openaiBlogPromptConfigured = false,
+  initialWritingPromptState = {
+    gemini: { status: "none", cache: null },
+    openai: { status: "none", cache: null },
+    selected: null,
+  },
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
   writingArticle?: WritingArticleContext;
   geminiBlogPromptConfigured?: boolean;
+  openaiBlogPromptConfigured?: boolean;
   initialWritingPromptState?: WritingPromptUiState;
 }) {
   const [draft, setDraft] = useState(initialDraft);
@@ -279,6 +285,7 @@ export function SeoPlanningDetail({
       <SeoPlanningWritingPrompt
         planningDraftId={draft.id}
         geminiBlogPromptConfigured={geminiBlogPromptConfigured}
+        openaiBlogPromptConfigured={openaiBlogPromptConfigured}
         providerEligible={writingBrief.providerEligible}
         providerIneligibleReason={writingBrief.providerIneligibleReason}
         dirty={dirty}

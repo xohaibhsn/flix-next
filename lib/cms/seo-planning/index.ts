@@ -82,11 +82,25 @@ export { fingerprintWritingBrief } from "@/lib/cms/seo-planning/writing-fingerpr
 export { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
 export {
   buildGeminiWritingPromptCacheEntry,
+  buildOpenAiWritingPromptCacheEntry,
+  buildWritingPromptCacheEntry,
   geminiWritingPromptCacheStatus,
   mergeGeminiWritingPromptCache,
+  mergeOpenAiWritingPromptCache,
+  mergeWritingPromptCache,
+  openAiWritingPromptCacheStatus,
   readGeminiWritingPromptCache,
+  readOpenAiWritingPromptCache,
+  readWritingPromptCache,
   readWritingPromptsPayload,
+  selectInitialWritingPromptProvider,
+  writingPromptCacheStatus,
   type WritingPromptCacheEntry,
   type WritingPromptCacheStatus,
+  type WritingPromptProvider,
   type WritingPromptsPayload,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
+export {
+  generateChatgptWritingPromptWithGemini,
+  generateChatgptWritingPromptWithOpenAi,
+} from "@/lib/cms/seo-planning/writing-prompt";

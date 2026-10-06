@@ -21,6 +21,9 @@ export const GEMINI_SEO_DRAFT_MAX_OUTPUT_TOKENS = 1200;
 export const GEMINI_BLOG_PROMPT_TIMEOUT_MS = 30_000;
 export const GEMINI_BLOG_PROMPT_MAX_OUTPUT_TOKENS = 3500;
 export const CHATGPT_WRITING_PROMPT_MAX_CHARS = 12_000;
+/** Phase D3 ChatGPT writing-prompt generation (not SEO explain/draft/research). */
+export const OPENAI_BLOG_PROMPT_TIMEOUT_MS = 30_000;
+export const OPENAI_BLOG_PROMPT_MAX_OUTPUT_TOKENS = 3500;
 
 export type OpenAiSeoConfig = {
   configured: boolean;
@@ -49,6 +52,9 @@ export type GeminiSeoConfig = GeminiGenerateContentConfig & {
 export type GeminiBlogPromptConfig = GeminiGenerateContentConfig & {
   maxOutputTokens: number;
 };
+
+/** Same transport shape as OpenAiSeoConfig; model comes only from OPENAI_BLOG_PROMPT_MODEL. */
+export type OpenAiBlogPromptConfig = OpenAiSeoConfig;
 
 export function isOpenAiSeoConfigured() {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -130,5 +136,24 @@ export function getGeminiBlogPromptConfig(): GeminiBlogPromptConfig {
       : "",
     timeoutMs: GEMINI_BLOG_PROMPT_TIMEOUT_MS,
     maxOutputTokens: GEMINI_BLOG_PROMPT_MAX_OUTPUT_TOKENS,
+  };
+}
+
+/** OpenAI Blog Prompt requires key + explicit OPENAI_BLOG_PROMPT_MODEL (never falls back to SEO/research models). */
+export function isOpenAiBlogPromptConfigured() {
+  return Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_BLOG_PROMPT_MODEL?.trim());
+}
+
+export function getOpenAiBlogPromptConfig(): OpenAiBlogPromptConfig {
+  const apiKey = process.env.OPENAI_API_KEY?.trim() || "";
+  const model = process.env.OPENAI_BLOG_PROMPT_MODEL?.trim() || "";
+  const configured = Boolean(apiKey && model);
+  return {
+    configured,
+    apiKey,
+    model,
+    endpoint: OPENAI_RESPONSES_ENDPOINT,
+    timeoutMs: OPENAI_BLOG_PROMPT_TIMEOUT_MS,
+    maxOutputTokens: OPENAI_BLOG_PROMPT_MAX_OUTPUT_TOKENS,
   };
 }

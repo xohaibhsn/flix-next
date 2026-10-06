@@ -1,16 +1,23 @@
 /**
- * Phase D2 — generate a private ChatGPT writing prompt with Gemini.
- * One deliberate call; no OpenAI; no CMS article writes.
+ * Phase D2/D3 — generate a private ChatGPT writing prompt with Gemini or OpenAI.
+ * One deliberate click = one provider call; no CMS article writes.
  */
 
 import "server-only";
 
-import type { GeminiBlogPromptConfig } from "@/lib/cms/ai-seo/config";
-import { getGeminiBlogPromptConfig, isGeminiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
+import type { GeminiBlogPromptConfig, OpenAiBlogPromptConfig } from "@/lib/cms/ai-seo/config";
+import {
+  getGeminiBlogPromptConfig,
+  getOpenAiBlogPromptConfig,
+  isGeminiBlogPromptConfigured,
+  isOpenAiBlogPromptConfigured,
+} from "@/lib/cms/ai-seo/config";
 import { requestGeminiChatgptWritingPrompt } from "@/lib/cms/ai-seo/blog-prompt-gemini";
+import { requestOpenAiChatgptWritingPrompt } from "@/lib/cms/ai-seo/blog-prompt-openai";
 import type { GeminiFetch } from "@/lib/cms/ai-seo/gemini-provider";
+import type { OpenAiFetch } from "@/lib/cms/ai-seo/provider";
 import { checkAiSeoBlogPromptRateLimit } from "@/lib/cms/ai-seo/rate-limit";
-import type { MergeSeoPlanningGeminiWritingPromptResult } from "@/lib/cms/catalog";
+import type { MergeSeoPlanningWritingPromptResult } from "@/lib/cms/catalog";
 import { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
 import {
   buildWritingBrief,
@@ -19,8 +26,9 @@ import {
 } from "@/lib/cms/seo-planning/writing-brief";
 import { fingerprintWritingBrief } from "@/lib/cms/seo-planning/writing-fingerprint";
 import {
-  buildGeminiWritingPromptCacheEntry,
+  buildWritingPromptCacheEntry,
   type WritingPromptCacheEntry,
+  type WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
 import type { BlogCategory, BlogPost, SeoPlanningDraft } from "@/lib/cms/types";
 
@@ -28,7 +36,7 @@ export type GenerateChatgptWritingPromptSuccess = {
   ok: true;
   draft: SeoPlanningDraft;
   cache: WritingPromptCacheEntry;
-  provider: "gemini";
+  provider: WritingPromptProvider;
 };
 
 export type GenerateChatgptWritingPromptFailure = {
@@ -57,11 +65,18 @@ export type GenerateChatgptWritingPromptResult =
 
 export type WritingPromptCatalog = {
   getSeoPlanningDraftById(id: string): Promise<SeoPlanningDraft | null>;
-  mergeSeoPlanningGeminiWritingPromptCache(args: {
+  mergeSeoPlanningWritingPromptCache(args: {
+    id: string;
+    provider: WritingPromptProvider;
+    entry: WritingPromptCacheEntry;
+    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningWritingPromptResult>;
+  /** D2 compatibility — optional when generic merge is present. */
+  mergeSeoPlanningGeminiWritingPromptCache?(args: {
     id: string;
     entry: WritingPromptCacheEntry;
     acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
-  }): Promise<MergeSeoPlanningGeminiWritingPromptResult>;
+  }): Promise<MergeSeoPlanningWritingPromptResult>;
   getPostById(id: string): Promise<BlogPost | null>;
   listCategories(): Promise<BlogCategory[]>;
 };
@@ -86,25 +101,23 @@ async function briefStillMatchesFingerprint(
   return fingerprintWritingBrief(brief) === expectedFingerprint;
 }
 
-export async function generateChatgptWritingPromptWithGemini(args: {
+async function generateChatgptWritingPrompt(args: {
   planningDraftId: string;
   adminId: string;
   ip: string;
   catalog: WritingPromptCatalog;
-  fetchImpl?: GeminiFetch;
-  config?: GeminiBlogPromptConfig;
+  provider: WritingPromptProvider;
+  notConfiguredError: string;
+  callProvider: (
+    canonicalInput: string,
+  ) => Promise<
+    | { ok: true; prompt: { chatgptPrompt: string }; model: string }
+    | { ok: false; code: NonNullable<GenerateChatgptWritingPromptFailure["code"]>; message: string }
+  >;
 }): Promise<GenerateChatgptWritingPromptResult> {
   const id = String(args.planningDraftId || "").trim();
   if (!id) {
     return { ok: false, code: "invalid_input", error: "Planning draft id is required." };
-  }
-
-  if (!isGeminiBlogPromptConfigured() && !args.config?.configured) {
-    return {
-      ok: false,
-      code: "not_configured",
-      error: "Gemini writing-prompt generation is not configured yet.",
-    };
   }
 
   const stored = await args.catalog.getSeoPlanningDraftById(id);
@@ -134,15 +147,11 @@ export async function generateChatgptWritingPromptWithGemini(args: {
     };
   }
 
-  const provider = await requestGeminiChatgptWritingPrompt(canonicalInput, {
-    fetchImpl: args.fetchImpl,
-    config: args.config ?? getGeminiBlogPromptConfig(),
-  });
+  const provider = await args.callProvider(canonicalInput);
   if (!provider.ok) {
     return { ok: false, code: provider.code, error: provider.message };
   }
 
-  // Lost-update protection: re-read authoritative draft after the provider call.
   const fresh = await args.catalog.getSeoPlanningDraftById(id);
   if (!fresh) {
     return { ok: false, code: "not_found", error: "That planning draft could not be found." };
@@ -157,17 +166,16 @@ export async function generateChatgptWritingPromptWithGemini(args: {
     };
   }
 
-  const cache = buildGeminiWritingPromptCacheEntry({
+  const cache = buildWritingPromptCacheEntry({
     chatgptPrompt: provider.prompt.chatgptPrompt,
     writingFingerprint: fingerprintF1,
     model: provider.model,
   });
 
   try {
-    // Atomic write-boundary merge: re-read under catalog lock/transaction,
-    // revalidate fingerprint again, change ONLY payload.writingPrompts.gemini.
-    const merged = await args.catalog.mergeSeoPlanningGeminiWritingPromptCache({
+    const merged = await args.catalog.mergeSeoPlanningWritingPromptCache({
       id,
+      provider: args.provider,
       entry: cache,
       acceptLatest: (latest) => briefStillMatchesFingerprint(latest, fingerprintF1, args.catalog),
     });
@@ -182,8 +190,70 @@ export async function generateChatgptWritingPromptWithGemini(args: {
           "The Writing Brief changed while the prompt was being generated. Generate again from the current saved brief.",
       };
     }
-    return { ok: true, draft: merged.draft, cache, provider: "gemini" };
+    return { ok: true, draft: merged.draft, cache, provider: args.provider };
   } catch {
     return { ok: false, code: "unavailable", error: "Could not save the writing prompt. Please try again." };
   }
+}
+
+export async function generateChatgptWritingPromptWithGemini(args: {
+  planningDraftId: string;
+  adminId: string;
+  ip: string;
+  catalog: WritingPromptCatalog;
+  fetchImpl?: GeminiFetch;
+  config?: GeminiBlogPromptConfig;
+}): Promise<GenerateChatgptWritingPromptResult> {
+  if (!isGeminiBlogPromptConfigured() && !args.config?.configured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "Gemini writing-prompt generation is not configured yet.",
+    };
+  }
+
+  return generateChatgptWritingPrompt({
+    planningDraftId: args.planningDraftId,
+    adminId: args.adminId,
+    ip: args.ip,
+    catalog: args.catalog,
+    provider: "gemini",
+    notConfiguredError: "Gemini writing-prompt generation is not configured yet.",
+    callProvider: (canonicalInput) =>
+      requestGeminiChatgptWritingPrompt(canonicalInput, {
+        fetchImpl: args.fetchImpl,
+        config: args.config ?? getGeminiBlogPromptConfig(),
+      }),
+  });
+}
+
+export async function generateChatgptWritingPromptWithOpenAi(args: {
+  planningDraftId: string;
+  adminId: string;
+  ip: string;
+  catalog: WritingPromptCatalog;
+  fetchImpl?: OpenAiFetch;
+  config?: OpenAiBlogPromptConfig;
+}): Promise<GenerateChatgptWritingPromptResult> {
+  if (!isOpenAiBlogPromptConfigured() && !args.config?.configured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "OpenAI writing-prompt generation is not configured yet.",
+    };
+  }
+
+  return generateChatgptWritingPrompt({
+    planningDraftId: args.planningDraftId,
+    adminId: args.adminId,
+    ip: args.ip,
+    catalog: args.catalog,
+    provider: "openai",
+    notConfiguredError: "OpenAI writing-prompt generation is not configured yet.",
+    callProvider: (canonicalInput) =>
+      requestOpenAiChatgptWritingPrompt(canonicalInput, {
+        fetchImpl: args.fetchImpl,
+        config: args.config ?? getOpenAiBlogPromptConfig(),
+      }),
+  });
 }
