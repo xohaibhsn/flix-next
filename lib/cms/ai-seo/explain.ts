@@ -23,6 +23,7 @@ export type ExplainSeoFindingFailure = {
     | "unauthorized"
     | "invalid_input"
     | "invalid_request"
+    | "failed_precondition"
     | "payment_required"
     | "permission_denied"
     | "not_found"

@@ -25,6 +25,7 @@ import {
   buildGeminiExplainRequestBody,
   classifyGeminiHttpFailure,
   extractGeminiGenerateContentText,
+  extractGeminiUpstreamStatus,
   requestGeminiSeoDraft,
   requestGeminiSeoExplanation,
   toGeminiStructuredJsonSchema,
@@ -345,9 +346,14 @@ test("EXPLAIN: Gemini and OpenAI share bounded payload and normalize to SeoExpla
   const openAiUserText = (openAiBody as { input: Array<{ content: Array<{ text: string }> }> }).input[1]
     .content[0].text;
   assert.deepEqual(JSON.parse(openAiUserText), openAiPayload);
-  assert.equal(geminiBody.generationConfig.responseFormat.text.mimeType, "application/json");
+  assert.equal(geminiBody.generationConfig.responseFormat.text.mimeType, "APPLICATION_JSON");
   assert.ok(geminiBody.generationConfig.responseFormat.text.schema);
   assert.equal((geminiBody as { responseSchema?: unknown }).responseSchema, undefined);
+  const geminiGen = geminiBody.generationConfig as Record<string, unknown>;
+  assert.equal(geminiGen.responseMimeType, undefined);
+  assert.equal(geminiGen.responseSchema, undefined);
+  assert.equal(geminiGen.responseJsonSchema, undefined);
+  assert.equal(geminiGen._responseJsonSchema, undefined);
   assert.equal(
     JSON.stringify(geminiBody.generationConfig.responseFormat.text.schema).includes("maxLength"),
     false,
@@ -774,10 +780,147 @@ test("GEMINI HTTP CLASSIFY: status codes map to safe messages without raw body l
       assert.equal(result.message, item.message);
       assert.equal(result.httpStatus, item.status);
       assert.equal(result.diagnostic, item.diagnostic);
+      const expectedUpstream =
+        item.status === 401
+          ? "UNAUTHENTICATED"
+          : item.status === 403
+            ? "PERMISSION_DENIED"
+            : item.status === 404
+              ? "NOT_FOUND"
+              : item.status === 429
+                ? "RESOURCE_EXHAUSTED"
+                : "UNKNOWN";
+      assert.equal(result.upstreamStatus, expectedUpstream);
       assert.doesNotMatch(result.message, new RegExp(secret));
       assert.doesNotMatch(JSON.stringify(result), new RegExp(secret));
-      assert.doesNotMatch(JSON.stringify(result), /DETAIL|ErrorInfo|AIza/);
+      assert.doesNotMatch(JSON.stringify(result), /DETAIL|ErrorInfo|AIza|SENSITIVE/);
     }
+  }
+});
+
+test("GEMINI UPSTREAM 400: INVALID_ARGUMENT vs FAILED_PRECONDITION; raw message never returned", async () => {
+  assert.equal(
+    extractGeminiUpstreamStatus({
+      error: { code: 400, status: "INVALID_ARGUMENT", message: "SENSITIVE PROVIDER DETAIL" },
+    }),
+    "INVALID_ARGUMENT",
+  );
+  assert.equal(
+    extractGeminiUpstreamStatus({
+      error: { code: 400, status: "FAILED_PRECONDITION", message: "SENSITIVE BILLING/REGION DETAIL" },
+    }),
+    "FAILED_PRECONDITION",
+  );
+  assert.equal(extractGeminiUpstreamStatus({ error: { status: "WEIRD_NEW_STATUS" } }), "UNKNOWN");
+  assert.equal(extractGeminiUpstreamStatus("not-json"), "UNKNOWN");
+
+  const invalidArg = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse(
+        {
+          error: {
+            code: 400,
+            status: "INVALID_ARGUMENT",
+            message: "SENSITIVE PROVIDER DETAIL",
+            details: [{ "@type": "type.googleapis.com/google.rpc.ErrorInfo", reason: "LEAK_ME" }],
+          },
+        },
+        400,
+      ),
+  });
+  assert.equal(invalidArg.ok, false);
+  if (!invalidArg.ok) {
+    assert.equal(invalidArg.code, "invalid_request");
+    assert.equal(invalidArg.diagnostic, "INVALID_ARGUMENT");
+    assert.equal(invalidArg.upstreamStatus, "INVALID_ARGUMENT");
+    assert.equal(invalidArg.message, "Gemini rejected the request parameters.");
+    assert.doesNotMatch(JSON.stringify(invalidArg), /SENSITIVE PROVIDER DETAIL|LEAK_ME|ErrorInfo/);
+  }
+
+  const failedPre = await requestGeminiSeoDraft(pageContext, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse(
+        {
+          error: {
+            code: 400,
+            status: "FAILED_PRECONDITION",
+            message: "SENSITIVE BILLING/REGION DETAIL",
+          },
+        },
+        400,
+      ),
+  });
+  assert.equal(failedPre.ok, false);
+  if (!failedPre.ok) {
+    assert.equal(failedPre.code, "failed_precondition");
+    assert.equal(failedPre.diagnostic, "FAILED_PRECONDITION");
+    assert.equal(failedPre.upstreamStatus, "FAILED_PRECONDITION");
+    assert.match(failedPre.message, /project prerequisites are not satisfied/i);
+    assert.doesNotMatch(JSON.stringify(failedPre), /SENSITIVE BILLING|REGION DETAIL/);
+  }
+
+  const malformed = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      new Response("<<<not-json>>>SENSITIVE MALFORMED BODY", {
+        status: 400,
+        headers: { "Content-Type": "text/plain" },
+      }),
+  });
+  assert.equal(malformed.ok, false);
+  if (!malformed.ok) {
+    assert.equal(malformed.code, "invalid_request");
+    assert.equal(malformed.diagnostic, "BAD_REQUEST");
+    assert.equal(malformed.upstreamStatus, "UNKNOWN");
+    assert.doesNotMatch(JSON.stringify(malformed), /SENSITIVE MALFORMED|<<<not-json>>>/);
+  }
+
+  const unknownStatus = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse(
+        { error: { code: 400, status: "TOTALLY_NEW_STATUS", message: "SENSITIVE UNKNOWN STATUS DETAIL" } },
+        400,
+      ),
+  });
+  assert.equal(unknownStatus.ok, false);
+  if (!unknownStatus.ok) {
+    assert.equal(unknownStatus.code, "invalid_request");
+    assert.equal(unknownStatus.diagnostic, "BAD_REQUEST");
+    assert.equal(unknownStatus.upstreamStatus, "UNKNOWN");
+    assert.doesNotMatch(JSON.stringify(unknownStatus), /TOTALLY_NEW_STATUS|SENSITIVE UNKNOWN/);
+  }
+
+  const permission = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse(
+        { error: { code: 403, status: "PERMISSION_DENIED", message: "SENSITIVE PERMISSION DETAIL" } },
+        403,
+      ),
+  });
+  assert.equal(permission.ok, false);
+  if (!permission.ok) {
+    assert.equal(permission.code, "permission_denied");
+    assert.equal(permission.upstreamStatus, "PERMISSION_DENIED");
+    assert.doesNotMatch(JSON.stringify(permission), /SENSITIVE PERMISSION/);
+  }
+
+  const exhausted = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse(
+        { error: { code: 429, status: "RESOURCE_EXHAUSTED", message: "SENSITIVE QUOTA DETAIL" } },
+        429,
+      ),
+  });
+  assert.equal(exhausted.ok, false);
+  if (!exhausted.ok) {
+    assert.equal(exhausted.code, "rate_limited");
+    assert.equal(exhausted.upstreamStatus, "RESOURCE_EXHAUSTED");
+    assert.doesNotMatch(JSON.stringify(exhausted), /SENSITIVE QUOTA/);
   }
 });
 
@@ -890,7 +1033,12 @@ test("GEMINI SCHEMA: domain maxLength stripped for Gemini; model path encodeURIC
 
   const draftBody = buildGeminiDraftRequestBody(pageContext, geminiConfig());
   assert.equal(JSON.stringify(draftBody).includes("maxLength"), false);
-  assert.equal(draftBody.generationConfig.responseFormat.text.mimeType, "application/json");
+  assert.equal(draftBody.generationConfig.responseFormat.text.mimeType, "APPLICATION_JSON");
+  const draftGen = draftBody.generationConfig as Record<string, unknown>;
+  assert.equal(draftGen.responseMimeType, undefined);
+  assert.equal(draftGen.responseSchema, undefined);
+  assert.equal(draftGen.responseJsonSchema, undefined);
+  assert.equal(draftGen._responseJsonSchema, undefined);
 });
 
 test("GEMINI NO FALLBACK: classified HTTP failure never calls OpenAI", async () => {

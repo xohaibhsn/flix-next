@@ -28,6 +28,7 @@ import {
 export type GeminiProviderErrorCode =
   | "not_configured"
   | "invalid_request"
+  | "failed_precondition"
   | "unauthorized"
   | "payment_required"
   | "permission_denied"
@@ -37,10 +38,31 @@ export type GeminiProviderErrorCode =
   | "unavailable"
   | "invalid_response";
 
+/**
+ * Strict allowlist of Google `error.status` values.
+ * Unknown strings become UNKNOWN — never pass arbitrary provider strings to callers.
+ */
+export const GEMINI_UPSTREAM_STATUSES = [
+  "INVALID_ARGUMENT",
+  "FAILED_PRECONDITION",
+  "UNAUTHENTICATED",
+  "PERMISSION_DENIED",
+  "NOT_FOUND",
+  "RESOURCE_EXHAUSTED",
+  "INTERNAL",
+  "UNAVAILABLE",
+  "DEADLINE_EXCEEDED",
+  "UNKNOWN",
+] as const;
+
+export type GeminiUpstreamStatus = (typeof GEMINI_UPSTREAM_STATUSES)[number];
+
 /** Bounded internal diagnostic — never persist, never include raw provider content. */
 export type GeminiSafeDiagnostic =
   | "NOT_CONFIGURED"
   | "BAD_REQUEST"
+  | "INVALID_ARGUMENT"
+  | "FAILED_PRECONDITION"
   | "AUTHENTICATION"
   | "PAYMENT_REQUIRED"
   | "PERMISSION_DENIED"
@@ -57,6 +79,8 @@ export type GeminiProviderFailure = {
   /** Optional HTTP status for server-side/test classification only. */
   httpStatus?: number;
   diagnostic?: GeminiSafeDiagnostic;
+  /** Allowlisted Google error.status only — never raw message/details. */
+  upstreamStatus?: GeminiUpstreamStatus;
 };
 
 export type GeminiExplainProviderResult =
@@ -137,23 +161,61 @@ export function toGeminiStructuredJsonSchema(schema: unknown): object {
   return out;
 }
 
-export function classifyGeminiHttpFailure(status: number): {
+/**
+ * Extract ONLY allowlisted `error.status` from a Gemini error JSON body.
+ * Never returns message, details, or any other provider field.
+ */
+export function extractGeminiUpstreamStatus(payload: unknown): GeminiUpstreamStatus {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return "UNKNOWN";
+  const error = (payload as Record<string, unknown>).error;
+  if (!error || typeof error !== "object" || Array.isArray(error)) return "UNKNOWN";
+  const status = (error as Record<string, unknown>).status;
+  if (typeof status !== "string") return "UNKNOWN";
+  return (GEMINI_UPSTREAM_STATUSES as readonly string[]).includes(status)
+    ? (status as GeminiUpstreamStatus)
+    : "UNKNOWN";
+}
+
+export function classifyGeminiHttpFailure(
+  status: number,
+  upstreamStatus: GeminiUpstreamStatus = "UNKNOWN",
+): {
   code: GeminiProviderErrorCode;
   message: string;
   diagnostic: GeminiSafeDiagnostic;
+  upstreamStatus: GeminiUpstreamStatus;
 } {
   if (status === 400) {
+    if (upstreamStatus === "INVALID_ARGUMENT") {
+      return {
+        code: "invalid_request",
+        message: "Gemini rejected the request parameters.",
+        diagnostic: "INVALID_ARGUMENT",
+        upstreamStatus,
+      };
+    }
+    if (upstreamStatus === "FAILED_PRECONDITION") {
+      return {
+        code: "failed_precondition",
+        message:
+          "Gemini project prerequisites are not satisfied. Check the AI Studio project status and billing/eligibility settings.",
+        diagnostic: "FAILED_PRECONDITION",
+        upstreamStatus,
+      };
+    }
     return {
       code: "invalid_request",
       message: "Gemini request was rejected by the API configuration.",
       diagnostic: "BAD_REQUEST",
+      upstreamStatus,
     };
   }
-  if (status === 401) {
+  if (status === 401 || upstreamStatus === "UNAUTHENTICATED") {
     return {
       code: "unauthorized",
       message: "Gemini authentication failed. Check the configured API key.",
       diagnostic: "AUTHENTICATION",
+      upstreamStatus: upstreamStatus === "UNKNOWN" && status === 401 ? "UNAUTHENTICATED" : upstreamStatus,
     };
   }
   if (status === 402) {
@@ -161,33 +223,38 @@ export function classifyGeminiHttpFailure(status: number): {
       code: "payment_required",
       message: "Gemini API billing or credit is required for this request.",
       diagnostic: "PAYMENT_REQUIRED",
+      upstreamStatus,
     };
   }
-  if (status === 403) {
+  if (status === 403 || upstreamStatus === "PERMISSION_DENIED") {
     return {
       code: "permission_denied",
       message: "Gemini API access is not permitted for the configured key/project.",
       diagnostic: "PERMISSION_DENIED",
+      upstreamStatus: upstreamStatus === "UNKNOWN" && status === 403 ? "PERMISSION_DENIED" : upstreamStatus,
     };
   }
-  if (status === 404) {
+  if (status === 404 || upstreamStatus === "NOT_FOUND") {
     return {
       code: "not_found",
       message: "Gemini model or endpoint is not available for this configuration.",
       diagnostic: "NOT_FOUND",
+      upstreamStatus: upstreamStatus === "UNKNOWN" && status === 404 ? "NOT_FOUND" : upstreamStatus,
     };
   }
-  if (status === 429) {
+  if (status === 429 || upstreamStatus === "RESOURCE_EXHAUSTED") {
     return {
       code: "rate_limited",
       message: "Gemini request limit reached. Please try again later.",
       diagnostic: "RATE_LIMITED",
+      upstreamStatus: upstreamStatus === "UNKNOWN" && status === 429 ? "RESOURCE_EXHAUSTED" : upstreamStatus,
     };
   }
   return {
     code: "unavailable",
     message: "Gemini is temporarily unavailable.",
     diagnostic: "UPSTREAM_UNAVAILABLE",
+    upstreamStatus,
   };
 }
 
@@ -241,7 +308,8 @@ export function buildGeminiStructuredRequestBody(args: {
       maxOutputTokens: args.maxOutputTokens,
       responseFormat: {
         text: {
-          mimeType: "application/json",
+          // TextResponseFormat.MimeType enum — IANA "application/json" is rejected by Google.
+          mimeType: "APPLICATION_JSON",
           schema: toGeminiStructuredJsonSchema(args.jsonSchema),
         },
       },
@@ -270,7 +338,11 @@ export function buildGeminiDraftRequestBody(input: SeoDraftInput, config: Gemini
 function fail(
   code: GeminiProviderErrorCode,
   message: string,
-  extras?: { httpStatus?: number; diagnostic?: GeminiSafeDiagnostic },
+  extras?: {
+    httpStatus?: number;
+    diagnostic?: GeminiSafeDiagnostic;
+    upstreamStatus?: GeminiUpstreamStatus;
+  },
 ): GeminiProviderFailure {
   return {
     ok: false,
@@ -278,6 +350,7 @@ function fail(
     message,
     ...(extras?.httpStatus != null ? { httpStatus: extras.httpStatus } : {}),
     ...(extras?.diagnostic ? { diagnostic: extras.diagnostic } : {}),
+    ...(extras?.upstreamStatus ? { upstreamStatus: extras.upstreamStatus } : {}),
   };
 }
 
@@ -309,16 +382,23 @@ async function requestGeminiStructuredJson(args: {
     });
 
     if (!response.ok) {
-      // Consume body without exposing it — classification uses status only.
+      // Parse body only to read allowlisted error.status; never return message/details/raw body.
+      let upstreamStatus: GeminiUpstreamStatus = "UNKNOWN";
       try {
-        await response.arrayBuffer();
+        const errorPayload: unknown = await response.json();
+        upstreamStatus = extractGeminiUpstreamStatus(errorPayload);
       } catch {
-        /* ignore */
+        try {
+          await response.arrayBuffer();
+        } catch {
+          /* ignore */
+        }
       }
-      const classified = classifyGeminiHttpFailure(response.status);
+      const classified = classifyGeminiHttpFailure(response.status, upstreamStatus);
       return fail(classified.code, classified.message, {
         httpStatus: response.status,
         diagnostic: classified.diagnostic,
+        upstreamStatus: classified.upstreamStatus,
       });
     }
 
