@@ -18,6 +18,11 @@ import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/type
 import { SeoPlanningSuggestions } from "@/components/sidhu/SeoPlanningSuggestions";
 import { SeoPlanningWritingBrief } from "@/components/sidhu/SeoPlanningWritingBrief";
 import {
+  markWritingPromptStale,
+  SeoPlanningWritingPrompt,
+  type WritingPromptUiState,
+} from "@/components/sidhu/SeoPlanningWritingPrompt";
+import {
   buildWritingBrief,
   SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE,
   type WritingArticleContext,
@@ -78,16 +83,22 @@ export function SeoPlanningDetail({
   draft: initialDraft,
   targetPostTitle,
   writingArticle = { status: "skipped" },
+  geminiBlogPromptConfigured = false,
+  initialWritingPromptState = { status: "none", cache: null },
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
   writingArticle?: WritingArticleContext;
+  geminiBlogPromptConfigured?: boolean;
+  initialWritingPromptState?: WritingPromptUiState;
 }) {
   const [draft, setDraft] = useState(initialDraft);
   const [form, setForm] = useState<FormState>(() => formFromDraft(initialDraft));
   const [savedForm, setSavedForm] = useState<FormState>(() => formFromDraft(initialDraft));
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [suggestionBusy, setSuggestionBusy] = useState(false);
+  const [writingPromptState, setWritingPromptState] =
+    useState<WritingPromptUiState>(initialWritingPromptState);
   const [pending, startTransition] = useTransition();
   const controlsLocked = pending || suggestionBusy;
 
@@ -131,6 +142,7 @@ export function SeoPlanningDetail({
       const nextForm = formFromDraft(result.draft);
       setForm(nextForm);
       setSavedForm(nextForm);
+      setWritingPromptState((prev) => markWritingPromptStale(prev));
       setMessage({ tone: "ok", text: "Planning draft saved. Still private — nothing was published." });
     });
   }
@@ -140,6 +152,7 @@ export function SeoPlanningDetail({
     setDraft(next);
     setForm(nextForm);
     setSavedForm(nextForm);
+    setWritingPromptState((prev) => markWritingPromptStale(prev));
   }
 
   return (
@@ -261,6 +274,18 @@ export function SeoPlanningDetail({
         brief={writingBrief}
         dirty={dirty}
         dirtyMessage={SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE}
+      />
+
+      <SeoPlanningWritingPrompt
+        planningDraftId={draft.id}
+        geminiBlogPromptConfigured={geminiBlogPromptConfigured}
+        providerEligible={writingBrief.providerEligible}
+        providerIneligibleReason={writingBrief.providerIneligibleReason}
+        dirty={dirty}
+        state={writingPromptState}
+        onState={setWritingPromptState}
+        onDraft={setDraft}
+        onMessage={setMessage}
       />
 
       <SectionCard className="space-y-3">

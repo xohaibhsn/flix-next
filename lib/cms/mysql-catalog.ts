@@ -1,11 +1,13 @@
 import type { RowDataPacket } from "mysql2/promise";
-import type { CatalogRepository } from "@/lib/cms/catalog";
+import type { CatalogRepository, MergeSeoPlanningGeminiWritingPromptResult } from "@/lib/cms/catalog";
 import {
   fromMysqlDateTime,
   parseJsonColumn,
   toMysqlDateTime,
 } from "@/lib/cms/mysql-migrate";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
+import { mergeGeminiWritingPromptCache } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import type { WritingPromptCacheEntry } from "@/lib/cms/seo-planning/writing-prompt-cache";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -23,7 +25,7 @@ import {
   withSlash,
   wouldCreateRedirectLoop,
 } from "@/lib/cms/redirects";
-import { getDbPool } from "@/lib/db/pool";
+import { getDbPool, withTransaction } from "@/lib/db/pool";
 import type {
   BlogCategory,
   BlogPost,
@@ -607,6 +609,48 @@ export class MysqlCatalogRepository implements CatalogRepository {
       ],
     );
     return safe;
+  }
+  async mergeSeoPlanningGeminiWritingPromptCache(args: {
+    id: string;
+    entry: WritingPromptCacheEntry;
+    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningGeminiWritingPromptResult> {
+    await this.ready();
+    const id = String(args.id || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [id],
+      );
+      if (!rows[0]) return { ok: false, reason: "not_found" };
+
+      const latest = mapPlanningDraft(rows[0]);
+      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+        return { ok: false, reason: "rejected" };
+      }
+
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeGeminiWritingPromptCache(basePayload, args.entry);
+      const updatedAt = new Date().toISOString();
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",
+        [JSON.stringify(nextPayload), toMysqlDateTime(updatedAt), id],
+      );
+
+      return {
+        ok: true,
+        draft: sanitizeSeoPlanningDraft({
+          ...latest,
+          payload: nextPayload,
+          updatedAt,
+        }),
+      };
+    });
   }
   async dashboardStats() {
     await this.ready();

@@ -2,44 +2,17 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoPlanningDetail } from "@/components/sidhu/SeoPlanningDetail";
-import { normalizePublicPath } from "@/lib/cms/ai-seo/research-schemas";
-import { blogPostPath } from "@/lib/cms/blog-paths";
+import { isGeminiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
-import { buildArticleSnapshot } from "@/lib/cms/seo-planning/article-snapshot";
-import { classifyRefreshArticle } from "@/lib/cms/seo-planning/refresh-target";
-import type { WritingArticleContext } from "@/lib/cms/seo-planning/writing-brief";
-import type { BlogPost, SeoPlanningDraft } from "@/lib/cms/types";
+import { buildWritingBrief } from "@/lib/cms/seo-planning/writing-brief";
+import { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
+import { fingerprintWritingBrief } from "@/lib/cms/seo-planning/writing-fingerprint";
+import {
+  geminiWritingPromptCacheStatus,
+  readGeminiWritingPromptCache,
+} from "@/lib/cms/seo-planning/writing-prompt-cache";
 
 export const dynamic = "force-dynamic";
-
-async function writingArticleForDraft(
-  draft: SeoPlanningDraft,
-  targetPost: BlogPost | null,
-): Promise<WritingArticleContext> {
-  if (draft.recommendation !== "REFRESH_EXISTING") return { status: "skipped" };
-  const status = classifyRefreshArticle({
-    targetPostId: draft.targetPostId,
-    matchedPublicUrl: draft.matchedPublicUrl,
-    post: targetPost,
-  });
-  if (status === "missing") return { status: "missing" };
-  if (status === "mismatch") return { status: "mismatch" };
-  if (!targetPost) return { status: "missing" };
-  const categories = await cms.listCategories();
-  const category = categories.find((item) => item.id === targetPost.categoryId);
-  return {
-    status: "ready",
-    snapshot: buildArticleSnapshot({
-      title: targetPost.title,
-      excerpt: targetPost.excerpt,
-      publicPath: normalizePublicPath(blogPostPath(targetPost.slug)) || blogPostPath(targetPost.slug),
-      categoryName: category?.name || "",
-      focusKeyword: targetPost.focusKeyword,
-      featuredImagePresent: Boolean(targetPost.featuredImage),
-      html: targetPost.content,
-    }),
-  };
-}
 
 export default async function SidhuSeoPlanningDetailPage({
   params,
@@ -51,6 +24,16 @@ export default async function SidhuSeoPlanningDetailPage({
   if (!draft) notFound();
 
   const targetPost = draft.targetPostId ? await cms.getPostById(draft.targetPostId) : null;
+  const categories = draft.recommendation === "REFRESH_EXISTING" ? await cms.listCategories() : [];
+  const writingArticle = buildWritingArticleContext({ draft, targetPost, categories });
+  const writingBrief = buildWritingBrief(draft, writingArticle);
+  const writingFingerprint = fingerprintWritingBrief(writingBrief);
+  const geminiCache = readGeminiWritingPromptCache(draft.payload);
+  const writingPromptStatus = geminiWritingPromptCacheStatus({
+    entry: geminiCache,
+    currentFingerprint: writingFingerprint,
+    providerEligible: writingBrief.providerEligible,
+  });
 
   return (
     <AdminShell
@@ -66,7 +49,9 @@ export default async function SidhuSeoPlanningDetailPage({
         <SeoPlanningDetail
           draft={draft}
           targetPostTitle={targetPost?.title || null}
-          writingArticle={await writingArticleForDraft(draft, targetPost)}
+          writingArticle={writingArticle}
+          geminiBlogPromptConfigured={isGeminiBlogPromptConfigured()}
+          initialWritingPromptState={{ status: writingPromptStatus, cache: geminiCache }}
         />
       </SeoModuleChrome>
     </AdminShell>

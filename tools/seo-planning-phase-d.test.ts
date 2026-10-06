@@ -505,7 +505,7 @@ test("phase D1 source stays off the network and off CMS writes", () => {
     read("components/sidhu/SeoPlanningDetail.tsx"),
     /writing-fingerprint|from "node:crypto"|server-only/,
   );
-  assert.doesNotMatch(read("lib/cms/seo-planning/index.ts"), /writing-brief|article-snapshot|writing-fingerprint/);
+  assert.match(read("lib/cms/seo-planning/index.ts"), /writing-brief|article-snapshot|writing-fingerprint/);
   assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
   assert.doesNotMatch(read("lib/db/schema.ts"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*4/);
 });
@@ -525,5 +525,11 @@ test("writing brief UI is read-only and has no provider buttons", () => {
     SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE,
     "Save your planning changes before generating a prompt.",
   );
-  assert.doesNotMatch(detail, /<button[^>]*>\s*Generate|Generate with Gemini|Generate with OpenAI/);
+  // D2: Generate lives in SeoPlanningWritingPrompt, not the Writing Brief card.
+  assert.match(detail, /SeoPlanningWritingPrompt/);
+  assert.doesNotMatch(detail, /Generate with Gemini/);
+  assert.doesNotMatch(detail, /Generate with OpenAI/);
+  const promptUi = read("components/sidhu/SeoPlanningWritingPrompt.tsx");
+  assert.match(promptUi, /Generate with Gemini/);
+  assert.doesNotMatch(promptUi, /Generate with OpenAI/);
 });

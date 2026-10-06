@@ -1,7 +1,6 @@
 "use client";
 
 import type { WritingBrief } from "@/lib/cms/seo-planning/writing-brief";
-import { SEO_PLANNING_WRITING_PROMPT_LATER_MESSAGE } from "@/lib/cms/seo-planning/writing-brief";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 
 function show(value: string, empty: string) {
@@ -27,7 +26,6 @@ export function SeoPlanningWritingBrief({
           Read-only brief derived from the saved plan. It is not published.
         </p>
       </div>
-      <p className="text-xs text-muted">{SEO_PLANNING_WRITING_PROMPT_LATER_MESSAGE}</p>
       {dirty ? <p className="text-sm text-amber-950">{dirtyMessage}</p> : null}
       {!brief.providerEligible && brief.providerIneligibleReason ? (
         <p className="text-sm text-ink">{brief.providerIneligibleReason}</p>

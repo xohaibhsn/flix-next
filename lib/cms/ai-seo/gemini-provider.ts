@@ -2,6 +2,7 @@
 
 import {
   getGeminiSeoConfig,
+  type GeminiGenerateContentConfig,
   type GeminiSeoConfig,
 } from "@/lib/cms/ai-seo/config";
 import {
@@ -354,16 +355,25 @@ function fail(
   };
 }
 
-async function requestGeminiStructuredJson(args: {
+/**
+ * Shared Gemini generateContent transport for structured JSON.
+ * Used by SEO Explain/Draft and Blog Prompt — callers supply their own body/config/messages.
+ */
+export async function requestGeminiStructuredJson(args: {
   body: object;
-  config: GeminiSeoConfig;
+  config: GeminiGenerateContentConfig;
   fetchImpl?: GeminiFetch;
   timeoutMessage: string;
+  notConfiguredMessage?: string;
 }): Promise<{ ok: true; json: unknown; model: string } | GeminiProviderFailure> {
   if (!args.config.configured || !args.config.apiKey || !args.config.model || !args.config.endpoint) {
-    return fail("not_configured", "Sidhu AI SEO Assistant is not configured yet.", {
-      diagnostic: "NOT_CONFIGURED",
-    });
+    return fail(
+      "not_configured",
+      args.notConfiguredMessage || "Sidhu AI SEO Assistant is not configured yet.",
+      {
+        diagnostic: "NOT_CONFIGURED",
+      },
+    );
   }
 
   const fetchImpl = args.fetchImpl ?? fetch;

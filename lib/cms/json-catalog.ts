@@ -1,4 +1,4 @@
-import type { CatalogRepository } from "@/lib/cms/catalog";
+import type { CatalogRepository, MergeSeoPlanningGeminiWritingPromptResult } from "@/lib/cms/catalog";
 import {
   defaultBlogCategories,
   defaultBlogPosts,
@@ -11,6 +11,8 @@ import { applySubscriptionRedirectMigration } from "@/lib/cms/subscription-url-m
 import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
+import { mergeGeminiWritingPromptCache } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import type { WritingPromptCacheEntry } from "@/lib/cms/seo-planning/writing-prompt-cache";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -294,6 +296,40 @@ export class JsonCatalogRepository implements CatalogRepository {
         : [...items, safe];
       await saveList(SEO_PLANNING_FILE, next);
       return safe;
+    });
+  }
+  async mergeSeoPlanningGeminiWritingPromptCache(args: {
+    id: string;
+    entry: WritingPromptCacheEntry;
+    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningGeminiWritingPromptResult> {
+    const id = String(args.id || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.listSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === id);
+      if (index < 0) return { ok: false, reason: "not_found" };
+
+      const latest = items[index]!;
+      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+        return { ok: false, reason: "rejected" };
+      }
+
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeGeminiWritingPromptCache(basePayload, args.entry);
+      const updatedAt = new Date().toISOString();
+      const nextDraft = sanitizeSeoPlanningDraft({
+        ...latest,
+        payload: nextPayload,
+        updatedAt,
+      });
+      const next = items.map((item, i) => (i === index ? nextDraft : item));
+      await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true, draft: nextDraft };
     });
   }
   async dashboardStats(): Promise<CmsDashboardStats> {

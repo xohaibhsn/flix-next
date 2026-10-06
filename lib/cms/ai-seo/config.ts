@@ -17,6 +17,10 @@ export const GEMINI_GENERATE_CONTENT_BASE =
 export const GEMINI_SEO_TIMEOUT_MS = 12_000;
 export const GEMINI_SEO_MAX_OUTPUT_TOKENS = 500;
 export const GEMINI_SEO_DRAFT_MAX_OUTPUT_TOKENS = 1200;
+/** Phase D2 ChatGPT writing-prompt generation (not SEO explain/draft). */
+export const GEMINI_BLOG_PROMPT_TIMEOUT_MS = 30_000;
+export const GEMINI_BLOG_PROMPT_MAX_OUTPUT_TOKENS = 3500;
+export const CHATGPT_WRITING_PROMPT_MAX_CHARS = 12_000;
 
 export type OpenAiSeoConfig = {
   configured: boolean;
@@ -27,15 +31,23 @@ export type OpenAiSeoConfig = {
   maxOutputTokens: number;
 };
 
-export type GeminiSeoConfig = {
+/** Shared generateContent transport fields (SEO + Blog Prompt). */
+export type GeminiGenerateContentConfig = {
   configured: boolean;
   apiKey: string;
   model: string;
   /** Full generateContent URL for the configured model (no API key). */
   endpoint: string;
   timeoutMs: number;
+};
+
+export type GeminiSeoConfig = GeminiGenerateContentConfig & {
   maxOutputTokens: number;
   draftMaxOutputTokens: number;
+};
+
+export type GeminiBlogPromptConfig = GeminiGenerateContentConfig & {
+  maxOutputTokens: number;
 };
 
 export function isOpenAiSeoConfigured() {
@@ -97,5 +109,26 @@ export function getGeminiSeoConfig(): GeminiSeoConfig {
     timeoutMs: GEMINI_SEO_TIMEOUT_MS,
     maxOutputTokens: GEMINI_SEO_MAX_OUTPUT_TOKENS,
     draftMaxOutputTokens: GEMINI_SEO_DRAFT_MAX_OUTPUT_TOKENS,
+  };
+}
+
+/** Gemini Blog Prompt requires key + explicit GEMINI_BLOG_PROMPT_MODEL (never falls back to GEMINI_SEO_MODEL). */
+export function isGeminiBlogPromptConfigured() {
+  return Boolean(process.env.GEMINI_API_KEY?.trim() && process.env.GEMINI_BLOG_PROMPT_MODEL?.trim());
+}
+
+export function getGeminiBlogPromptConfig(): GeminiBlogPromptConfig {
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+  const model = process.env.GEMINI_BLOG_PROMPT_MODEL?.trim() || "";
+  const configured = Boolean(apiKey && model);
+  return {
+    configured,
+    apiKey,
+    model,
+    endpoint: configured
+      ? `${GEMINI_GENERATE_CONTENT_BASE}/${encodeURIComponent(model)}:generateContent`
+      : "",
+    timeoutMs: GEMINI_BLOG_PROMPT_TIMEOUT_MS,
+    maxOutputTokens: GEMINI_BLOG_PROMPT_MAX_OUTPUT_TOKENS,
   };
 }
