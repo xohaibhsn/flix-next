@@ -8,6 +8,7 @@ import { SeoAiDraftPanel } from "../components/sidhu/SeoAiDraftPanel";
 import { SeoHealthAiExplain } from "../components/sidhu/SeoHealthAiExplain";
 import {
   DEFAULT_OPENAI_SEO_MODEL,
+  GEMINI_GENERATE_CONTENT_BASE,
   getGeminiSeoConfig,
   getOpenAiSeoConfig,
   getOpenAiSeoResearchConfig,
@@ -22,9 +23,11 @@ import { explainSeoFinding } from "../lib/cms/ai-seo/explain";
 import {
   buildGeminiDraftRequestBody,
   buildGeminiExplainRequestBody,
+  classifyGeminiHttpFailure,
   extractGeminiGenerateContentText,
   requestGeminiSeoDraft,
   requestGeminiSeoExplanation,
+  toGeminiStructuredJsonSchema,
 } from "../lib/cms/ai-seo/gemini-provider";
 import {
   parseSeoAiProviderRequest,
@@ -47,6 +50,8 @@ import {
 import {
   normalizeSeoDraftResult,
   normalizeSeoExplainResult,
+  SEO_DRAFT_JSON_SCHEMA,
+  SEO_EXPLAIN_JSON_SCHEMA,
   toSeoExplainFindingInput,
   type SeoDraftInput,
   type SeoExplainFindingInput,
@@ -343,6 +348,11 @@ test("EXPLAIN: Gemini and OpenAI share bounded payload and normalize to SeoExpla
   assert.equal(geminiBody.generationConfig.responseFormat.text.mimeType, "application/json");
   assert.ok(geminiBody.generationConfig.responseFormat.text.schema);
   assert.equal((geminiBody as { responseSchema?: unknown }).responseSchema, undefined);
+  assert.equal(
+    JSON.stringify(geminiBody.generationConfig.responseFormat.text.schema).includes("maxLength"),
+    false,
+  );
+  assert.equal(JSON.stringify(SEO_EXPLAIN_JSON_SCHEMA).includes("maxLength"), true);
 
   let openAiCalls = 0;
   let geminiCalls = 0;
@@ -408,6 +418,11 @@ test("EXPLAIN: Gemini failure never calls OpenAI; OpenAI failure never calls Gem
     },
   });
   assert.equal(geminiFail.ok, false);
+  if (!geminiFail.ok) {
+    assert.equal(geminiFail.code, "unavailable");
+    assert.equal(geminiFail.error, "Gemini is temporarily unavailable.");
+    assert.doesNotMatch(geminiFail.error, /boom/);
+  }
   assert.equal(geminiCalls, 1);
   assert.equal(openAiCalls, 0);
 
@@ -689,4 +704,218 @@ test("direct provider helpers: OpenAI explain/draft still work independently", a
   });
   assert.equal(geminiDraft.ok, false);
   if (!geminiDraft.ok) assert.equal(geminiDraft.code, "not_configured");
+});
+
+test("GEMINI HTTP CLASSIFY: status codes map to safe messages without raw body leakage", async () => {
+  const cases: Array<{
+    status: number;
+    code: string;
+    message: string;
+    diagnostic: string;
+  }> = [
+    {
+      status: 400,
+      code: "invalid_request",
+      message: "Gemini request was rejected by the API configuration.",
+      diagnostic: "BAD_REQUEST",
+    },
+    {
+      status: 401,
+      code: "unauthorized",
+      message: "Gemini authentication failed. Check the configured API key.",
+      diagnostic: "AUTHENTICATION",
+    },
+    {
+      status: 402,
+      code: "payment_required",
+      message: "Gemini API billing or credit is required for this request.",
+      diagnostic: "PAYMENT_REQUIRED",
+    },
+    {
+      status: 403,
+      code: "permission_denied",
+      message: "Gemini API access is not permitted for the configured key/project.",
+      diagnostic: "PERMISSION_DENIED",
+    },
+    {
+      status: 404,
+      code: "not_found",
+      message: "Gemini model or endpoint is not available for this configuration.",
+      diagnostic: "NOT_FOUND",
+    },
+    {
+      status: 429,
+      code: "rate_limited",
+      message: "Gemini request limit reached. Please try again later.",
+      diagnostic: "RATE_LIMITED",
+    },
+    {
+      status: 500,
+      code: "unavailable",
+      message: "Gemini is temporarily unavailable.",
+      diagnostic: "UPSTREAM_UNAVAILABLE",
+    },
+  ];
+
+  for (const item of cases) {
+    const classified = classifyGeminiHttpFailure(item.status);
+    assert.equal(classified.code, item.code);
+    assert.equal(classified.message, item.message);
+    assert.equal(classified.diagnostic, item.diagnostic);
+
+    const secret = `UPSTREAM_SECRET_${item.status}_DO_NOT_LEAK`;
+    const result = await requestGeminiSeoExplanation(sampleFinding, {
+      config: geminiConfig(),
+      fetchImpl: async () => mockJsonResponse({ error: { message: secret, status: "DETAIL" } }, item.status),
+    });
+    assert.equal(result.ok, false);
+    if (!result.ok) {
+      assert.equal(result.code, item.code);
+      assert.equal(result.message, item.message);
+      assert.equal(result.httpStatus, item.status);
+      assert.equal(result.diagnostic, item.diagnostic);
+      assert.doesNotMatch(result.message, new RegExp(secret));
+      assert.doesNotMatch(JSON.stringify(result), new RegExp(secret));
+      assert.doesNotMatch(JSON.stringify(result), /DETAIL|ErrorInfo|AIza/);
+    }
+  }
+});
+
+test("GEMINI RESPONSE CLASSIFY: timeout, empty candidates, invalid JSON, wrong shape vs valid", async () => {
+  let timeoutCalls = 0;
+  const timedOut = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig({ timeoutMs: 5 }),
+    fetchImpl: async (_url, init) =>
+      new Promise((_resolve, reject) => {
+        timeoutCalls += 1;
+        init?.signal?.addEventListener("abort", () => {
+          const err = new Error("aborted");
+          err.name = "AbortError";
+          reject(err);
+        });
+      }),
+  });
+  assert.equal(timedOut.ok, false);
+  if (!timedOut.ok) {
+    assert.equal(timedOut.code, "timeout");
+    assert.equal(timedOut.diagnostic, "TIMEOUT");
+  }
+  assert.equal(timeoutCalls, 1);
+
+  const empty = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse({ candidates: [] }),
+  });
+  assert.equal(empty.ok, false);
+  if (!empty.ok) {
+    assert.equal(empty.code, "invalid_response");
+    assert.equal(empty.diagnostic, "INVALID_RESPONSE");
+    assert.equal(empty.httpStatus, 200);
+  }
+
+  const badJson = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse(geminiSuccessPayload("not-json-object")),
+  });
+  assert.equal(badJson.ok, false);
+  if (!badJson.ok) {
+    assert.equal(badJson.code, "invalid_response");
+    assert.doesNotMatch(badJson.message, /not-json-object/);
+  }
+
+  // geminiSuccessPayload stringifies non-objects; force literal non-JSON text part
+  const invalidJsonText = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse({
+        candidates: [{ content: { parts: [{ text: "{broken" }] } }],
+      }),
+  });
+  assert.equal(invalidJsonText.ok, false);
+  if (!invalidJsonText.ok) {
+    assert.equal(invalidJsonText.code, "invalid_response");
+    assert.doesNotMatch(invalidJsonText.message, /broken/);
+  }
+
+  const wrongShape = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse(geminiSuccessPayload({ summary: "only" })),
+  });
+  assert.equal(wrongShape.ok, false);
+  if (!wrongShape.ok) {
+    assert.equal(wrongShape.code, "invalid_response");
+    assert.equal(wrongShape.diagnostic, "INVALID_RESPONSE");
+  }
+
+  const validExplain = await requestGeminiSeoExplanation(sampleFinding, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse(geminiSuccessPayload(goodExplanation)),
+  });
+  assert.equal(validExplain.ok, true);
+
+  const validDraft = await requestGeminiSeoDraft(pageContext, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse(geminiSuccessPayload(goodDraft)),
+  });
+  assert.equal(validDraft.ok, true);
+
+  const wrongDraftShape = await requestGeminiSeoDraft(pageContext, {
+    config: geminiConfig(),
+    fetchImpl: async () => mockJsonResponse(geminiSuccessPayload({ titles: [], descriptions: [], guidance: "x" })),
+  });
+  assert.equal(wrongDraftShape.ok, false);
+  if (!wrongDraftShape.ok) assert.equal(wrongDraftShape.code, "invalid_response");
+});
+
+test("GEMINI SCHEMA: domain maxLength stripped for Gemini; model path encodeURIComponent safe", () => {
+  const adaptedExplain = toGeminiStructuredJsonSchema(SEO_EXPLAIN_JSON_SCHEMA);
+  const adaptedDraft = toGeminiStructuredJsonSchema(SEO_DRAFT_JSON_SCHEMA);
+  assert.equal(JSON.stringify(SEO_EXPLAIN_JSON_SCHEMA).includes("maxLength"), true);
+  assert.equal(JSON.stringify(SEO_DRAFT_JSON_SCHEMA).includes("maxLength"), true);
+  assert.equal(JSON.stringify(adaptedExplain).includes("maxLength"), false);
+  assert.equal(JSON.stringify(adaptedDraft).includes("maxLength"), false);
+  assert.equal((adaptedExplain as { additionalProperties?: boolean }).additionalProperties, false);
+  assert.equal((adaptedDraft as { properties: { titles: { minItems: number } } }).properties.titles.minItems, 3);
+
+  const model = "gemini-3.8-flash";
+  assert.equal(encodeURIComponent(model), "gemini-3.8-flash");
+  withEnv({ GEMINI_API_KEY: SAMPLE_GEMINI_KEY, GEMINI_SEO_MODEL: model }, () => {
+    const config = getGeminiSeoConfig();
+    assert.equal(
+      config.endpoint,
+      `${GEMINI_GENERATE_CONTENT_BASE}/${encodeURIComponent(model)}:generateContent`,
+    );
+    assert.doesNotMatch(config.endpoint, /key=|AIza/);
+  });
+
+  const draftBody = buildGeminiDraftRequestBody(pageContext, geminiConfig());
+  assert.equal(JSON.stringify(draftBody).includes("maxLength"), false);
+  assert.equal(draftBody.generationConfig.responseFormat.text.mimeType, "application/json");
+});
+
+test("GEMINI NO FALLBACK: classified HTTP failure never calls OpenAI", async () => {
+  resetAiSeoExplainRateLimitForTests();
+  let openAiCalls = 0;
+  let geminiCalls = 0;
+  const result = await explainSeoFinding({
+    provider: "gemini",
+    rawInput: sampleFinding,
+    adminId: "classify-no-fallback",
+    ip: "10.2.2.2",
+    geminiConfig: geminiConfig(),
+    config: openaiConfig(),
+    fetchImpl: async (url) => {
+      if (String(url).includes("openai")) openAiCalls += 1;
+      else geminiCalls += 1;
+      return mockJsonResponse({ error: { message: "schema rejected DETAIL" } }, 400);
+    },
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, "invalid_request");
+    assert.equal(result.error, "Gemini request was rejected by the API configuration.");
+    assert.doesNotMatch(result.error, /DETAIL|schema rejected/);
+  }
+  assert.equal(geminiCalls, 1);
+  assert.equal(openAiCalls, 0);
 });

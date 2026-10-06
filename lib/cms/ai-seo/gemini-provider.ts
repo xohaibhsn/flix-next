@@ -21,22 +21,175 @@ import {
   type SeoExplainResult,
 } from "@/lib/cms/ai-seo/schemas";
 
+/**
+ * Safe failure codes returned to callers. Never include provider raw text.
+ * 401 maps to existing app convention `unauthorized`.
+ */
 export type GeminiProviderErrorCode =
   | "not_configured"
+  | "invalid_request"
+  | "unauthorized"
+  | "payment_required"
+  | "permission_denied"
+  | "not_found"
   | "timeout"
   | "rate_limited"
   | "unavailable"
   | "invalid_response";
 
+/** Bounded internal diagnostic — never persist, never include raw provider content. */
+export type GeminiSafeDiagnostic =
+  | "NOT_CONFIGURED"
+  | "BAD_REQUEST"
+  | "AUTHENTICATION"
+  | "PAYMENT_REQUIRED"
+  | "PERMISSION_DENIED"
+  | "NOT_FOUND"
+  | "RATE_LIMITED"
+  | "UPSTREAM_UNAVAILABLE"
+  | "TIMEOUT"
+  | "INVALID_RESPONSE";
+
+export type GeminiProviderFailure = {
+  ok: false;
+  code: GeminiProviderErrorCode;
+  message: string;
+  /** Optional HTTP status for server-side/test classification only. */
+  httpStatus?: number;
+  diagnostic?: GeminiSafeDiagnostic;
+};
+
 export type GeminiExplainProviderResult =
   | { ok: true; explanation: SeoExplainResult; model: string }
-  | { ok: false; code: GeminiProviderErrorCode; message: string };
+  | GeminiProviderFailure;
 
 export type GeminiDraftProviderResult =
   | { ok: true; draft: SeoDraftResult; model: string }
-  | { ok: false; code: GeminiProviderErrorCode; message: string };
+  | GeminiProviderFailure;
 
 export type GeminiFetch = typeof fetch;
+
+/** JSON Schema keywords documented for Gemini structured JSON Schema subset. */
+const GEMINI_STRUCTURED_SCHEMA_KEYS = new Set([
+  "$id",
+  "$defs",
+  "$ref",
+  "$anchor",
+  "type",
+  "format",
+  "title",
+  "description",
+  "enum",
+  "items",
+  "prefixItems",
+  "minItems",
+  "maxItems",
+  "minimum",
+  "maximum",
+  "anyOf",
+  "oneOf",
+  "properties",
+  "additionalProperties",
+  "required",
+  "propertyOrdering",
+]);
+
+/**
+ * Adapt domain JSON Schema for Gemini generateContent structured output.
+ * Strips unsupported keywords (e.g. maxLength) without changing the domain contract used elsewhere.
+ */
+export function toGeminiStructuredJsonSchema(schema: unknown): object {
+  if (Array.isArray(schema)) {
+    return schema.map((item) => toGeminiStructuredJsonSchema(item));
+  }
+  if (!schema || typeof schema !== "object") {
+    return schema as object;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema as Record<string, unknown>)) {
+    if (!GEMINI_STRUCTURED_SCHEMA_KEYS.has(key)) continue;
+    if (key === "properties" && value && typeof value === "object" && !Array.isArray(value)) {
+      const props: Record<string, unknown> = {};
+      for (const [propKey, propValue] of Object.entries(value as Record<string, unknown>)) {
+        props[propKey] = toGeminiStructuredJsonSchema(propValue);
+      }
+      out[key] = props;
+      continue;
+    }
+    if (key === "items" || key === "additionalProperties") {
+      out[key] = toGeminiStructuredJsonSchema(value);
+      continue;
+    }
+    if ((key === "anyOf" || key === "oneOf" || key === "prefixItems") && Array.isArray(value)) {
+      out[key] = value.map((item) => toGeminiStructuredJsonSchema(item));
+      continue;
+    }
+    if (key === "$defs" && value && typeof value === "object" && !Array.isArray(value)) {
+      const defs: Record<string, unknown> = {};
+      for (const [defKey, defValue] of Object.entries(value as Record<string, unknown>)) {
+        defs[defKey] = toGeminiStructuredJsonSchema(defValue);
+      }
+      out[key] = defs;
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+export function classifyGeminiHttpFailure(status: number): {
+  code: GeminiProviderErrorCode;
+  message: string;
+  diagnostic: GeminiSafeDiagnostic;
+} {
+  if (status === 400) {
+    return {
+      code: "invalid_request",
+      message: "Gemini request was rejected by the API configuration.",
+      diagnostic: "BAD_REQUEST",
+    };
+  }
+  if (status === 401) {
+    return {
+      code: "unauthorized",
+      message: "Gemini authentication failed. Check the configured API key.",
+      diagnostic: "AUTHENTICATION",
+    };
+  }
+  if (status === 402) {
+    return {
+      code: "payment_required",
+      message: "Gemini API billing or credit is required for this request.",
+      diagnostic: "PAYMENT_REQUIRED",
+    };
+  }
+  if (status === 403) {
+    return {
+      code: "permission_denied",
+      message: "Gemini API access is not permitted for the configured key/project.",
+      diagnostic: "PERMISSION_DENIED",
+    };
+  }
+  if (status === 404) {
+    return {
+      code: "not_found",
+      message: "Gemini model or endpoint is not available for this configuration.",
+      diagnostic: "NOT_FOUND",
+    };
+  }
+  if (status === 429) {
+    return {
+      code: "rate_limited",
+      message: "Gemini request limit reached. Please try again later.",
+      diagnostic: "RATE_LIMITED",
+    };
+  }
+  return {
+    code: "unavailable",
+    message: "Gemini is temporarily unavailable.",
+    diagnostic: "UPSTREAM_UNAVAILABLE",
+  };
+}
 
 /**
  * Extract text from a Gemini generateContent response without returning raw payloads to callers.
@@ -89,7 +242,7 @@ export function buildGeminiStructuredRequestBody(args: {
       responseFormat: {
         text: {
           mimeType: "application/json",
-          schema: args.jsonSchema,
+          schema: toGeminiStructuredJsonSchema(args.jsonSchema),
         },
       },
     },
@@ -114,21 +267,30 @@ export function buildGeminiDraftRequestBody(input: SeoDraftInput, config: Gemini
   });
 }
 
+function fail(
+  code: GeminiProviderErrorCode,
+  message: string,
+  extras?: { httpStatus?: number; diagnostic?: GeminiSafeDiagnostic },
+): GeminiProviderFailure {
+  return {
+    ok: false,
+    code,
+    message,
+    ...(extras?.httpStatus != null ? { httpStatus: extras.httpStatus } : {}),
+    ...(extras?.diagnostic ? { diagnostic: extras.diagnostic } : {}),
+  };
+}
+
 async function requestGeminiStructuredJson(args: {
   body: object;
   config: GeminiSeoConfig;
   fetchImpl?: GeminiFetch;
-  unavailableMessage: string;
   timeoutMessage: string;
-}): Promise<
-  { ok: true; json: unknown; model: string } | { ok: false; code: GeminiProviderErrorCode; message: string }
-> {
+}): Promise<{ ok: true; json: unknown; model: string } | GeminiProviderFailure> {
   if (!args.config.configured || !args.config.apiKey || !args.config.model || !args.config.endpoint) {
-    return {
-      ok: false,
-      code: "not_configured",
-      message: "Sidhu AI SEO Assistant is not configured yet.",
-    };
+    return fail("not_configured", "Sidhu AI SEO Assistant is not configured yet.", {
+      diagnostic: "NOT_CONFIGURED",
+    });
   }
 
   const fetchImpl = args.fetchImpl ?? fetch;
@@ -146,64 +308,53 @@ async function requestGeminiStructuredJson(args: {
       signal: controller.signal,
     });
 
-    if (response.status === 429) {
-      return {
-        ok: false,
-        code: "rate_limited",
-        message: "AI request limit reached. Please try again later.",
-      };
-    }
-
     if (!response.ok) {
-      return {
-        ok: false,
-        code: "unavailable",
-        message: args.unavailableMessage,
-      };
+      // Consume body without exposing it — classification uses status only.
+      try {
+        await response.arrayBuffer();
+      } catch {
+        /* ignore */
+      }
+      const classified = classifyGeminiHttpFailure(response.status);
+      return fail(classified.code, classified.message, {
+        httpStatus: response.status,
+        diagnostic: classified.diagnostic,
+      });
     }
 
     let payload: unknown;
     try {
       payload = await response.json();
     } catch {
-      return {
-        ok: false,
-        code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
-      };
+      return fail("invalid_response", "AI returned an unusable response. Please try again.", {
+        httpStatus: response.status,
+        diagnostic: "INVALID_RESPONSE",
+      });
     }
 
     const text = extractGeminiGenerateContentText(payload);
     if (!text) {
-      return {
-        ok: false,
-        code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
-      };
+      return fail("invalid_response", "AI returned an unusable response. Please try again.", {
+        httpStatus: response.status,
+        diagnostic: "INVALID_RESPONSE",
+      });
     }
 
     try {
       return { ok: true, json: JSON.parse(text), model: args.config.model };
     } catch {
-      return {
-        ok: false,
-        code: "invalid_response",
-        message: "AI returned an unusable response. Please try again.",
-      };
+      return fail("invalid_response", "AI returned an unusable response. Please try again.", {
+        httpStatus: response.status,
+        diagnostic: "INVALID_RESPONSE",
+      });
     }
   } catch (error) {
     if (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message))) {
-      return {
-        ok: false,
-        code: "timeout",
-        message: args.timeoutMessage,
-      };
+      return fail("timeout", args.timeoutMessage, { diagnostic: "TIMEOUT" });
     }
-    return {
-      ok: false,
-      code: "unavailable",
-      message: args.unavailableMessage,
-    };
+    return fail("unavailable", "Gemini is temporarily unavailable.", {
+      diagnostic: "UPSTREAM_UNAVAILABLE",
+    });
   } finally {
     clearTimeout(timer);
   }
@@ -221,18 +372,15 @@ export async function requestGeminiSeoExplanation(
     body: buildGeminiExplainRequestBody(finding, config),
     config,
     fetchImpl: options?.fetchImpl,
-    unavailableMessage: "AI explanation is temporarily unavailable.",
     timeoutMessage: "AI explanation took too long. Please try again.",
   });
   if (!result.ok) return result;
 
   const explanation = normalizeSeoExplainResult(result.json);
   if (!explanation) {
-    return {
-      ok: false,
-      code: "invalid_response",
-      message: "AI returned an unusable response. Please try again.",
-    };
+    return fail("invalid_response", "AI returned an unusable response. Please try again.", {
+      diagnostic: "INVALID_RESPONSE",
+    });
   }
   return { ok: true, explanation, model: result.model };
 }
@@ -249,18 +397,15 @@ export async function requestGeminiSeoDraft(
     body: buildGeminiDraftRequestBody(input, config),
     config,
     fetchImpl: options?.fetchImpl,
-    unavailableMessage: "AI drafting is temporarily unavailable.",
     timeoutMessage: "AI drafting took too long. Please try again.",
   });
   if (!result.ok) return result;
 
   const draft = normalizeSeoDraftResult(result.json);
   if (!draft) {
-    return {
-      ok: false,
-      code: "invalid_response",
-      message: "AI returned an unusable response. Please try again.",
-    };
+    return fail("invalid_response", "AI returned an unusable response. Please try again.", {
+      diagnostic: "INVALID_RESPONSE",
+    });
   }
   return { ok: true, draft, model: result.model };
 }
