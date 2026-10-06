@@ -105,6 +105,7 @@ test("valid finding produces exactly one provider request with safe request shap
   let capturedInit: RequestInit | undefined;
 
   const result = await explainSeoFinding({
+    provider: "openai",
     rawInput: sampleFinding,
     adminId: "admin-1",
     ip: "127.0.0.1",
@@ -272,6 +273,7 @@ test("explain service applies rate limit before provider fetch", async () => {
   };
   for (let i = 0; i < AI_SEO_RATE_LIMITS.burstMax; i += 1) {
     const ok = await explainSeoFinding({
+      provider: "openai",
       rawInput: sampleFinding,
       adminId: "admin-rl",
       ip: "10.0.0.2",
@@ -281,6 +283,7 @@ test("explain service applies rate limit before provider fetch", async () => {
     assert.equal(ok.ok, true);
   }
   const limited = await explainSeoFinding({
+    provider: "openai",
     rawInput: sampleFinding,
     adminId: "admin-rl",
     ip: "10.0.0.2",
@@ -308,7 +311,10 @@ test("authorization is required on the server action and AI is click-only", () =
   assert.match(page, /aiExplainAction=\{explainSeoHealthFindingAction\}/);
   assert.doesNotMatch(page, /requestOpenAiSeoExplanation/);
   assert.match(report, /SeoHealthAiExplain/);
-  assert.match(ui, /onClick=\{runExplain\}/);
+  assert.match(ui, /runExplain\("gemini"\)|runExplain\("openai"\)/);
+  assert.match(ui, /Explain with Gemini/);
+  assert.match(ui, /Explain with OpenAI/);
+  assert.doesNotMatch(ui, /Explain with Sidhu AI/);
   assert.doesNotMatch(ui, /useEffect\(/);
   assert.doesNotMatch(ui, /from ["']@\/lib\/cms\/ai-seo-actions["']/);
   assert.doesNotMatch(provider, /\bretry\b/);
@@ -361,11 +367,13 @@ test("UI shows explain control without auto-invoking AI and accepted findings ke
         resolved: [],
         counts: { new: 0, open: 0, existing: 0, resolved: 0, accepted: 1 },
       },
-      aiConfigured: false,
+      openaiConfigured: false,
+      geminiConfigured: false,
     }),
   );
 
-  assert.match(html, /Explain with Sidhu AI/);
+  assert.match(html, /Explain with Gemini/);
+  assert.match(html, /Explain with OpenAI/);
   assert.match(html, /Reviewed \/ Accepted/);
   assert.doesNotMatch(html, /Sidhu AI explanation/);
   assert.doesNotMatch(html, /sk-/);
@@ -373,11 +381,13 @@ test("UI shows explain control without auto-invoking AI and accepted findings ke
 
   const panel = renderToStaticMarkup(
     createElement(SeoHealthAiExplain, {
-      configured: false,
+      openaiConfigured: false,
+      geminiConfigured: false,
       finding: toSeoExplainFindingInput(finding),
     }),
   );
-  assert.match(panel, /Explain with Sidhu AI/);
+  assert.match(panel, /Explain with Gemini/);
+  assert.match(panel, /Explain with OpenAI/);
   assert.doesNotMatch(panel, /Sidhu AI explanation/);
 });
 
@@ -386,6 +396,8 @@ test("AI modules never write CMS or SEO Health state", () => {
     "lib/cms/ai-seo/config.ts",
     "lib/cms/ai-seo/schemas.ts",
     "lib/cms/ai-seo/provider.ts",
+    "lib/cms/ai-seo/gemini-provider.ts",
+    "lib/cms/ai-seo/provider-type.ts",
     "lib/cms/ai-seo/explain.ts",
     "lib/cms/ai-seo/draft.ts",
     "lib/cms/ai-seo/rate-limit.ts",
@@ -415,5 +427,7 @@ test(".env.example documents placeholders only", () => {
   const envExample = readFileSync(path.join(root, ".env.example"), "utf8");
   assert.match(envExample, /^OPENAI_API_KEY=$/m);
   assert.match(envExample, /^OPENAI_SEO_MODEL=gpt-6-luna$/m);
+  assert.match(envExample, /^GEMINI_API_KEY=$/m);
+  assert.match(envExample, /^GEMINI_SEO_MODEL=$/m);
   assert.doesNotMatch(envExample, /sk-[a-zA-Z0-9]/);
 });

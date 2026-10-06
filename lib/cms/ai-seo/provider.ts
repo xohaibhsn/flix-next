@@ -54,7 +54,8 @@ export type OpenAiResearchProviderResult =
 
 export type OpenAiFetch = typeof fetch;
 
-function buildExplainUserPayload(finding: SeoExplainFindingInput) {
+/** Shared bounded explain payload — OpenAI and Gemini must receive the same logical fields. */
+export function buildSeoExplainUserPayload(finding: SeoExplainFindingInput) {
   return {
     task: "explain_seo_finding",
     finding: {
@@ -72,7 +73,8 @@ function buildExplainUserPayload(finding: SeoExplainFindingInput) {
   };
 }
 
-function buildDraftUserPayload(input: SeoDraftInput) {
+/** Shared bounded draft payload — OpenAI and Gemini must receive the same logical fields. */
+export function buildSeoDraftUserPayload(input: SeoDraftInput) {
   return {
     task: "draft_seo_title_meta",
     entity: {
@@ -177,7 +179,7 @@ export function buildOpenAiExplainRequestBody(finding: SeoExplainFindingInput, c
     schemaName: "sidhu_seo_explain",
     jsonSchema: SEO_EXPLAIN_JSON_SCHEMA,
     systemInstruction: SEO_EXPLAIN_SYSTEM_INSTRUCTION,
-    userPayload: buildExplainUserPayload(finding),
+    userPayload: buildSeoExplainUserPayload(finding),
     maxOutputTokens: config.maxOutputTokens,
   });
 }
@@ -188,7 +190,7 @@ export function buildOpenAiDraftRequestBody(input: SeoDraftInput, config: OpenAi
     schemaName: "sidhu_seo_draft",
     jsonSchema: SEO_DRAFT_JSON_SCHEMA,
     systemInstruction: SEO_DRAFT_SYSTEM_INSTRUCTION,
-    userPayload: buildDraftUserPayload(input),
+    userPayload: buildSeoDraftUserPayload(input),
     maxOutputTokens: OPENAI_SEO_DRAFT_MAX_OUTPUT_TOKENS,
   });
 }

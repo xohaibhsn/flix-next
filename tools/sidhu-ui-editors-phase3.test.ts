@@ -128,7 +128,7 @@ test("EditorTabs render selected tab without calling handlers on mount", () => {
   assert.equal(changes, 0);
 });
 
-test("AI drawer entry opens without provider call; Draft with Sidhu AI remains the generate action", () => {
+test("AI drawer entry opens without provider call; Draft with Gemini/OpenAI remain generate actions", () => {
   let calls = 0;
   const html = renderToStaticMarkup(
     createElement(SeoAiDraftPanel, {
@@ -141,6 +141,8 @@ test("AI drawer entry opens without provider call; Draft with Sidhu AI remains t
         siteName: "Flix IPTV",
         titleSuffix: " | Flix IPTV",
       },
+      openaiConfigured: true,
+      geminiConfigured: true,
       draftAction: async () => {
         calls += 1;
         return {
@@ -150,6 +152,7 @@ test("AI drawer entry opens without provider call; Draft with Sidhu AI remains t
             descriptions: [],
             guidance: "",
           },
+          provider: "openai" as const,
         };
       },
       onUseTitle: () => undefined,
@@ -162,7 +165,11 @@ test("AI drawer entry opens without provider call; Draft with Sidhu AI remains t
   const src = read("components/sidhu/SeoAiDraftPanel.tsx");
   assert.match(src, /openDrawer/);
   assert.match(src, /function runDraft/);
-  assert.match(src, /Generate again \(another AI request\)/);
+  assert.match(src, /Draft with Gemini/);
+  assert.match(src, /Draft with OpenAI/);
+  assert.match(src, /Generate again with Gemini/);
+  assert.match(src, /Generate again with OpenAI/);
+  assert.doesNotMatch(src, /another AI request/);
   assert.match(src, /Undo/);
   assert.match(src, /AI suggestion applied — not saved/);
 });

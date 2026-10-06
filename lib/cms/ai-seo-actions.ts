@@ -3,9 +3,14 @@
 import { headers } from "next/headers";
 import { requireAdminActor } from "@/lib/auth/guards";
 import type { Permission } from "@/lib/auth/permissions";
-import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
+import {
+  getSeoAiProviderAvailability,
+  isGeminiSeoConfigured,
+  isOpenAiSeoConfigured,
+} from "@/lib/cms/ai-seo/config";
 import { draftSeoTitleMeta, type DraftSeoTitleMetaResult } from "@/lib/cms/ai-seo/draft";
 import { explainSeoFinding, type ExplainSeoFindingResult } from "@/lib/cms/ai-seo/explain";
+import { parseSeoAiProviderRequest } from "@/lib/cms/ai-seo/provider-type";
 import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
 import { researchUkContentOpportunitiesFromCms } from "@/lib/cms/ai-seo/research-run";
 import { parseSeoDraftInput } from "@/lib/cms/ai-seo/schemas";
@@ -19,42 +24,66 @@ function clientIp(headerStore: Headers) {
 }
 
 export type ExplainSeoFindingActionResult = ExplainSeoFindingResult & {
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
+  /** @deprecated Prefer openaiConfigured / geminiConfigured. */
   configured?: boolean;
 };
 
 export type DraftSeoTitleMetaActionResult = DraftSeoTitleMetaResult & {
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
+  /** @deprecated Prefer openaiConfigured / geminiConfigured. */
   configured?: boolean;
 };
+
+function availabilityFlags() {
+  const availability = getSeoAiProviderAvailability();
+  return {
+    ...availability,
+    configured: availability.openaiConfigured || availability.geminiConfigured,
+  };
+}
 
 /**
  * Explicit user-triggered Sidhu AI explanation for one SEO Health finding.
  * Does not mutate CMS content or SEO Health issue-memory state.
+ * Provider is required and never falls back to the other API.
  */
 export async function explainSeoHealthFindingAction(
   rawInput: unknown,
 ): Promise<ExplainSeoFindingActionResult> {
+  const flags = availabilityFlags();
   const actor = await requireAdminActor("seo");
   if (!actor.ok) {
-    return { ok: false, code: "unauthorized", error: actor.error, configured: isOpenAiSeoConfigured() };
+    return { ok: false, code: "unauthorized", error: actor.error, ...flags };
   }
 
-  if (!isOpenAiSeoConfigured()) {
+  const parsedRequest = parseSeoAiProviderRequest(rawInput);
+  if (!parsedRequest.ok) {
+    return { ok: false, code: "invalid_input", error: parsedRequest.error, ...flags };
+  }
+
+  const { provider, payload } = parsedRequest;
+  const providerConfigured = provider === "gemini" ? isGeminiSeoConfigured() : isOpenAiSeoConfigured();
+  if (!providerConfigured) {
     return {
       ok: false,
       code: "not_configured",
       error: "Sidhu AI SEO Assistant is not configured yet.",
-      configured: false,
+      ...flags,
     };
   }
 
   const headerStore = await headers();
   const result = await explainSeoFinding({
-    rawInput,
+    provider,
+    rawInput: payload,
     adminId: actor.user.id,
     ip: clientIp(headerStore),
   });
 
-  return { ...result, configured: true };
+  return { ...result, ...flags };
 }
 
 function permissionForDraftEntity(entityKind: string): Permission {
@@ -65,35 +94,45 @@ function permissionForDraftEntity(entityKind: string): Permission {
  * Explicit user-triggered SEO title/meta draft suggestions.
  * Populates editor fields only after the admin chooses an option client-side.
  * Never writes CMS content or SEO Health memory.
+ * Provider is required and never falls back to the other API.
  */
 export async function draftSeoTitleMetaAction(rawInput: unknown): Promise<DraftSeoTitleMetaActionResult> {
-  const parsed = parseSeoDraftInput(rawInput);
+  const flags = availabilityFlags();
+  const parsedRequest = parseSeoAiProviderRequest(rawInput);
+  if (!parsedRequest.ok) {
+    return { ok: false, code: "invalid_input", error: parsedRequest.error, ...flags };
+  }
+
+  const { provider, payload } = parsedRequest;
+  const parsed = parseSeoDraftInput(payload);
   if (!parsed.ok) {
-    return { ok: false, code: "invalid_input", error: parsed.error, configured: isOpenAiSeoConfigured() };
+    return { ok: false, code: "invalid_input", error: parsed.error, ...flags };
   }
 
   const actor = await requireAdminActor(permissionForDraftEntity(parsed.value.entityKind));
   if (!actor.ok) {
-    return { ok: false, code: "unauthorized", error: actor.error, configured: isOpenAiSeoConfigured() };
+    return { ok: false, code: "unauthorized", error: actor.error, ...flags };
   }
 
-  if (!isOpenAiSeoConfigured()) {
+  const providerConfigured = provider === "gemini" ? isGeminiSeoConfigured() : isOpenAiSeoConfigured();
+  if (!providerConfigured) {
     return {
       ok: false,
       code: "not_configured",
       error: "Sidhu AI SEO Assistant is not configured yet.",
-      configured: false,
+      ...flags,
     };
   }
 
   const headerStore = await headers();
   const result = await draftSeoTitleMeta({
+    provider,
     rawInput: parsed.value,
     adminId: actor.user.id,
     ip: clientIp(headerStore),
   });
 
-  return { ...result, configured: true };
+  return { ...result, ...flags };
 }
 
 export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult & {
@@ -103,6 +142,7 @@ export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult 
 /**
  * Explicit user-triggered UK content opportunity research (web_search).
  * Never creates, edits, saves, or publishes CMS content.
+ * OpenAI-only — Gemini is not offered for research.
  */
 export async function researchUkContentOpportunitiesAction(): Promise<ResearchUkOpportunitiesActionResult> {
   const actor = await requireAdminActor("seo");

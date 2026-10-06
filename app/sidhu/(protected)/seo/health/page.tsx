@@ -2,7 +2,7 @@ import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoHealthReport } from "@/components/sidhu/SeoHealthReport";
 import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { explainSeoHealthFindingAction } from "@/lib/cms/ai-seo-actions";
-import { isOpenAiSeoConfigured } from "@/lib/cms/ai-seo/config";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import {
   acceptSeoHealthFindingAction,
   reopenSeoHealthFindingAction,
@@ -29,7 +29,7 @@ export default async function SidhuSeoHealthPage({
   let report = null;
   let workflow: SeoHealthWorkflowView | null = null;
   let stateWarning: string | null = null;
-  const aiConfigured = isOpenAiSeoConfigured();
+  const aiProviders = getSeoAiProviderAvailability();
   let siteName: string | undefined;
 
   if (runRequested) {
@@ -71,7 +71,8 @@ export default async function SidhuSeoHealthPage({
             stateWarning={stateWarning}
             acceptAction={acceptSeoHealthFindingAction}
             reopenAction={reopenSeoHealthFindingAction}
-            aiConfigured={aiConfigured}
+            openaiConfigured={aiProviders.openaiConfigured}
+            geminiConfigured={aiProviders.geminiConfigured}
             aiExplainAction={explainSeoHealthFindingAction}
             siteName={siteName}
           />

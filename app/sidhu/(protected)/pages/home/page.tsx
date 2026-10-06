@@ -5,6 +5,7 @@ import { PageSeoPanel } from "@/components/sidhu/PageSeoPanel";
 import { requireAdminSession } from "@/lib/auth/guards";
 import { adminHasPermission } from "@/lib/auth/session";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function SidhuHomeBuilderPage() {
     getCloudinaryStatusAction(),
   ]);
   if (!page) notFound();
+  const aiProviders = getSeoAiProviderAvailability();
 
   return (
     <AdminShell
@@ -33,6 +35,8 @@ export default async function SidhuHomeBuilderPage() {
             seo={settings.pageSeo.home}
             assets={assets}
             configured={cloud.configured}
+            openaiConfigured={aiProviders.openaiConfigured}
+            geminiConfigured={aiProviders.geminiConfigured}
             settings={settings}
             page={page}
             fallbackTitle="Welcome"

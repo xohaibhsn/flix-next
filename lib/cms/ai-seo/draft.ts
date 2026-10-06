@@ -1,4 +1,6 @@
-import type { OpenAiSeoConfig } from "@/lib/cms/ai-seo/config";
+import type { GeminiSeoConfig, OpenAiSeoConfig } from "@/lib/cms/ai-seo/config";
+import { requestGeminiSeoDraft } from "@/lib/cms/ai-seo/gemini-provider";
+import { isSeoAiProvider, type SeoAiProvider } from "@/lib/cms/ai-seo/provider-type";
 import { requestOpenAiSeoDraft } from "@/lib/cms/ai-seo/provider";
 import { checkAiSeoExplainRateLimit } from "@/lib/cms/ai-seo/rate-limit";
 import {
@@ -10,26 +12,43 @@ import {
 export type DraftSeoTitleMetaSuccess = {
   ok: true;
   draft: SeoDraftResult;
+  provider: SeoAiProvider;
 };
 
 export type DraftSeoTitleMetaFailure = {
   ok: false;
   error: string;
-  code?: "not_configured" | "unauthorized" | "invalid_input" | "rate_limited" | "timeout" | "unavailable" | "invalid_response";
+  code?:
+    | "not_configured"
+    | "unauthorized"
+    | "invalid_input"
+    | "rate_limited"
+    | "timeout"
+    | "unavailable"
+    | "invalid_response";
 };
 
 export type DraftSeoTitleMetaResult = DraftSeoTitleMetaSuccess | DraftSeoTitleMetaFailure;
 
 /**
  * Explicit user-triggered title/meta drafting. Does not write CMS or SEO Health state.
+ * One deliberate provider per call — never falls back to the other provider.
  */
 export async function draftSeoTitleMeta(args: {
+  provider: SeoAiProvider;
   rawInput: unknown;
   adminId: string;
   ip: string;
   fetchImpl?: typeof fetch;
+  /** OpenAI-only test/config override. Ignored for Gemini. */
   config?: OpenAiSeoConfig;
+  /** Gemini-only test/config override. Ignored for OpenAI. */
+  geminiConfig?: GeminiSeoConfig;
 }): Promise<DraftSeoTitleMetaResult> {
+  if (!isSeoAiProvider(args.provider)) {
+    return { ok: false, code: "invalid_input", error: "Choose Gemini or OpenAI." };
+  }
+
   const parsed = parseSeoDraftInput(args.rawInput);
   if (!parsed.ok) {
     return { ok: false, code: "invalid_input", error: parsed.error };
@@ -44,6 +63,17 @@ export async function draftSeoTitleMeta(args: {
     };
   }
 
+  if (args.provider === "gemini") {
+    const provider = await requestGeminiSeoDraft(parsed.value, {
+      fetchImpl: args.fetchImpl,
+      config: args.geminiConfig,
+    });
+    if (!provider.ok) {
+      return { ok: false, code: provider.code, error: provider.message };
+    }
+    return { ok: true, draft: provider.draft, provider: "gemini" };
+  }
+
   const provider = await requestOpenAiSeoDraft(parsed.value, {
     fetchImpl: args.fetchImpl,
     config: args.config,
@@ -52,7 +82,7 @@ export async function draftSeoTitleMeta(args: {
     return { ok: false, code: provider.code, error: provider.message };
   }
 
-  return { ok: true, draft: provider.draft };
+  return { ok: true, draft: provider.draft, provider: "openai" };
 }
 
 export type { SeoDraftInput, SeoDraftResult };

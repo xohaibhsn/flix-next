@@ -6,6 +6,7 @@ import { requireAdminSession } from "@/lib/auth/guards";
 import { adminHasPermission } from "@/lib/auth/session";
 import { defaultPages } from "@/lib/cms/defaults";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,7 @@ export default async function SidhuContactBuilderPage() {
   ]);
   const resolved = page ?? defaultPages().find((item) => item.slug === "/contact/");
   if (!resolved) notFound();
+  const aiProviders = getSeoAiProviderAvailability();
 
   return (
     <AdminShell
@@ -41,6 +43,8 @@ export default async function SidhuContactBuilderPage() {
             seo={settings.pageSeo.contact}
             assets={assets}
             configured={cloud.configured}
+            openaiConfigured={aiProviders.openaiConfigured}
+            geminiConfigured={aiProviders.geminiConfigured}
             settings={settings}
             page={resolved}
             fallbackTitle="Contact"

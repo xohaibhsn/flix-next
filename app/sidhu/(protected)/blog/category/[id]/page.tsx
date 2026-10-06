@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { CategoryEditor } from "@/components/sidhu/CategoryEditor";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import { logServerError } from "@/lib/security/errors";
 
@@ -29,12 +30,15 @@ export default async function SidhuEditCategoryPage({ params }: { params: Promis
     throw error;
   }
   if (!category) notFound();
+  const aiProviders = getSeoAiProviderAvailability();
   return (
     <AdminShell title="Edit category" subtitle="Content and RankMath-style SEO for this category archive.">
       <CategoryEditor
         category={category}
         assets={assets}
         configured={cloud.configured}
+        openaiConfigured={aiProviders.openaiConfigured}
+        geminiConfigured={aiProviders.geminiConfigured}
         siteName={settings.siteName}
         siteTagline={settings.tagline}
         defaultOgImage={settings.branding.defaultOgImage}

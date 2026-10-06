@@ -1,8 +1,12 @@
-import { SeoHealthAiExplain, type SeoHealthAiExplainActionResult } from "@/components/sidhu/SeoHealthAiExplain";
+import {
+  SeoHealthAiExplain,
+  type SeoHealthAiExplainActionInput,
+  type SeoHealthAiExplainActionResult,
+} from "@/components/sidhu/SeoHealthAiExplain";
 import { Button } from "@/components/sidhu/ui/Button";
 import { ListActionLink, ListActions } from "@/components/sidhu/ui/ListActions";
 import { RelatedWorkspaces } from "@/components/sidhu/ui/RelatedWorkspaces";
-import { toSeoExplainFindingInput, type SeoExplainFindingInput } from "@/lib/cms/ai-seo/schemas";
+import { toSeoExplainFindingInput } from "@/lib/cms/ai-seo/schemas";
 import {
   seoHealthStatusMessage,
   type SeoHealthFinding,
@@ -17,7 +21,9 @@ import type {
 } from "@/lib/cms/seo-health-memory";
 
 type SeoHealthFindingAction = (formData: FormData) => void | Promise<void>;
-type SeoHealthAiExplainAction = (input: SeoExplainFindingInput) => Promise<SeoHealthAiExplainActionResult>;
+type SeoHealthAiExplainAction = (
+  input: SeoHealthAiExplainActionInput,
+) => Promise<SeoHealthAiExplainActionResult>;
 
 const RELATED_SEO_WORKSPACES = [
   {
@@ -98,7 +104,8 @@ function FindingCard({
   status,
   acceptAction,
   reopenAction,
-  aiConfigured = false,
+  openaiConfigured = false,
+  geminiConfigured = false,
   aiExplainAction,
   siteName,
 }: {
@@ -107,7 +114,8 @@ function FindingCard({
   status?: "new" | "existing" | "accepted";
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
-  aiConfigured?: boolean;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   aiExplainAction?: SeoHealthAiExplainAction;
   siteName?: string;
 }) {
@@ -232,7 +240,8 @@ function FindingCard({
 
       {finding.severity !== "healthy" ? (
         <SeoHealthAiExplain
-          configured={aiConfigured}
+          openaiConfigured={openaiConfigured}
+          geminiConfigured={geminiConfigured}
           explainAction={aiExplainAction}
           finding={toSeoExplainFindingInput(finding, { siteName })}
         />
@@ -269,7 +278,8 @@ function FindingSection({
   items,
   acceptAction,
   reopenAction,
-  aiConfigured = false,
+  openaiConfigured = false,
+  geminiConfigured = false,
   aiExplainAction,
   siteName,
 }: {
@@ -277,7 +287,8 @@ function FindingSection({
   items: SeoHealthAnnotatedFinding[];
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
-  aiConfigured?: boolean;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   aiExplainAction?: SeoHealthAiExplainAction;
   siteName?: string;
 }) {
@@ -305,7 +316,8 @@ function FindingSection({
               status={item.status}
               acceptAction={acceptAction}
               reopenAction={reopenAction}
-              aiConfigured={aiConfigured}
+              openaiConfigured={openaiConfigured}
+              geminiConfigured={geminiConfigured}
               aiExplainAction={aiExplainAction}
               siteName={siteName}
             />
@@ -334,7 +346,8 @@ export function SeoHealthReport({
   stateWarning = null,
   acceptAction,
   reopenAction,
-  aiConfigured = false,
+  openaiConfigured = false,
+  geminiConfigured = false,
   aiExplainAction,
   siteName,
 }: {
@@ -343,7 +356,8 @@ export function SeoHealthReport({
   stateWarning?: string | null;
   acceptAction?: SeoHealthFindingAction;
   reopenAction?: SeoHealthFindingAction;
-  aiConfigured?: boolean;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   aiExplainAction?: SeoHealthAiExplainAction;
   siteName?: string;
 }) {
@@ -436,7 +450,8 @@ export function SeoHealthReport({
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
-            aiConfigured={aiConfigured}
+            openaiConfigured={openaiConfigured}
+            geminiConfigured={geminiConfigured}
             aiExplainAction={aiExplainAction}
             siteName={siteName}
           />
@@ -445,7 +460,8 @@ export function SeoHealthReport({
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
-            aiConfigured={aiConfigured}
+            openaiConfigured={openaiConfigured}
+            geminiConfigured={geminiConfigured}
             aiExplainAction={aiExplainAction}
             siteName={siteName}
           />
@@ -454,7 +470,8 @@ export function SeoHealthReport({
             items={openItems}
             acceptAction={acceptAction}
             reopenAction={reopenAction}
-            aiConfigured={aiConfigured}
+            openaiConfigured={openaiConfigured}
+            geminiConfigured={geminiConfigured}
             aiExplainAction={aiExplainAction}
             siteName={siteName}
           />
@@ -489,7 +506,8 @@ export function SeoHealthReport({
                     status="accepted"
                     acceptAction={acceptAction}
                     reopenAction={reopenAction}
-                    aiConfigured={aiConfigured}
+                    openaiConfigured={openaiConfigured}
+                    geminiConfigured={geminiConfigured}
                     aiExplainAction={aiExplainAction}
                     siteName={siteName}
                   />

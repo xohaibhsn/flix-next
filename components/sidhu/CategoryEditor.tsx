@@ -36,6 +36,8 @@ export function CategoryEditor({
   category: initial,
   assets: initialAssets,
   configured,
+  openaiConfigured = false,
+  geminiConfigured = false,
   siteName,
   siteTagline,
   defaultOgImage,
@@ -43,6 +45,8 @@ export function CategoryEditor({
   category: BlogCategory;
   assets: MediaAsset[];
   configured: boolean;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   siteName: string;
   siteTagline?: string;
   defaultOgImage?: MediaRef | null;
@@ -146,6 +150,8 @@ export function CategoryEditor({
           </Field>
           <SeoAiDraftPanel
             draftAction={draftSeoTitleMetaAction}
+            openaiConfigured={openaiConfigured}
+            geminiConfigured={geminiConfigured}
             context={{
               entityKind: "category",
               entityLabel: draft.name || "Category",

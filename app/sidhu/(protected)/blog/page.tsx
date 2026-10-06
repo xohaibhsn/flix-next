@@ -6,6 +6,7 @@ import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { requireAdminSession } from "@/lib/auth/guards";
 import { adminHasPermission } from "@/lib/auth/session";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +20,7 @@ export default async function SidhuBlogPage() {
     cms.listMedia(),
     getCloudinaryStatusAction(),
   ]);
+  const aiProviders = getSeoAiProviderAvailability();
   return (
     <AdminShell
       title="Blog"
@@ -40,6 +42,8 @@ export default async function SidhuBlogPage() {
               seo={settings.pageSeo.blog}
               assets={assets}
               configured={cloud.configured}
+              openaiConfigured={aiProviders.openaiConfigured}
+              geminiConfigured={aiProviders.geminiConfigured}
               settings={settings}
               fallbackTitle="Blog"
               fallbackDescription="Guides and updates from Flix IPTV."

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { BlogEditor } from "@/components/sidhu/BlogEditor";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import { logServerError } from "@/lib/security/errors";
 
@@ -28,6 +29,7 @@ export default async function SidhuEditPostPage({ params }: { params: Promise<{ 
     throw error;
   }
   if (!post) notFound();
+  const aiProviders = getSeoAiProviderAvailability();
   return (
     <AdminShell title="Edit post" subtitle="TipTap content is stored as sanitized HTML.">
       <BlogEditor
@@ -35,6 +37,8 @@ export default async function SidhuEditPostPage({ params }: { params: Promise<{ 
         categories={categories}
         assets={assets}
         configured={cloud.configured}
+        openaiConfigured={aiProviders.openaiConfigured}
+        geminiConfigured={aiProviders.geminiConfigured}
         siteName={settings.siteName}
         siteTagline={settings.tagline}
         defaultOgImage={settings.branding.defaultOgImage}

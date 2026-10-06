@@ -136,6 +136,7 @@ test("page/blog/category draft generation each produce one mocked provider reque
       max_output_tokens?: number;
     } = {};
     const result = await draftSeoTitleMeta({
+      provider: "openai",
       rawInput: context,
       adminId: `admin-${context.entityKind}`,
       ip: "127.0.0.1",
@@ -257,6 +258,7 @@ test("Phase 4B explain still works after provider reuse", async () => {
   assert.equal(explainBody.model, "gpt-6-luna");
 
   const result = await explainSeoFinding({
+    provider: "openai",
     rawInput: finding,
     adminId: "explain-still",
     ip: "127.0.0.1",
@@ -297,11 +299,15 @@ test("UI and actions are click-only, auth-scoped, and never write CMS/memory", (
   assert.match(action, /entityKind === "page" \? "seo" : "blog"/);
   assert.doesNotMatch(draftService, /savePage|savePost|saveCategory|saveSeoHealthState/);
   assert.match(draftUi, /Ask Sidhu AI/);
-  assert.match(draftUi, /Draft with Sidhu AI/);
+  assert.match(draftUi, /Draft with Gemini/);
+  assert.match(draftUi, /Draft with OpenAI/);
+  assert.doesNotMatch(draftUi, /Draft with Sidhu AI/);
   assert.match(draftUi, /Use this title/);
   assert.match(draftUi, /Use this description/);
   assert.match(draftUi, /Save is still required|Save the editor to keep it|AI suggestion applied — not saved/);
-  assert.match(draftUi, /Generate again/);
+  assert.match(draftUi, /Generate again with Gemini/);
+  assert.match(draftUi, /Generate again with OpenAI/);
+  assert.doesNotMatch(draftUi, /another AI request/);
   assert.match(pagePanel, /SeoAiDraftPanel/);
   assert.match(blog, /SeoAiDraftPanel/);
   assert.match(category, /SeoAiDraftPanel/);
@@ -316,7 +322,9 @@ test("Draft with Sidhu AI control does not auto-invoke and Apply only updates lo
   const html = renderToStaticMarkup(
     createElement(SeoAiDraftPanel, {
       context: pageContext,
-      draftAction: async () => ({ ok: true as const, draft: goodDraft }),
+      openaiConfigured: true,
+      geminiConfigured: true,
+      draftAction: async () => ({ ok: true as const, draft: goodDraft, provider: "openai" as const }),
       onUseTitle: (value) => {
         title = value;
       },

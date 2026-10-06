@@ -2,20 +2,34 @@
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import type { DraftSeoTitleMetaResult } from "@/lib/cms/ai-seo/draft";
+import {
+  seoAiProviderLabel,
+  type SeoAiProvider,
+} from "@/lib/cms/ai-seo/provider-type";
 import type { SeoDraftInput, SeoDraftResult } from "@/lib/cms/ai-seo/schemas";
 import { Button, sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import { cn } from "@/components/sidhu/ui/cn";
 
-export type SeoAiDraftActionResult = DraftSeoTitleMetaResult & { configured?: boolean };
+export type SeoAiDraftActionInput = SeoDraftInput & { provider: SeoAiProvider };
+
+export type SeoAiDraftActionResult = DraftSeoTitleMetaResult & {
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
+  configured?: boolean;
+};
 
 export function SeoAiDraftPanel({
   context,
   draftAction,
+  openaiConfigured = false,
+  geminiConfigured = false,
   onUseTitle,
   onUseDescription,
 }: {
   context: SeoDraftInput;
-  draftAction: (input: SeoDraftInput) => Promise<SeoAiDraftActionResult>;
+  draftAction: (input: SeoAiDraftActionInput) => Promise<SeoAiDraftActionResult>;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   onUseTitle: (value: string) => void;
   onUseDescription: (value: string) => void;
 }) {
@@ -24,11 +38,13 @@ export function SeoAiDraftPanel({
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<SeoDraftResult | null>(null);
+  const [lastProvider, setLastProvider] = useState<SeoAiProvider | null>(null);
   const [appliedTitle, setAppliedTitle] = useState<string | null>(null);
   const [appliedDescription, setAppliedDescription] = useState<string | null>(null);
   const [undoTitle, setUndoTitle] = useState<string | null>(null);
   const [undoDescription, setUndoDescription] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const anyConfigured = openaiConfigured || geminiConfigured;
 
   useEffect(() => {
     if (!open) return;
@@ -53,24 +69,32 @@ export function SeoAiDraftPanel({
     setOpen(false);
   }
 
-  function runDraft() {
+  function runDraft(provider: SeoAiProvider) {
     if (pending) return;
     setOpen(true);
     setError(null);
     setDraft(null);
+    setLastProvider(null);
     setAppliedTitle(null);
     setAppliedDescription(null);
     setUndoTitle(null);
     setUndoDescription(null);
+    const providerReady = provider === "gemini" ? geminiConfigured : openaiConfigured;
+    if (!providerReady) {
+      setError("Sidhu AI SEO Assistant is not configured yet.");
+      return;
+    }
     startTransition(async () => {
-      const result = await draftAction(context);
+      const result = await draftAction({ ...context, provider });
       if (!result.ok) {
         setDraft(null);
+        setLastProvider(null);
         setError(result.error);
         return;
       }
       setError(null);
       setDraft(result.draft);
+      setLastProvider(result.provider);
     });
   }
 
@@ -144,11 +168,36 @@ export function SeoAiDraftPanel({
               {!draft && !pending && !error ? (
                 <div className="space-y-2">
                   <p className="text-xs text-muted">
-                    Generate three title and three description options. This makes one AI request.
+                    Generate three title and three description options. Choose Gemini or OpenAI deliberately —
+                    one click is one request.
                   </p>
-                  <Button type="button" variant="secondary" disabled={pending} onClick={runDraft}>
-                    Draft with Sidhu AI
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !geminiConfigured}
+                      onClick={() => runDraft("gemini")}
+                      title={geminiConfigured ? "Uses configured Gemini API." : "Gemini is not configured."}
+                    >
+                      Draft with Gemini
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !openaiConfigured}
+                      onClick={() => runDraft("openai")}
+                      title={
+                        openaiConfigured
+                          ? "Uses configured OpenAI API and may incur API usage."
+                          : "OpenAI is not configured."
+                      }
+                    >
+                      Draft with OpenAI
+                    </Button>
+                  </div>
+                  {!anyConfigured ? (
+                    <p className="text-xs text-muted">Sidhu AI SEO Assistant is not configured yet.</p>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -156,10 +205,36 @@ export function SeoAiDraftPanel({
                 <p className="text-muted">Sidhu AI is drafting…</p>
               ) : null}
 
-              {error ? <p className="text-amber-900">{error}</p> : null}
+              {error ? (
+                <div className="space-y-2">
+                  <p className="text-amber-900">{error}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !geminiConfigured}
+                      onClick={() => runDraft("gemini")}
+                    >
+                      Draft with Gemini
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={pending || !openaiConfigured}
+                      onClick={() => runDraft("openai")}
+                    >
+                      Draft with OpenAI
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
 
               {draft ? (
                 <div className="space-y-5">
+                  {lastProvider ? (
+                    <p className="text-xs text-muted">Generated with {seoAiProviderLabel(lastProvider)}</p>
+                  ) : null}
+
                   <details className="rounded-md border border-line bg-paper px-3 py-2">
                     <summary className="cursor-pointer text-xs font-semibold text-ink">Guidance</summary>
                     <p className="mt-2 text-xs leading-relaxed text-muted">{draft.guidance}</p>
@@ -253,15 +328,26 @@ export function SeoAiDraftPanel({
                     ) : null}
                   </section>
 
-                  <div className="border-t border-line pt-3">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={runDraft}
-                      className="text-xs font-medium text-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-60"
-                    >
-                      {pending ? "Generating…" : "Generate again (another AI request)"}
-                    </button>
+                  <div className="space-y-2 border-t border-line pt-3">
+                    <p className="text-xs text-muted">Generate again — choose the provider deliberately.</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={pending || !geminiConfigured}
+                        onClick={() => runDraft("gemini")}
+                        className="text-xs font-medium text-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-60"
+                      >
+                        {pending ? "Generating…" : "Generate again with Gemini"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending || !openaiConfigured}
+                        onClick={() => runDraft("openai")}
+                        className="text-xs font-medium text-muted underline-offset-2 hover:text-ink hover:underline disabled:opacity-60"
+                      >
+                        {pending ? "Generating…" : "Generate again with OpenAI"}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : null}

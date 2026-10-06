@@ -85,6 +85,8 @@ export function PageSeoPanel({
   seo: initialSeo,
   assets: initialAssets,
   configured,
+  openaiConfigured = false,
+  geminiConfigured = false,
   settings,
   page,
   fallbackTitle,
@@ -94,6 +96,8 @@ export function PageSeoPanel({
   seo: PageSeo;
   assets: MediaAsset[];
   configured: boolean;
+  openaiConfigured?: boolean;
+  geminiConfigured?: boolean;
   settings: SiteSettings;
   page?: CmsPage;
   fallbackTitle: string;
@@ -190,6 +194,8 @@ export function PageSeoPanel({
           </Field>
           <SeoAiDraftPanel
             draftAction={draftSeoTitleMetaAction}
+            openaiConfigured={openaiConfigured}
+            geminiConfigured={geminiConfigured}
             context={{
               entityKind: "page",
               entityLabel: meta.label,

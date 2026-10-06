@@ -7,6 +7,7 @@ import { adminHasPermission } from "@/lib/auth/session";
 import { companyPageByAdminParam } from "@/lib/cms/company-pages";
 import { defaultPages } from "@/lib/cms/defaults";
 import { getCloudinaryStatusAction } from "@/lib/cms/actions";
+import { getSeoAiProviderAvailability } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function SidhuCompanyPageBuilder({
   ]);
   const resolved = page ?? defaultPages().find((item) => item.id === definition.id);
   if (!resolved) notFound();
+  const aiProviders = getSeoAiProviderAvailability();
 
   return (
     <AdminShell
@@ -50,6 +52,8 @@ export default async function SidhuCompanyPageBuilder({
             seo={settings.pageSeo[definition.seoKey]}
             assets={assets}
             configured={cloud.configured}
+            openaiConfigured={aiProviders.openaiConfigured}
+            geminiConfigured={aiProviders.geminiConfigured}
             settings={settings}
             page={resolved}
             fallbackTitle={definition.seoTitle}
