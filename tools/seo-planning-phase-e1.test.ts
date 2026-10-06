@@ -10,10 +10,13 @@ import path from "node:path";
 import { test } from "node:test";
 import { buildArticleSnapshot } from "../lib/cms/seo-planning/article-snapshot";
 import {
+  IMAGE_PROMPT_INPUT_MAX,
   SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
   SEO_PLANNING_IMAGE_BRIEF_SPEC,
   buildImageBrief,
+  buildImageFingerprintInput,
   buildImagePromptInput,
+  type ImageBrief,
 } from "../lib/cms/seo-planning/image-brief";
 import { fingerprintImageBrief } from "../lib/cms/seo-planning/image-fingerprint";
 import type { WritingArticleContext } from "../lib/cms/seo-planning/writing-brief";
@@ -232,8 +235,13 @@ test("FINGERPRINT: deterministic; relevant changes move hash; noise does not", (
   const a = fingerprintImageBrief(base);
   const b = fingerprintImageBrief(buildImageBrief(draft({ workflowStatus: "IMAGE_NEEDED" })));
   assert.equal(a, b);
-  assert.equal(a, createHash("sha256").update(buildImagePromptInput(base), "utf8").digest("hex"));
+  assert.equal(a, createHash("sha256").update(buildImageFingerprintInput(base), "utf8").digest("hex"));
   assert.equal(a.length, 64);
+  assert.notEqual(
+    a,
+    createHash("sha256").update(buildImagePromptInput(base), "utf8").digest("hex"),
+    "fingerprint must use semantic fingerprint input, not provider prompt input",
+  );
 
   const topicChanged = fingerprintImageBrief(
     buildImageBrief(draft({ workflowStatus: "IMAGE_NEEDED", topic: "Different topic" })),
@@ -347,8 +355,366 @@ test("UI / SAFETY: Image Brief after Writing Prompt; no providers/media/BlogPost
 test("canonical input stays bounded and includes safety/policy", () => {
   const brief = buildImageBrief(draft({ workflowStatus: "IMAGE_NEEDED" }));
   const input = buildImagePromptInput(brief);
-  assert.ok(input.length <= 4000);
+  assert.ok(input.length <= IMAGE_PROMPT_INPUT_MAX);
   assert.match(input, /NO_BAKED_TITLE_TEXT|Text-in-image policy/);
   assert.match(input, /fake IPTV player|Fake logos|FEATURED_BLOG_IMAGE|16:9|1280x720/);
   assert.match(input, /og:image|1200/);
+});
+
+function maxNotesPayload(notes: string, angle = "A".repeat(280)) {
+  return {
+    workspace: {
+      contentAngle: angle,
+      nextStep: "Approved next step",
+      humanNotes: notes,
+      suggestions: {
+        topic: { originalValue: "Candidate topic", value: "Candidate topic", status: "PENDING" as const },
+      },
+    },
+  };
+}
+
+function refreshDraft(notes: string) {
+  return withPayload(
+    draft({
+      recommendation: "REFRESH_EXISTING",
+      matchedPublicUrl: "/blogs/how-to-watch-iptv-on-firestick/",
+      targetPostId: "post_1",
+      workflowStatus: "IMAGE_NEEDED",
+      topic: "T".repeat(160),
+      workingTitle: "W".repeat(180),
+      searchIntent: "TROUBLESHOOTING",
+    }),
+    maxNotesPayload(notes),
+  );
+}
+
+test("E1.1 CANONICAL: max humanNotes cannot starve featured/policy/safety", () => {
+  const notes = "N".repeat(4000);
+  const brief = buildImageBrief(refreshDraft(notes), readyFeaturedPresent);
+  assert.equal(brief.humanNotes.length, 4000);
+
+  const input = buildImagePromptInput(brief);
+  assert.ok(input.length <= IMAGE_PROMPT_INPUT_MAX);
+  assert.match(input, /Existing featured image: present/);
+  assert.match(input, /Featured disposition: review_existing/);
+  assert.match(input, /Text-in-image policy: NO_BAKED_TITLE_TEXT/);
+  assert.match(input, /Safety constraints:/);
+  assert.match(input, /Factual constraints:/);
+  assert.match(input, /Image purpose: FEATURED_BLOG_IMAGE/);
+  assert.match(input, /Aspect ratio: 16:9/);
+  assert.match(input, /Source size: 1280x720/);
+  assert.match(input, /Avoid:/);
+  assert.match(input, /Keep the image suitable for a public UK consumer blog/);
+  // No final blind slice mid-section: safety header implies full section retained.
+  assert.match(input, /Safety constraints:\n- Prefer editorial/);
+  assert.doesNotMatch(input, /Safety constraints:\n?$/);
+});
+
+test("E1.1 FINGERPRINT: max notes still sensitive to featured/disposition/article/policy/safety", () => {
+  const notes = "N".repeat(4000);
+  const review = buildImageBrief(refreshDraft(notes), readyFeaturedPresent);
+  const missing = buildImageBrief(refreshDraft(notes), readyFeaturedAbsent);
+  const present = fingerprintImageBrief(review);
+  const absent = fingerprintImageBrief(missing);
+
+  assert.equal(review.existingFeaturedDisposition, "review_existing");
+  assert.equal(missing.existingFeaturedDisposition, "missing_needs_image");
+  assert.notEqual(present, absent, "featured present→absent must change fingerprint under max notes");
+  assert.notEqual(
+    present,
+    absent,
+    "disposition review_existing→missing_needs_image must change fingerprint",
+  );
+
+  const titleChanged = fingerprintImageBrief(
+    buildImageBrief(refreshDraft(notes), {
+      status: "ready",
+      snapshot: buildArticleSnapshot({
+        title: "Completely Different Article Title For Fingerprint",
+        excerpt: "A setup walkthrough.",
+        publicPath: "/blogs/how-to-watch-iptv-on-firestick/",
+        categoryName: "Setup",
+        focusKeyword: "firestick iptv",
+        featuredImagePresent: true,
+        html: "<p>x</p>",
+      }),
+    }),
+  );
+  assert.notEqual(present, titleChanged, "articleTitle change must move fingerprint");
+
+  const categoryChanged = fingerprintImageBrief(
+    buildImageBrief(refreshDraft(notes), {
+      status: "ready",
+      snapshot: buildArticleSnapshot({
+        title: "How to Watch IPTV on Firestick: Complete Setup Guide",
+        excerpt: "A setup walkthrough.",
+        publicPath: "/blogs/how-to-watch-iptv-on-firestick/",
+        categoryName: "Different Category",
+        focusKeyword: "firestick iptv",
+        featuredImagePresent: true,
+        html: "<p>x</p>",
+      }),
+    }),
+  );
+  assert.notEqual(present, categoryChanged, "articleCategory change must move fingerprint");
+
+  const textPolicyChanged = fingerprintImageBrief({
+    ...review,
+    textInImagePolicy: "DIFFERENT_POLICY" as ImageBrief["textInImagePolicy"],
+  });
+  assert.notEqual(present, textPolicyChanged, "textInImagePolicy change must move fingerprint");
+
+  const safetyChanged = fingerprintImageBrief({
+    ...review,
+    safetyConstraints: [...review.safetyConstraints, "Extra safety rule for fingerprint proof"],
+  });
+  assert.notEqual(present, safetyChanged, "safety constraint change must move fingerprint");
+
+  const updatedAtNoise = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(
+        draft({
+          recommendation: "REFRESH_EXISTING",
+          matchedPublicUrl: "/blogs/how-to-watch-iptv-on-firestick/",
+          targetPostId: "post_1",
+          workflowStatus: "IMAGE_NEEDED",
+          topic: "T".repeat(160),
+          workingTitle: "W".repeat(180),
+          searchIntent: "TROUBLESHOOTING",
+          updatedAt: "2099-01-01T00:00:00.000Z",
+        }),
+        maxNotesPayload(notes),
+      ),
+      readyFeaturedPresent,
+    ),
+  );
+  assert.equal(present, updatedAtNoise, "updatedAt must not change fingerprint");
+
+  const suggestionNoise = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(refreshDraft(notes), {
+        workspace: {
+          contentAngle: "A".repeat(280),
+          nextStep: "Approved next step",
+          humanNotes: notes,
+          suggestions: {
+            topic: { originalValue: "Candidate topic", value: "Candidate topic", status: "APPLIED" },
+          },
+        },
+      }),
+      readyFeaturedPresent,
+    ),
+  );
+  assert.equal(present, suggestionNoise, "suggestion status must not change fingerprint");
+
+  const writingPromptNoise = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(refreshDraft(notes), {
+        writingPrompts: {
+          openai: {
+            chatgptPrompt: "Different writing prompt under max notes",
+            writingFingerprint: "c".repeat(64),
+            model: "gpt-test",
+            generatedAt: "2026-10-07T00:00:00.000Z",
+            briefSpec: "d1-1",
+          },
+        },
+      }),
+      readyFeaturedPresent,
+    ),
+  );
+  assert.equal(present, writingPromptNoise, "writingPrompts must not change fingerprint");
+});
+
+test("E1.1 PROVIDER INPUT: within max; complete contract; no mid-section truncation", () => {
+  const notes = "N".repeat(4000);
+  const brief = buildImageBrief(refreshDraft(notes), readyFeaturedPresent);
+  const input = buildImagePromptInput(brief);
+  const lines = input.split("\n");
+
+  assert.ok(input.length <= IMAGE_PROMPT_INPUT_MAX, `provider input ${input.length} exceeds ${IMAGE_PROMPT_INPUT_MAX}`);
+  assert.match(input, /Existing featured image: present\nFeatured disposition: review_existing/);
+  assert.match(input, /Factual constraints:\n- Do not invent product claims/);
+  assert.match(input, /Safety constraints:\n- Prefer editorial/);
+  assert.match(input, /Avoid:\n- Baked-in article title/);
+
+  for (const header of [
+    "Existing featured image:",
+    "Featured disposition:",
+    "Text-in-image policy:",
+    "Factual constraints:",
+    "Safety constraints:",
+    "Avoid:",
+  ]) {
+    assert.ok(
+      lines.some((line) => line === header || line.startsWith(`${header} `) || line.startsWith(`${header}`)),
+      `missing complete section header: ${header}`,
+    );
+  }
+  // No final arbitrary slice: last line must be a complete assembled line.
+  assert.ok(lines.at(-1)?.length, "provider input must not end on an empty truncated fragment");
+  assert.ok(
+    lines.some((line) => line.startsWith("Human notes:")),
+    "editorial humanNotes line must remain a complete section",
+  );
+
+  const fpInput = buildImageFingerprintInput(brief);
+  assert.ok(fpInput.includes('"existingFeaturedImage":"present"'));
+  assert.ok(fpInput.includes('"existingFeaturedDisposition":"review_existing"'));
+  assert.ok(fpInput.includes('"textInImagePolicy":"NO_BAKED_TITLE_TEXT"'));
+  assert.ok(fpInput.includes(`"humanNotes":"${notes}"`));
+  assert.ok(!fpInput.includes("providerEligible"));
+  assert.ok(!fpInput.includes("writingPrompts"));
+  assert.ok(!fpInput.includes("updatedAt"));
+});
+
+test("E1.1 LONG-NOTES: fingerprint stays sensitive beyond provider shrink budget", () => {
+  const base = buildImageBrief(refreshDraft("N".repeat(4000)), readyFeaturedPresent);
+  // Inflate a fixed field equally on both variants so editorial notes must shrink
+  // far enough that trailing note deltas fall outside the retained provider budget.
+  const inflate = (notes: string): ImageBrief => ({
+    ...base,
+    brandContext: `${base.brandContext}${"X".repeat(2000)}`,
+    humanNotes: notes,
+  });
+  const markerA = "[[E11-TAIL-A]]";
+  const markerB = "[[E11-TAIL-B]]";
+  const a = inflate(`${"N".repeat(4000 - markerA.length)}${markerA}`);
+  const b = inflate(`${"N".repeat(4000 - markerB.length)}${markerB}`);
+
+  const providerA = buildImagePromptInput(a);
+  const providerB = buildImagePromptInput(b);
+  assert.equal(providerA, providerB, "provider input may match after deterministic note shrinking");
+  assert.ok(providerA.length <= IMAGE_PROMPT_INPUT_MAX);
+  assert.ok(!providerA.includes(markerA) && !providerA.includes(markerB));
+  assert.notEqual(
+    fingerprintImageBrief(a),
+    fingerprintImageBrief(b),
+    "fingerprint must still see note changes beyond the provider retained budget",
+  );
+  assert.ok(buildImageFingerprintInput(a).includes(markerA));
+  assert.ok(buildImageFingerprintInput(b).includes(markerB));
+});
+
+test("E1.1 REFRESH + SAFETY: URL and contract sections move fingerprint under max notes", () => {
+  const notes = "N".repeat(4000);
+  const base = buildImageBrief(refreshDraft(notes), readyFeaturedPresent);
+  const baseHash = fingerprintImageBrief(base);
+
+  const urlChanged = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(
+        draft({
+          recommendation: "REFRESH_EXISTING",
+          matchedPublicUrl: "/blogs/completely-different-refresh-target/",
+          targetPostId: "post_1",
+          workflowStatus: "IMAGE_NEEDED",
+          topic: "T".repeat(160),
+          workingTitle: "W".repeat(180),
+          searchIntent: "TROUBLESHOOTING",
+        }),
+        maxNotesPayload(notes),
+      ),
+      {
+        status: "ready",
+        snapshot: buildArticleSnapshot({
+          title: "How to Watch IPTV on Firestick: Complete Setup Guide",
+          excerpt: "A setup walkthrough.",
+          publicPath: "/blogs/completely-different-refresh-target/",
+          categoryName: "Setup",
+          focusKeyword: "firestick iptv",
+          featuredImagePresent: true,
+          html: "<p>x</p>",
+        }),
+      },
+    ),
+  );
+  assert.notEqual(baseHash, urlChanged, "targetPublicUrl change must move fingerprint under max notes");
+
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({ ...base, avoid: [...base.avoid, "Extra avoid rule"] }),
+    "avoid rule change must move fingerprint",
+  );
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({
+      ...base,
+      factualConstraints: [...base.factualConstraints, "Extra factual constraint"],
+    }),
+    "factual constraint change must move fingerprint",
+  );
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({ ...base, visualConcept: `${base.visualConcept} · probe` }),
+    "visualConcept change must move fingerprint",
+  );
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({
+      ...base,
+      recommendedAspectRatio: "4:3" as ImageBrief["recommendedAspectRatio"],
+    }),
+    "aspect ratio change must move fingerprint",
+  );
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({
+      ...base,
+      recommendedSourceSize: "1920x1080" as ImageBrief["recommendedSourceSize"],
+    }),
+    "source size change must move fingerprint",
+  );
+  assert.notEqual(
+    baseHash,
+    fingerprintImageBrief({ ...base, ogReuseNote: `${base.ogReuseNote} · probe` }),
+    "ogReuseNote change must move fingerprint",
+  );
+});
+
+test("E1.1 NOISE: gemini writingPrompts and unrelated payload sibling ignored", () => {
+  const notes = "N".repeat(4000);
+  const base = fingerprintImageBrief(buildImageBrief(refreshDraft(notes), readyFeaturedPresent));
+
+  const geminiNoise = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(refreshDraft(notes), {
+        writingPrompts: {
+          gemini: {
+            chatgptPrompt: "Different Gemini writing prompt under max notes",
+            writingFingerprint: "d".repeat(64),
+            model: "gemini-other",
+            generatedAt: "2026-10-08T00:00:00.000Z",
+            briefSpec: "d1-1",
+          },
+        },
+      }),
+      readyFeaturedPresent,
+    ),
+  );
+  assert.equal(base, geminiNoise, "writingPrompts.gemini must not change fingerprint");
+
+  const siblingNoise = fingerprintImageBrief(
+    buildImageBrief(
+      withPayload(refreshDraft(notes), {
+        unrelatedAuditSibling: { keep: false, reason: "noise" },
+      }),
+      readyFeaturedPresent,
+    ),
+  );
+  assert.equal(base, siblingNoise, "unrelated payload sibling must not change fingerprint");
+});
+
+test("E1.1 PROVIDER: essential overrun fails clearly (no blind slice)", () => {
+  const brief = buildImageBrief(refreshDraft("N".repeat(4000)), readyFeaturedPresent);
+  const bloated: ImageBrief = {
+    ...brief,
+    // Fixed section alone exceeds max; editorial shrink cannot recover.
+    brandContext: "B".repeat(IMAGE_PROMPT_INPUT_MAX + 100),
+  };
+  assert.throws(
+    () => buildImagePromptInput(bloated),
+    /essential contract exceeds IMAGE_PROMPT_INPUT_MAX/,
+  );
 });

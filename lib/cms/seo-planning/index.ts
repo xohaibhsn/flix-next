@@ -83,8 +83,10 @@ export { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-conte
 export {
   SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
   SEO_PLANNING_IMAGE_BRIEF_SPEC,
+  IMAGE_PROMPT_FIELD_BUDGETS,
   IMAGE_PROMPT_INPUT_MAX,
   buildImageBrief,
+  buildImageFingerprintInput,
   buildImagePromptInput,
   type ExistingFeaturedDisposition,
   type ExistingFeaturedImage,

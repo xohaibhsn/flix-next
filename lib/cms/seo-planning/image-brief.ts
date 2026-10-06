@@ -8,7 +8,23 @@ import { SEO_PLANNING_FIELD_CAPS } from "@/lib/cms/seo-planning/constants";
 import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
 
 export const SEO_PLANNING_IMAGE_BRIEF_SPEC = "e1-1";
-export const IMAGE_PROMPT_INPUT_MAX = 4_000;
+/**
+ * Hard maximum for future E2/E3 provider image input.
+ *
+ * Worst-case fixed essential + visual/safety contract ≈ 3.1KB.
+ * Full editorial fields without notes ≈ 0.7KB.
+ * Full humanNotes (4000) brings assembled input ≈ 7.8KB.
+ * 8000 leaves headroom without a final arbitrary slice that can drop safety.
+ */
+export const IMAGE_PROMPT_INPUT_MAX = 8_000;
+/** Per-field budgets for variable editorial text in provider input. */
+export const IMAGE_PROMPT_FIELD_BUDGETS = {
+  topic: SEO_PLANNING_FIELD_CAPS.topic,
+  workingTitle: SEO_PLANNING_FIELD_CAPS.workingTitle,
+  searchIntent: SEO_PLANNING_FIELD_CAPS.searchIntent,
+  contentAngle: SEO_PLANNING_FIELD_CAPS.suggestedAngle,
+  humanNotes: SEO_PLANNING_FIELD_CAPS.humanNotes,
+} as const;
 export const IMAGE_BRIEF_AUDIENCE = "UK readers of The Flix IPTV blog.";
 export const SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE =
   "Save your planning changes before treating this Image Brief as current.";
@@ -332,17 +348,20 @@ export function buildImageBrief(
   };
 }
 
-/** Canonical image-relevant input for fingerprinting (not full article body). */
-export function buildImagePromptInput(brief: ImageBrief) {
-  const lines = [
+type EditorialFit = {
+  topic: string;
+  workingTitle: string;
+  searchIntent: string;
+  contentAngle: string;
+  humanNotes: string;
+};
+
+/** Fixed essential identity / featured / purpose / policy contract. Never shrunk. */
+function essentialPrefix(brief: ImageBrief) {
+  return [
     `Image brief spec: ${brief.spec}`,
     `Task: ${brief.taskType}`,
     `Workflow: ${brief.workflowStatus}`,
-    `Topic: ${brief.topic}`,
-    `Working title: ${brief.workingTitle}`,
-    `Search intent: ${brief.searchIntent}`,
-    `Content angle: ${brief.contentAngle}`,
-    `Human notes: ${brief.humanNotes}`,
     `Target public URL: ${brief.targetPublicUrl}`,
     `Restore path: ${brief.restorePath}`,
     `Article title: ${brief.articleTitle}`,
@@ -353,11 +372,17 @@ export function buildImagePromptInput(brief: ImageBrief) {
     `Aspect ratio: ${brief.recommendedAspectRatio}`,
     `Source size: ${brief.recommendedSourceSize}`,
     `OG reuse: ${brief.ogReuseNote}`,
-    `Visual subject: ${brief.visualSubject}`,
-    `Visual concept: ${brief.visualConcept}`,
     `Text-in-image policy: ${brief.textInImagePolicy}`,
     `Brand context: ${brief.brandContext}`,
     `Audience: ${brief.audience}`,
+  ].join("\n");
+}
+
+/** Required visual / safety contract. Never shrunk. */
+function visualSafetyBlock(brief: ImageBrief) {
+  return [
+    `Visual subject: ${brief.visualSubject}`,
+    `Visual concept: ${brief.visualConcept}`,
     "Must include:",
     ...brief.mustInclude.map((line) => `- ${line}`),
     "Avoid:",
@@ -366,6 +391,113 @@ export function buildImagePromptInput(brief: ImageBrief) {
     ...brief.factualConstraints.map((line) => `- ${line}`),
     "Safety constraints:",
     ...brief.safetyConstraints.map((line) => `- ${line}`),
-  ];
-  return lines.join("\n").slice(0, IMAGE_PROMPT_INPUT_MAX);
+  ].join("\n");
+}
+
+/** Variable editorial fields — may be bounded / shrunk for provider input. */
+function editorialBlock(fit: EditorialFit) {
+  return [
+    `Topic: ${fit.topic}`,
+    `Working title: ${fit.workingTitle}`,
+    `Search intent: ${fit.searchIntent}`,
+    `Content angle: ${fit.contentAngle}`,
+    `Human notes: ${fit.humanNotes}`,
+  ].join("\n");
+}
+
+function fullEditorialFit(brief: ImageBrief): EditorialFit {
+  return {
+    topic: brief.topic.slice(0, IMAGE_PROMPT_FIELD_BUDGETS.topic),
+    workingTitle: brief.workingTitle.slice(0, IMAGE_PROMPT_FIELD_BUDGETS.workingTitle),
+    searchIntent: brief.searchIntent.slice(0, IMAGE_PROMPT_FIELD_BUDGETS.searchIntent),
+    contentAngle: brief.contentAngle.slice(0, IMAGE_PROMPT_FIELD_BUDGETS.contentAngle),
+    humanNotes: brief.humanNotes.slice(0, IMAGE_PROMPT_FIELD_BUDGETS.humanNotes),
+  };
+}
+
+/**
+ * Shrink optional editorial text only.
+ * Order: humanNotes → contentAngle → workingTitle → topic.
+ * Never touches featured state, purpose, ratio/size, text policy, avoid, factual, or safety.
+ */
+function shrinkEditorial(fit: EditorialFit) {
+  if (fit.humanNotes.length > 0) {
+    fit.humanNotes = fit.humanNotes.slice(0, Math.max(0, fit.humanNotes.length - 400)).trimEnd();
+    return;
+  }
+  if (fit.contentAngle.length > 0) {
+    fit.contentAngle = fit.contentAngle.slice(0, Math.max(0, fit.contentAngle.length - 80)).trimEnd();
+    return;
+  }
+  if (fit.workingTitle.length > 40) {
+    fit.workingTitle = fit.workingTitle.slice(0, Math.max(40, fit.workingTitle.length - 40)).trimEnd();
+    return;
+  }
+  if (fit.topic.length > 40) {
+    fit.topic = fit.topic.slice(0, Math.max(40, fit.topic.length - 40)).trimEnd();
+  }
+}
+
+/**
+ * Bounded canonical input for future E2/E3 providers.
+ * Essential + visual/safety sections are always retained complete.
+ * Long editorial text is individually budgeted and shrunk first — never a final blind slice.
+ */
+export function buildImagePromptInput(brief: ImageBrief) {
+  const fixed = `${essentialPrefix(brief)}\n${visualSafetyBlock(brief)}`;
+  const fit = fullEditorialFit(brief);
+  let rendered = `${fixed}\n${editorialBlock(fit)}`;
+  let guard = 0;
+  while (rendered.length > IMAGE_PROMPT_INPUT_MAX && guard < 80) {
+    const before = rendered;
+    shrinkEditorial(fit);
+    rendered = `${fixed}\n${editorialBlock(fit)}`;
+    if (rendered === before) break;
+    guard += 1;
+  }
+  // Never silently drop essential/visual/safety via a final blind slice.
+  if (rendered.length > IMAGE_PROMPT_INPUT_MAX) {
+    throw new Error(
+      `Image prompt essential contract exceeds IMAGE_PROMPT_INPUT_MAX (${rendered.length} > ${IMAGE_PROMPT_INPUT_MAX}).`,
+    );
+  }
+  return rendered;
+}
+
+/**
+ * Complete normalized image-relevant semantic state for fingerprinting.
+ * Not truncated for provider budgets. Excludes eligibility, caches, timestamps, article body.
+ */
+export function buildImageFingerprintInput(brief: ImageBrief) {
+  // Explicit key order — do not rely on incidental object enumeration.
+  const payload = {
+    spec: brief.spec,
+    taskType: brief.taskType,
+    workflowStatus: brief.workflowStatus,
+    topic: brief.topic,
+    workingTitle: brief.workingTitle,
+    searchIntent: brief.searchIntent,
+    contentAngle: brief.contentAngle,
+    humanNotes: brief.humanNotes,
+    targetPublicUrl: brief.targetPublicUrl,
+    restorePath: brief.restorePath,
+    articleTitle: brief.articleTitle,
+    articleCategory: brief.articleCategory,
+    existingFeaturedImage: brief.existingFeaturedImage,
+    existingFeaturedDisposition: brief.existingFeaturedDisposition,
+    imagePurpose: brief.imagePurpose,
+    recommendedAspectRatio: brief.recommendedAspectRatio,
+    recommendedSourceSize: brief.recommendedSourceSize,
+    ogReuseNote: brief.ogReuseNote,
+    visualSubject: brief.visualSubject,
+    visualConcept: brief.visualConcept,
+    mustInclude: [...brief.mustInclude],
+    avoid: [...brief.avoid],
+    textInImagePolicy: brief.textInImagePolicy,
+    brandContext: brief.brandContext,
+    audience: brief.audience,
+    factualConstraints: [...brief.factualConstraints],
+    safetyConstraints: [...brief.safetyConstraints],
+  };
+  return JSON.stringify(payload);
 }
