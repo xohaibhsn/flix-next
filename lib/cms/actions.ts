@@ -44,6 +44,12 @@ import {
   unavailableSeoPostSaveAdvisory,
   type SeoPostSaveAdvisory,
 } from "@/lib/cms/seo-post-save-guard";
+import {
+  evaluatePrePublishQa,
+  prePublishBlocksPersist,
+} from "@/lib/cms/seo-prepublish-qa";
+import type { PrePublishQaResult } from "@/lib/cms/seo-prepublish-qa-types";
+import { sanitizePost } from "@/lib/cms/validation";
 import { ClientError, publicErrorMessage } from "@/lib/security/errors";
 
 function fail(error: unknown, fallback: string) {
@@ -255,30 +261,78 @@ export async function deleteCategoryAction(id: string) {
   }
 }
 
-export async function savePostAction(post: BlogPost) {
+export type SavePostActionInput = {
+  post: BlogPost;
+  /** Server-issued fingerprint from a prior warnings-only Pre-Publish result. */
+  prePublishConfirmationFingerprint?: string;
+};
+
+export type SavePostActionResult =
+  | { ok: true; post: BlogPost; seoAdvisory: SeoPostSaveAdvisory; prePublish?: PrePublishQaResult }
+  | {
+      ok: false;
+      error: string;
+      prePublish?: PrePublishQaResult;
+    };
+
+export async function savePostAction(
+  postOrInput: BlogPost | SavePostActionInput,
+): Promise<SavePostActionResult> {
   const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
+
+  const input: SavePostActionInput =
+    postOrInput && typeof postOrInput === "object" && "post" in postOrInput
+      ? postOrInput
+      : { post: postOrInput as BlogPost };
+
   try {
-    const saved = await cms.savePost(post);
+    const previous = input.post.id ? await cms.getPostById(input.post.id) : null;
+    const candidate = sanitizePost(input.post);
+    const [posts, featuredMedia, ogMedia] = await Promise.all([
+      cms.listPosts(),
+      candidate.featuredImage?.id ? cms.getMediaById(candidate.featuredImage.id) : Promise.resolve(null),
+      candidate.ogImage?.id ? cms.getMediaById(candidate.ogImage.id) : Promise.resolve(null),
+    ]);
+
+    const prePublish = evaluatePrePublishQa({
+      previous,
+      raw: input.post,
+      candidate,
+      posts,
+      featuredMedia,
+      ogMedia,
+      confirmationFingerprint: input.prePublishConfirmationFingerprint || null,
+    });
+
+    if (prePublishBlocksPersist(prePublish)) {
+      const error =
+        prePublish.status === "blocked"
+          ? "Pre-Publish SEO QA blocked this save. Fix the blockers and try again."
+          : "Pre-Publish SEO QA found warnings. Review them, then confirm Publish Anyway to continue.";
+      return { ok: false as const, error, prePublish };
+    }
+
+    const saved = await cms.savePost(candidate);
     revalidateSidhuCms();
     revalidateBlog(saved.slug);
     let seoAdvisory: SeoPostSaveAdvisory;
     try {
       const settings = await cms.getSettings();
-      const featuredMedia =
+      const savedFeatured =
         saved.featuredImage?.id ? await cms.getMediaById(saved.featuredImage.id) : null;
       seoAdvisory = await attachSeoAdvisory(() =>
         evaluatePostSeoPostSave({
           post: saved,
           siteName: settings.siteName,
           siteTagline: settings.tagline,
-          featuredMedia,
+          featuredMedia: savedFeatured,
         }),
       );
     } catch {
       seoAdvisory = unavailableSeoPostSaveAdvisory();
     }
-    return { ok: true as const, post: saved, seoAdvisory };
+    return { ok: true as const, post: saved, seoAdvisory, prePublish };
   } catch (error) {
     return fail(error, "Could not save post.");
   }

@@ -15,12 +15,14 @@ import { ImageField, MediaSpecHint } from "@/components/sidhu/ImageField";
 import { MediaPickerModal } from "@/components/sidhu/MediaPickerModal";
 import { SeoAiDraftPanel } from "@/components/sidhu/SeoAiDraftPanel";
 import { SeoPostSaveAdvisoryPanel } from "@/components/sidhu/SeoPostSaveAdvisoryPanel";
+import { SeoPrePublishQaPanel } from "@/components/sidhu/SeoPrePublishQaPanel";
 import { SeoPreview } from "@/components/sidhu/SeoPreview";
 import { CollapsiblePreview } from "@/components/sidhu/ui/CollapsiblePreview";
 import { EditorTabPanel, EditorTabs } from "@/components/sidhu/ui/EditorTabs";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
 import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import type { SeoPostSaveAdvisory } from "@/lib/cms/seo-post-save-guard";
+import type { PrePublishQaResult } from "@/lib/cms/seo-prepublish-qa-types";
 import { sidhuPreviewFromPost } from "@/lib/cms/sidhu-seo-preview";
 
 type BlogTab = "content" | "seo" | "social" | "advanced";
@@ -59,11 +61,44 @@ export function BlogEditor({
   const [assets, setAssets] = useState(initialAssets);
   const [message, setMessage] = useState<{ tone: "ok" | "error" | "info"; text: string } | null>(null);
   const [seoAdvisory, setSeoAdvisory] = useState<SeoPostSaveAdvisory | null>(null);
+  const [prePublishSnapshot, setPrePublishSnapshot] = useState<{
+    draftKey: string;
+    result: PrePublishQaResult;
+  } | null>(null);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState(false);
   const [tab, setTab] = useState<BlogTab>("content");
   const dirty = useMemo(() => isEditorDirty(draft, saved), [draft, saved]);
   const preview = sidhuPreviewFromPost(draft, { siteName, siteTagline, defaultOgImage });
+  const draftKey = useMemo(
+    () =>
+      JSON.stringify({
+        id: draft.id,
+        title: draft.title,
+        slug: draft.slug,
+        excerpt: draft.excerpt,
+        content: draft.content,
+        categoryId: draft.categoryId,
+        featuredImageId: draft.featuredImage?.id || "",
+        status: draft.status,
+        featured: draft.featured,
+        seoTitle: draft.seoTitle,
+        seoDescription: draft.seoDescription,
+        focusKeyword: draft.focusKeyword,
+        canonicalUrl: draft.canonicalUrl,
+        robotsIndex: draft.robotsIndex,
+        robotsFollow: draft.robotsFollow,
+        ogTitle: draft.ogTitle,
+        ogDescription: draft.ogDescription,
+        ogImageId: draft.ogImage?.id || "",
+        sitemapInclude: draft.sitemapInclude,
+      }),
+    [draft],
+  );
+  const prePublish =
+    prePublishSnapshot && prePublishSnapshot.draftKey === draftKey ? prePublishSnapshot.result : null;
+  const pendingConfirmFingerprint =
+    prePublish?.confirmationRequired ? prePublish.candidateFingerprint : null;
 
   useEffect(() => {
     if (!dirty) return;
@@ -79,25 +114,44 @@ export function BlogEditor({
     setMessage({ tone, text });
   }
 
-  async function save() {
+  async function save(options?: { confirmFingerprint?: string | null }) {
     setSaving(true);
-    const result = await savePostAction(draft);
+    const result = await savePostAction({
+      post: draft,
+      prePublishConfirmationFingerprint: options?.confirmFingerprint || undefined,
+    });
     setSaving(false);
     if (!result.ok) {
       setMessage({ tone: "error", text: result.error });
       setSeoAdvisory(null);
+      if (result.prePublish) {
+        setPrePublishSnapshot({ draftKey, result: result.prePublish });
+      } else {
+        setPrePublishSnapshot(null);
+      }
       return;
     }
     setDraft(result.post);
     setSaved(result.post);
     setMessage({ tone: "ok", text: "Post saved." });
     setSeoAdvisory(result.seoAdvisory ?? null);
+    // Successful save — post-save advisory covers follow-up; clear gate card.
+    setPrePublishSnapshot(null);
     if (post.id !== result.post.id) router.replace(`/sidhu/blog/${result.post.id}/`);
   }
 
   return (
     <div className="space-y-4">
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+      <SeoPrePublishQaPanel
+        result={prePublish}
+        pending={saving}
+        onPublishAnyway={
+          pendingConfirmFingerprint
+            ? () => void save({ confirmFingerprint: pendingConfirmFingerprint })
+            : undefined
+        }
+      />
       <SeoPostSaveAdvisoryPanel advisory={seoAdvisory} compact />
 
       <EditorTabs items={TABS} value={tab} onChange={setTab} ariaLabel="Blog editor sections" />
@@ -319,7 +373,7 @@ export function BlogEditor({
         dirty={dirty}
         saving={saving}
         saveLabel="Save post"
-        onSave={() => void save()}
+        onSave={() => void save({})}
         secondary={
           draft.status === "published" && draft.slug ? (
             <a
