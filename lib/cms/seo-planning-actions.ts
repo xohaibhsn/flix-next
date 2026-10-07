@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { requireAdminActor } from "@/lib/auth/guards";
+import { adminHasPermission } from "@/lib/auth/session";
 import {
   isGeminiBlogPromptConfigured,
   isGeminiImagePromptConfigured,
@@ -9,6 +10,11 @@ import {
   isOpenAiImagePromptConfigured,
 } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
+import {
+  parseSeoPlanningHandoffInput,
+  SEO_PLANNING_HANDOFF_BLOG_PERMISSION_MESSAGE,
+  type SeoPlanningHandoffResult,
+} from "@/lib/cms/seo-planning/handoff";
 import {
   proceedSeoOpportunityToPlanningDraft,
   type ProceedSeoPlanningResult,
@@ -514,5 +520,45 @@ export async function deleteSeoPlanningDraftPermanentlyAction(
     return await cms.deleteSeoPlanningDraftPermanently(parsed.id);
   } catch {
     return { ok: false, error: "Could not permanently delete the planning draft. Please try again." };
+  }
+}
+
+/**
+ * Content Handoff V1 — open REFRESH target or create/reopen NEW_BLOG private draft.
+ * Requires SEO + Blog permissions. Does not publish, advance workflow, or call providers.
+ */
+export async function handoffSeoPlanningToBlogAction(
+  rawInput: unknown,
+): Promise<SeoPlanningHandoffResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: actor.error,
+      code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
+    };
+  }
+  if (!adminHasPermission(actor.user, "blog")) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_HANDOFF_BLOG_PERMISSION_MESSAGE,
+      code: "blog_permission_required",
+    };
+  }
+
+  const parsed = parseSeoPlanningHandoffInput(rawInput);
+  if (!parsed.ok) return parsed;
+
+  try {
+    return await cms.handoffSeoPlanningToBlog(parsed.planningDraftId);
+  } catch (error) {
+    if (isSeoPlanningArchivedMutationError(error)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE, code: "planning_archived" };
+    }
+    return {
+      ok: false,
+      error: "Could not hand off this planning draft to the Blog editor. Please try again.",
+      code: "handoff_conflict",
+    };
   }
 }

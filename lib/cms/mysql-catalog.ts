@@ -20,6 +20,16 @@ import {
   type SeoPlanningListLifecycle,
 } from "@/lib/cms/seo-planning/lifecycle";
 import {
+  buildNewBlogHandoffDraft,
+  evaluateSeoPlanningHandoffEligibility,
+  handoffSuccess,
+  SEO_PLANNING_HANDOFF_LINKED_POST_MISSING_MESSAGE,
+  SEO_PLANNING_HANDOFF_REFRESH_TARGET_MISSING_MESSAGE,
+  SEO_PLANNING_HANDOFF_REFRESH_TARGET_REQUIRED_MESSAGE,
+  SEO_PLANNING_HANDOFF_SLUG_CONFLICT_MESSAGE,
+  type SeoPlanningHandoffResult,
+} from "@/lib/cms/seo-planning/handoff";
+import {
   mergeImagePromptCache,
   type ImagePromptCacheEntry,
   type ImagePromptProvider,
@@ -877,6 +887,138 @@ export class MysqlCatalogRepository implements CatalogRepository {
           updatedAt,
         }),
       };
+    });
+  }
+  async handoffSeoPlanningToBlog(planningDraftId: string): Promise<SeoPlanningHandoffResult> {
+    await this.ready();
+    const id = String(planningDraftId || "").trim();
+    if (!id) {
+      return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "planning_not_found" };
+    }
+
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [id],
+      );
+      if (!rows[0]) {
+        return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "planning_not_found" };
+      }
+      const latest = mapPlanningDraft(rows[0]);
+      const eligible = evaluateSeoPlanningHandoffEligibility(latest);
+      if (!eligible.ok) return eligible;
+
+      if (eligible.draft.recommendation === "REFRESH_EXISTING") {
+        const targetId = String(eligible.draft.targetPostId || "").trim();
+        if (!targetId) {
+          return {
+            ok: false,
+            error: SEO_PLANNING_HANDOFF_REFRESH_TARGET_REQUIRED_MESSAGE,
+            code: "refresh_target_required",
+          };
+        }
+        const [postRows] = await conn.query<PostRow[]>(
+          "SELECT * FROM blog_posts WHERE id = ? LIMIT 1",
+          [targetId],
+        );
+        if (!postRows[0]) {
+          return {
+            ok: false,
+            error: SEO_PLANNING_HANDOFF_REFRESH_TARGET_MISSING_MESSAGE,
+            code: "refresh_target_missing",
+          };
+        }
+        return handoffSuccess({
+          postId: mapPost(postRows[0]).id,
+          created: false,
+          recommendation: "REFRESH_EXISTING",
+        });
+      }
+
+      // NEW_BLOG — same connection holds Planning FOR UPDATE for the create+link boundary.
+      const linkedId = String(eligible.draft.linkedPostId || "").trim();
+      if (linkedId) {
+        const [linkedRows] = await conn.query<PostRow[]>(
+          "SELECT * FROM blog_posts WHERE id = ? LIMIT 1",
+          [linkedId],
+        );
+        if (!linkedRows[0]) {
+          return {
+            ok: false,
+            error: SEO_PLANNING_HANDOFF_LINKED_POST_MISSING_MESSAGE,
+            code: "linked_post_missing",
+          };
+        }
+        return handoffSuccess({
+          postId: mapPost(linkedRows[0]).id,
+          created: false,
+          recommendation: "NEW_BLOG",
+        });
+      }
+
+      const built = buildNewBlogHandoffDraft({
+        workingTitle: eligible.draft.workingTitle,
+        proposedSlug: eligible.draft.proposedSlug,
+      });
+      if ("ok" in built) return built;
+      const draftPost = built;
+
+      const [dupes] = await conn.query<PostRow[]>(
+        "SELECT id FROM blog_posts WHERE slug = ? AND id <> ? LIMIT 1",
+        [draftPost.slug, draftPost.id],
+      );
+      if (dupes[0]) {
+        return {
+          ok: false,
+          error: SEO_PLANNING_HANDOFF_SLUG_CONFLICT_MESSAGE,
+          code: "slug_conflict",
+        };
+      }
+
+      // Archive cannot land while we hold FOR UPDATE; still assert before writes.
+      assertSeoPlanningDraftMutableForOrdinarySave(latest);
+
+      await conn.execute(
+        `INSERT INTO blog_posts (
+          id, title, slug, excerpt, content, category_id, featured_image, status, featured, published_at,
+          seo_title, seo_description, focus_keyword, canonical_url, robots_index, robots_follow,
+          og_title, og_description, og_image, sitemap_include
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          draftPost.id,
+          draftPost.title,
+          draftPost.slug,
+          draftPost.excerpt,
+          draftPost.content,
+          draftPost.categoryId,
+          JSON.stringify(draftPost.featuredImage),
+          draftPost.status,
+          draftPost.featured ? 1 : 0,
+          draftPost.publishedAt ? toMysqlDateTime(draftPost.publishedAt) : null,
+          draftPost.seoTitle,
+          draftPost.seoDescription,
+          draftPost.focusKeyword,
+          draftPost.canonicalUrl,
+          draftPost.robotsIndex ? 1 : 0,
+          draftPost.robotsFollow ? 1 : 0,
+          draftPost.ogTitle,
+          draftPost.ogDescription,
+          JSON.stringify(draftPost.ogImage),
+          draftPost.sitemapInclude ? 1 : 0,
+        ],
+      );
+
+      const updatedAt = new Date().toISOString();
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET linked_post_id = ?, updated_at = ? WHERE id = ?",
+        [draftPost.id, toMysqlDateTime(updatedAt), id],
+      );
+
+      return handoffSuccess({
+        postId: draftPost.id,
+        created: true,
+        recommendation: "NEW_BLOG",
+      });
     });
   }
   async dashboardStats() {

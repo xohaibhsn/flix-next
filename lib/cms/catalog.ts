@@ -6,6 +6,7 @@ import type {
   WritingPromptCacheEntry,
   WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import type { SeoPlanningHandoffResult } from "@/lib/cms/seo-planning/handoff";
 import type {
   BlogCategory,
   BlogPost,
@@ -128,5 +129,12 @@ export interface CatalogRepository {
       readers: SeoPlanningImagePromptAcceptReaders,
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningImagePromptResult>;
+  /**
+   * Content Handoff V1: open REFRESH target or create/reopen NEW_BLOG private draft.
+   * MySQL: single transaction (Planning FOR UPDATE → Blog insert → linked_post_id).
+   * JSON: Planning lock → Blog lock; reserve linkedPostId before Blog write.
+   * Never publishes. Never advances Planning workflow. Never writes Media.
+   */
+  handoffSeoPlanningToBlog(planningDraftId: string): Promise<SeoPlanningHandoffResult>;
   dashboardStats(): Promise<CmsDashboardStats>;
 }

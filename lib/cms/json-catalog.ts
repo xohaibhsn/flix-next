@@ -26,6 +26,16 @@ import {
   type SeoPlanningListLifecycle,
 } from "@/lib/cms/seo-planning/lifecycle";
 import {
+  buildNewBlogHandoffDraft,
+  evaluateSeoPlanningHandoffEligibility,
+  handoffSuccess,
+  SEO_PLANNING_HANDOFF_LINKED_POST_MISSING_MESSAGE,
+  SEO_PLANNING_HANDOFF_REFRESH_TARGET_MISSING_MESSAGE,
+  SEO_PLANNING_HANDOFF_REFRESH_TARGET_REQUIRED_MESSAGE,
+  SEO_PLANNING_HANDOFF_SLUG_CONFLICT_MESSAGE,
+  type SeoPlanningHandoffResult,
+} from "@/lib/cms/seo-planning/handoff";
+import {
   mergeImagePromptCache,
   type ImagePromptCacheEntry,
   type ImagePromptProvider,
@@ -516,6 +526,106 @@ export class JsonCatalogRepository implements CatalogRepository {
         const next = items.map((item, i) => (i === index ? nextDraft : item));
         await saveList(SEO_PLANNING_FILE, next);
         return { ok: true, draft: nextDraft };
+      }),
+    );
+  }
+  async handoffSeoPlanningToBlog(planningDraftId: string): Promise<SeoPlanningHandoffResult> {
+    const id = String(planningDraftId || "").trim();
+    if (!id) {
+      return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "planning_not_found" };
+    }
+
+    // Lock order: Planning → Blog (same as prompt-cache write boundary).
+    return withSeoPlanningJsonWriteLock(() =>
+      withBlogContentJsonWriteLock(async () => {
+        const planningItems = await this.#readAllSeoPlanningDrafts();
+        const index = planningItems.findIndex((item) => item.id === id);
+        if (index < 0) {
+          return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "planning_not_found" };
+        }
+        const latest = planningItems[index]!;
+        const eligible = evaluateSeoPlanningHandoffEligibility(latest);
+        if (!eligible.ok) return eligible;
+
+        const posts = (await readJsonFile<BlogPost[]>(POSTS_FILE, [])).map(sanitizePost);
+
+        if (eligible.draft.recommendation === "REFRESH_EXISTING") {
+          const targetId = String(eligible.draft.targetPostId || "").trim();
+          if (!targetId) {
+            return {
+              ok: false,
+              error: SEO_PLANNING_HANDOFF_REFRESH_TARGET_REQUIRED_MESSAGE,
+              code: "refresh_target_required",
+            };
+          }
+          const target = posts.find((post) => post.id === targetId);
+          if (!target) {
+            return {
+              ok: false,
+              error: SEO_PLANNING_HANDOFF_REFRESH_TARGET_MISSING_MESSAGE,
+              code: "refresh_target_missing",
+            };
+          }
+          return handoffSuccess({
+            postId: target.id,
+            created: false,
+            recommendation: "REFRESH_EXISTING",
+          });
+        }
+
+        // NEW_BLOG
+        const linkedId = String(eligible.draft.linkedPostId || "").trim();
+        if (linkedId) {
+          const linked = posts.find((post) => post.id === linkedId);
+          if (!linked) {
+            return {
+              ok: false,
+              error: SEO_PLANNING_HANDOFF_LINKED_POST_MISSING_MESSAGE,
+              code: "linked_post_missing",
+            };
+          }
+          return handoffSuccess({
+            postId: linked.id,
+            created: false,
+            recommendation: "NEW_BLOG",
+          });
+        }
+
+        const built = buildNewBlogHandoffDraft({
+          workingTitle: eligible.draft.workingTitle,
+          proposedSlug: eligible.draft.proposedSlug,
+        });
+        if ("ok" in built) return built;
+        const draftPost = built;
+
+        if (posts.some((post) => post.slug === draftPost.slug && post.id !== draftPost.id)) {
+          return {
+            ok: false,
+            error: SEO_PLANNING_HANDOFF_SLUG_CONFLICT_MESSAGE,
+            code: "slug_conflict",
+          };
+        }
+
+        // Final Archive boundary before any durable write (lock already held).
+        assertSeoPlanningDraftMutableForOrdinarySave(latest);
+
+        const updatedAt = new Date().toISOString();
+        const nextPlanning = sanitizeSeoPlanningDraft({
+          ...latest,
+          linkedPostId: draftPost.id,
+          updatedAt,
+        });
+
+        // Reserve linkedPostId first so a Blog write failure cannot create a second draft on retry.
+        const nextPlanningItems = planningItems.map((item, i) => (i === index ? nextPlanning : item));
+        await saveList(SEO_PLANNING_FILE, nextPlanningItems);
+        await saveList(POSTS_FILE, [...posts, draftPost]);
+
+        return handoffSuccess({
+          postId: draftPost.id,
+          created: true,
+          recommendation: "NEW_BLOG",
+        });
       }),
     );
   }

@@ -38,6 +38,7 @@ import {
   SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
 } from "@/lib/cms/seo-planning/image-brief";
 import { SeoPlanningLifecycleControls } from "@/components/sidhu/SeoPlanningLifecycleControls";
+import { SeoPlanningContentHandoff } from "@/components/sidhu/SeoPlanningContentHandoff";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -228,6 +229,8 @@ export function SeoPlanningDetail({
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
 
       <SeoPlanningLifecycleControls draft={draft} archived={archived} />
+
+      <SeoPlanningContentHandoff draft={draft} archived={archived} />
 
       <SectionCard className="space-y-3">
         <h3 className="text-sm font-semibold text-ink">Target</h3>
