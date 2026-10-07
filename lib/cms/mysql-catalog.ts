@@ -1,9 +1,9 @@
-import type { RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type {
   CatalogRepository,
   MergeSeoPlanningImagePromptResult,
   MergeSeoPlanningWritingPromptResult,
-  SeoPlanningImagePromptAcceptReaders,
+  SeoPlanningPromptAcceptReaders,
 } from "@/lib/cms/catalog";
 import {
   fromMysqlDateTime,
@@ -269,6 +269,48 @@ function mapMessage(row: MessageRow): ContactMessage {
     message: row.message,
     createdAt: fromMysqlDateTime(row.created_at),
   });
+}
+
+/**
+ * Transaction-scoped REFRESH article readers. Lock order after Planning FOR UPDATE:
+ * target BlogPost → relevant category. NEW/RESTORE callers never need these locks.
+ */
+function createPromptAcceptReaders(
+  conn: PoolConnection,
+  latest: SeoPlanningDraft,
+): SeoPlanningPromptAcceptReaders {
+  let lockedPost: BlogPost | null | undefined;
+  let lockedCategory: BlogCategory | null | undefined;
+  return {
+    async getPostById(postId: string) {
+      const want = String(postId || "").trim();
+      if (!want) {
+        lockedPost = null;
+        return null;
+      }
+      const [postRows] = await conn.query<PostRow[]>(
+        "SELECT * FROM blog_posts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [want],
+      );
+      lockedPost = postRows[0] ? mapPost(postRows[0]) : null;
+      lockedCategory = undefined;
+      return lockedPost;
+    },
+    async listCategories() {
+      if (latest.recommendation !== "REFRESH_EXISTING") return [];
+      const categoryId = lockedPost?.categoryId?.trim() || "";
+      if (!categoryId) return [];
+      if (lockedCategory !== undefined) {
+        return lockedCategory ? [lockedCategory] : [];
+      }
+      const [catRows] = await conn.query<CategoryRow[]>(
+        "SELECT * FROM blog_categories WHERE id = ? LIMIT 1 FOR UPDATE",
+        [categoryId],
+      );
+      lockedCategory = catRows[0] ? mapCategory(catRows[0]) : null;
+      return lockedCategory ? [lockedCategory] : [];
+    },
+  };
 }
 
 function mapPlanningDraft(row: PlanningRow): SeoPlanningDraft {
@@ -627,7 +669,10 @@ export class MysqlCatalogRepository implements CatalogRepository {
     id: string;
     provider: WritingPromptProvider;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult> {
     await this.ready();
     const id = String(args.id || "").trim();
@@ -644,7 +689,9 @@ export class MysqlCatalogRepository implements CatalogRepository {
       if (!rows[0]) return { ok: false, reason: "not_found" };
 
       const latest = mapPlanningDraft(rows[0]);
-      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+      // Lock order: Planning → BlogPost → category (REFRESH only). Same conn.
+      const readers = createPromptAcceptReaders(conn, latest);
+      if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
         return { ok: false, reason: "rejected" };
       }
 
@@ -672,7 +719,10 @@ export class MysqlCatalogRepository implements CatalogRepository {
   async mergeSeoPlanningGeminiWritingPromptCache(args: {
     id: string;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult> {
     return this.mergeSeoPlanningWritingPromptCache({
       id: args.id,
@@ -687,7 +737,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     entry: ImagePromptCacheEntry;
     acceptLatest?: (
       latest: SeoPlanningDraft,
-      readers: SeoPlanningImagePromptAcceptReaders,
+      readers: SeoPlanningPromptAcceptReaders,
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningImagePromptResult> {
     await this.ready();
@@ -705,43 +755,8 @@ export class MysqlCatalogRepository implements CatalogRepository {
       if (!rows[0]) return { ok: false, reason: "not_found" };
 
       const latest = mapPlanningDraft(rows[0]);
-
-      // Lock order: Planning → target BlogPost → relevant category (REFRESH only).
-      // Same connection as Planning FOR UPDATE — closes article-context TOCTOU.
-      let lockedPost: BlogPost | null | undefined;
-      let lockedCategory: BlogCategory | null | undefined;
-
-      const readers: SeoPlanningImagePromptAcceptReaders = {
-        async getPostById(postId: string) {
-          const want = String(postId || "").trim();
-          if (!want) {
-            lockedPost = null;
-            return null;
-          }
-          const [postRows] = await conn.query<PostRow[]>(
-            "SELECT * FROM blog_posts WHERE id = ? LIMIT 1 FOR UPDATE",
-            [want],
-          );
-          lockedPost = postRows[0] ? mapPost(postRows[0]) : null;
-          lockedCategory = undefined;
-          return lockedPost;
-        },
-        async listCategories() {
-          if (latest.recommendation !== "REFRESH_EXISTING") return [];
-          const categoryId = lockedPost?.categoryId?.trim() || "";
-          if (!categoryId) return [];
-          if (lockedCategory !== undefined) {
-            return lockedCategory ? [lockedCategory] : [];
-          }
-          const [catRows] = await conn.query<CategoryRow[]>(
-            "SELECT * FROM blog_categories WHERE id = ? LIMIT 1 FOR UPDATE",
-            [categoryId],
-          );
-          lockedCategory = catRows[0] ? mapCategory(catRows[0]) : null;
-          return lockedCategory ? [lockedCategory] : [];
-        },
-      };
-
+      // Lock order: Planning → BlogPost → category (REFRESH only). Same conn.
+      const readers = createPromptAcceptReaders(conn, latest);
       if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
         return { ok: false, reason: "rejected" };
       }

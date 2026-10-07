@@ -166,11 +166,21 @@ function memoryCatalog(initial: SeoPlanningDraft) {
       id: string;
       provider: "gemini" | "openai";
       entry: WritingPromptCacheEntry;
-      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+      acceptLatest?: (
+        latest: SeoPlanningDraft,
+        readers: {
+          getPostById(id: string): Promise<BlogPost | null>;
+          listCategories(): Promise<BlogCategory[]>;
+        },
+      ) => boolean | Promise<boolean>;
     }) {
       if (store.id !== args.id) return { ok: false as const, reason: "not_found" as const };
       const latest = structuredClone(store);
-      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+      const readers = {
+        getPostById: (postId: string) => catalog.getPostById(postId),
+        listCategories: () => catalog.listCategories(),
+      };
+      if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
         return { ok: false as const, reason: "rejected" as const };
       }
       const basePayload =
@@ -187,7 +197,13 @@ function memoryCatalog(initial: SeoPlanningDraft) {
     async mergeSeoPlanningGeminiWritingPromptCache(args: {
       id: string;
       entry: WritingPromptCacheEntry;
-      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+      acceptLatest?: (
+        latest: SeoPlanningDraft,
+        readers: {
+          getPostById(id: string): Promise<BlogPost | null>;
+          listCategories(): Promise<BlogCategory[]>;
+        },
+      ) => boolean | Promise<boolean>;
     }) {
       return catalog.mergeSeoPlanningWritingPromptCache({
         id: args.id,
@@ -209,6 +225,9 @@ function memoryCatalog(initial: SeoPlanningDraft) {
     },
     set store(next: SeoPlanningDraft) {
       store = structuredClone(next);
+    },
+    setPost(post: BlogPost) {
+      posts.set(post.id, structuredClone(post));
     },
     catalog,
   };
@@ -521,6 +540,83 @@ test("CONCURRENCY: F2 mismatch and write-boundary reject; preserve Gemini siblin
   assert.equal(readOpenAiWritingPromptCache(okMem.store.payload)?.chatgptPrompt, "OpenAI persisted.");
   assert.equal(readGeminiWritingPromptCache(okMem.store.payload)?.chatgptPrompt, "Keep Gemini");
   assert.equal((okMem.store.payload as { gsc: { mark: string } }).gsc.mark, "concurrent-newer");
+});
+
+test("WRITE-BOUNDARY ARTICLE (OpenAI): body change after F2 rejects; one provider call", async () => {
+  resetAiSeoBlogPromptRateLimitForTests();
+  const post: BlogPost = {
+    id: "post-d3",
+    title: "How to Watch IPTV on Firestick: Complete Setup Guide",
+    slug: "how-to-watch-iptv-on-firestick",
+    excerpt: "A setup walkthrough.",
+    content: "<h2>Check the network</h2><p>Restart the stick.</p>",
+    categoryId: "cat-1",
+    featuredImage: { id: "media-1", publicId: "m1", secureUrl: "https://example.com/m1.jpg" },
+    status: "published",
+    featured: false,
+    publishedAt: "2026-01-01T00:00:00.000Z",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    seoTitle: "",
+    seoDescription: "",
+    focusKeyword: "firestick iptv",
+    canonicalUrl: "",
+    robotsIndex: true,
+    robotsFollow: true,
+    ogTitle: "",
+    ogDescription: "",
+    ogImage: null,
+    sitemapInclude: true,
+  };
+  const mem = memoryCatalog(
+    draft({
+      id: "seoplan_d3_wb_body",
+      recommendation: "REFRESH_EXISTING",
+      workflowStatus: "CONTENT_NEEDED",
+      targetPostId: "post-d3",
+      matchedPublicUrl: "/blogs/how-to-watch-iptv-on-firestick/",
+      payload: {
+        ...(draft().payload as object),
+        writingPrompts: {
+          openai: {
+            chatgptPrompt: "Old OpenAI writing prompt",
+            writingFingerprint: "c".repeat(64),
+            model: "gpt-old",
+            generatedAt: "2026-01-01T00:00:00.000Z",
+            briefSpec: SEO_PLANNING_WRITING_BRIEF_SPEC,
+          },
+        },
+      },
+    }),
+  );
+  mem.setPost(post);
+  const beforeUpdatedAt = mem.store.updatedAt;
+  let providerCalls = 0;
+  const result = await generateChatgptWritingPromptWithOpenAi({
+    planningDraftId: mem.store.id,
+    adminId: "d3-wb",
+    ip: "10.9.0.8",
+    catalog: {
+      ...mem.catalog,
+      async mergeSeoPlanningWritingPromptCache(args) {
+        mem.setPost({ ...post, content: "<h2>Changed body after F2</h2><p>New.</p>" });
+        return mem.catalog.mergeSeoPlanningWritingPromptCache(args);
+      },
+    },
+    config: blogPromptConfig(),
+    fetchImpl: async () => {
+      providerCalls += 1;
+      return mockJsonResponse(openaiSuccessPayload({ chatgptPrompt: "Must not persist OpenAI." }));
+    },
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, "brief_changed");
+  assert.equal(providerCalls, 1);
+  assert.equal(
+    readOpenAiWritingPromptCache(mem.store.payload)?.chatgptPrompt,
+    "Old OpenAI writing prompt",
+  );
+  assert.equal(mem.store.updatedAt, beforeUpdatedAt);
 });
 
 test("LIMITER: Gemini and OpenAI Blog Prompt share the same 2/min bucket", async () => {

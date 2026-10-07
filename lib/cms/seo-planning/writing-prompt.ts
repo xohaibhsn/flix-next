@@ -17,7 +17,10 @@ import { requestOpenAiChatgptWritingPrompt } from "@/lib/cms/ai-seo/blog-prompt-
 import type { GeminiFetch } from "@/lib/cms/ai-seo/gemini-provider";
 import type { OpenAiFetch } from "@/lib/cms/ai-seo/provider";
 import { checkAiSeoBlogPromptRateLimit } from "@/lib/cms/ai-seo/rate-limit";
-import type { MergeSeoPlanningWritingPromptResult } from "@/lib/cms/catalog";
+import type {
+  MergeSeoPlanningWritingPromptResult,
+  SeoPlanningWritingPromptAcceptReaders,
+} from "@/lib/cms/catalog";
 import { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
 import {
   buildWritingBrief,
@@ -63,19 +66,27 @@ export type GenerateChatgptWritingPromptResult =
   | GenerateChatgptWritingPromptSuccess
   | GenerateChatgptWritingPromptFailure;
 
+export type WritingPromptArticleReaders = SeoPlanningWritingPromptAcceptReaders;
+
 export type WritingPromptCatalog = {
   getSeoPlanningDraftById(id: string): Promise<SeoPlanningDraft | null>;
   mergeSeoPlanningWritingPromptCache(args: {
     id: string;
     provider: WritingPromptProvider;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: WritingPromptArticleReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult>;
   /** D2 compatibility — optional when generic merge is present. */
   mergeSeoPlanningGeminiWritingPromptCache?(args: {
     id: string;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: WritingPromptArticleReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult>;
   getPostById(id: string): Promise<BlogPost | null>;
   listCategories(): Promise<BlogCategory[]>;
@@ -83,19 +94,19 @@ export type WritingPromptCatalog = {
 
 async function articleContextForDraft(
   draft: SeoPlanningDraft,
-  catalog: WritingPromptCatalog,
+  readers: WritingPromptArticleReaders,
 ): Promise<WritingArticleContext> {
-  const targetPost = draft.targetPostId ? await catalog.getPostById(draft.targetPostId) : null;
-  const categories = draft.recommendation === "REFRESH_EXISTING" ? await catalog.listCategories() : [];
+  const targetPost = draft.targetPostId ? await readers.getPostById(draft.targetPostId) : null;
+  const categories = draft.recommendation === "REFRESH_EXISTING" ? await readers.listCategories() : [];
   return buildWritingArticleContext({ draft, targetPost, categories });
 }
 
 async function briefStillMatchesFingerprint(
   draft: SeoPlanningDraft,
   expectedFingerprint: string,
-  catalog: WritingPromptCatalog,
+  readers: WritingPromptArticleReaders,
 ): Promise<boolean> {
-  const article = await articleContextForDraft(draft, catalog);
+  const article = await articleContextForDraft(draft, readers);
   const brief = buildWritingBrief(draft, article);
   if (!brief.providerEligible) return false;
   return fingerprintWritingBrief(brief) === expectedFingerprint;
@@ -125,7 +136,8 @@ async function generateChatgptWritingPrompt(args: {
     return { ok: false, code: "not_found", error: "That planning draft could not be found." };
   }
 
-  const article = await articleContextForDraft(stored, args.catalog);
+  const f1Readers: WritingPromptArticleReaders = args.catalog;
+  const article = await articleContextForDraft(stored, f1Readers);
   const brief = buildWritingBrief(stored, article);
   if (!brief.providerEligible) {
     return {
@@ -156,7 +168,7 @@ async function generateChatgptWritingPrompt(args: {
   if (!fresh) {
     return { ok: false, code: "not_found", error: "That planning draft could not be found." };
   }
-  const stillMatches = await briefStillMatchesFingerprint(fresh, fingerprintF1, args.catalog);
+  const stillMatches = await briefStillMatchesFingerprint(fresh, fingerprintF1, f1Readers);
   if (!stillMatches) {
     return {
       ok: false,
@@ -177,7 +189,9 @@ async function generateChatgptWritingPrompt(args: {
       id,
       provider: args.provider,
       entry: cache,
-      acceptLatest: (latest) => briefStillMatchesFingerprint(latest, fingerprintF1, args.catalog),
+      // Write-boundary MUST use transaction/lock-scoped readers from the catalog merge.
+      acceptLatest: (latest, readers) =>
+        briefStillMatchesFingerprint(latest, fingerprintF1, readers),
     });
     if (!merged.ok) {
       if (merged.reason === "not_found") {

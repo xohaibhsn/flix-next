@@ -1055,7 +1055,8 @@ test("WRITE-BOUNDARY ARTICLE: featured/title/category/target races after F2 reje
   const mysqlSrc = read("lib/cms/mysql-catalog.ts");
   assert.match(mysqlSrc, /SELECT \* FROM blog_posts WHERE id = \? LIMIT 1 FOR UPDATE/);
   assert.match(mysqlSrc, /SELECT \* FROM blog_categories WHERE id = \? LIMIT 1 FOR UPDATE/);
-  assert.match(mysqlSrc, /SeoPlanningImagePromptAcceptReaders/);
+  assert.match(mysqlSrc, /createPromptAcceptReaders|SeoPlanningPromptAcceptReaders/);
+  assert.match(mysqlSrc, /async mergeSeoPlanningImagePromptCache/);
   const jsonSrc = read("lib/cms/json-catalog.ts");
   assert.match(jsonSrc, /withBlogContentJsonWriteLock/);
   assert.match(jsonSrc, /withSeoPlanningJsonWriteLock\(\(\) =>\s*withBlogContentJsonWriteLock/);

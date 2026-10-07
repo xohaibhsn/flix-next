@@ -31,13 +31,20 @@ export type MergeSeoPlanningImagePromptResult =
   | { ok: false; reason: "not_found" | "rejected" };
 
 /**
- * Transaction/lock-scoped readers for final E2 write-boundary validation.
+ * Transaction/lock-scoped article readers for final Planning prompt write-boundary validation.
  * MySQL must satisfy these via the same connection that holds Planning FOR UPDATE.
+ * Shared by E2 Image Prompt and D2/D3 Writing Prompt.
  */
-export type SeoPlanningImagePromptAcceptReaders = {
+export type SeoPlanningPromptAcceptReaders = {
   getPostById(id: string): Promise<BlogPost | null>;
   listCategories(): Promise<BlogCategory[]>;
 };
+
+/** @alias SeoPlanningPromptAcceptReaders — E2 Image Prompt */
+export type SeoPlanningImagePromptAcceptReaders = SeoPlanningPromptAcceptReaders;
+
+/** @alias SeoPlanningPromptAcceptReaders — D2/D3 Writing Prompt */
+export type SeoPlanningWritingPromptAcceptReaders = SeoPlanningPromptAcceptReaders;
 
 export interface CatalogRepository {
   listPlans(): Promise<PricingPlan[]>;
@@ -68,12 +75,16 @@ export interface CatalogRepository {
   /**
    * Atomic prompt-cache write: re-read latest under write lock/transaction,
    * merge ONLY the selected writingPrompts provider sibling.
+   * acceptLatest receives transaction/lock-scoped article readers for REFRESH safety.
    */
   mergeSeoPlanningWritingPromptCache(args: {
     id: string;
     provider: WritingPromptProvider;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningWritingPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult>;
   /**
    * D2 compatibility wrapper — merges ONLY payload.writingPrompts.gemini.
@@ -81,7 +92,10 @@ export interface CatalogRepository {
   mergeSeoPlanningGeminiWritingPromptCache(args: {
     id: string;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningWritingPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningGeminiWritingPromptResult>;
   /**
    * Atomic image-prompt cache write: re-read latest under write lock/transaction,

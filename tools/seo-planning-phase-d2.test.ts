@@ -42,6 +42,7 @@ import {
   mergeGeminiWritingPromptCache,
   mergeWritingPromptCache,
   readGeminiWritingPromptCache,
+  readOpenAiWritingPromptCache,
   readWritingPromptsPayload,
   type WritingPromptCacheEntry,
 } from "../lib/cms/seo-planning/writing-prompt-cache";
@@ -167,11 +168,21 @@ function memoryCatalog(initial: SeoPlanningDraft) {
       id: string;
       provider: "gemini" | "openai";
       entry: WritingPromptCacheEntry;
-      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+      acceptLatest?: (
+        latest: SeoPlanningDraft,
+        readers: {
+          getPostById(id: string): Promise<BlogPost | null>;
+          listCategories(): Promise<BlogCategory[]>;
+        },
+      ) => boolean | Promise<boolean>;
     }) {
       if (store.id !== args.id) return { ok: false as const, reason: "not_found" as const };
       const latest = structuredClone(store);
-      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
+      const readers = {
+        getPostById: (postId: string) => catalog.getPostById(postId),
+        listCategories: () => catalog.listCategories(),
+      };
+      if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
         return { ok: false as const, reason: "rejected" as const };
       }
       const basePayload =
@@ -189,7 +200,13 @@ function memoryCatalog(initial: SeoPlanningDraft) {
     async mergeSeoPlanningGeminiWritingPromptCache(args: {
       id: string;
       entry: WritingPromptCacheEntry;
-      acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+      acceptLatest?: (
+        latest: SeoPlanningDraft,
+        readers: {
+          getPostById(id: string): Promise<BlogPost | null>;
+          listCategories(): Promise<BlogCategory[]>;
+        },
+      ) => boolean | Promise<boolean>;
     }) {
       return catalog.mergeSeoPlanningWritingPromptCache({
         id: args.id,
@@ -213,7 +230,15 @@ function memoryCatalog(initial: SeoPlanningDraft) {
       store = structuredClone(next);
     },
     setPost(post: BlogPost) {
-      posts.set(post.id, post);
+      posts.set(post.id, structuredClone(post));
+    },
+    deletePost(id: string) {
+      posts.delete(id);
+    },
+    setCategory(category: BlogCategory) {
+      const idx = categories.findIndex((item) => item.id === category.id);
+      if (idx >= 0) categories[idx] = structuredClone(category);
+      else categories.push(structuredClone(category));
     },
     catalog,
   };
@@ -479,6 +504,29 @@ test("CACHE: current/stale/openai sibling preserved; old payload ok", () => {
   assert.equal((merged.opportunity as { keep: boolean }).keep, true);
   assert.equal(readGeminiWritingPromptCache({}), null);
   assert.equal(readGeminiWritingPromptCache({ writingPrompts: {} }), null);
+
+  // Write path preserves RAW siblings the read parser ignores.
+  const rawPreserved = mergeGeminiWritingPromptCache(
+    {
+      opportunity: { keep: true },
+      writingPrompts: {
+        openai: {
+          chatgptPrompt: "Malformed sibling",
+          futureField: "preserve-me",
+        },
+        futureProvider: { keep: "raw-future" },
+      },
+    },
+    entry,
+  );
+  const writingBlock = rawPreserved.writingPrompts as Record<string, unknown>;
+  assert.equal((writingBlock.gemini as { chatgptPrompt: string }).chatgptPrompt, "Cached prompt");
+  assert.deepEqual(writingBlock.openai, {
+    chatgptPrompt: "Malformed sibling",
+    futureField: "preserve-me",
+  });
+  assert.deepEqual(writingBlock.futureProvider, { keep: "raw-future" });
+  assert.equal(readOpenAiWritingPromptCache(rawPreserved), null);
 });
 
 test("CONCURRENCY: F2===F1 persists; F2!==F1 does not clobber", async () => {
@@ -732,6 +780,174 @@ function sanitizeCloneWithSiblings(base: SeoPlanningDraft): SeoPlanningDraft {
     },
   };
 }
+
+test("WRITE-BOUNDARY ARTICLE: body/title/featured/category/target races reject; success when stable", async () => {
+  function samplePost(overrides: Partial<BlogPost> = {}): BlogPost {
+    return {
+      id: "post-refresh",
+      title: readyArticle.status === "ready" ? readyArticle.snapshot.title : "Title",
+      slug: "how-to-watch-iptv-on-firestick",
+      excerpt: "A setup walkthrough.",
+      content: "<h2>Check the network</h2><p>Restart the stick.</p>",
+      categoryId: "cat-1",
+      featuredImage: { id: "media-1", publicId: "media/m1", secureUrl: "https://example.com/m1.jpg" },
+      status: "published",
+      featured: false,
+      publishedAt: "2026-01-01T00:00:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "firestick iptv",
+      canonicalUrl: "",
+      robotsIndex: true,
+      robotsFollow: true,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: true,
+      ...overrides,
+    };
+  }
+  function sampleCategory(overrides: Partial<BlogCategory> = {}): BlogCategory {
+    return {
+      id: "cat-1",
+      name: "Setup",
+      slug: "setup",
+      description: "",
+      active: true,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      seoTitle: "",
+      seoDescription: "",
+      focusKeyword: "",
+      canonicalUrl: "",
+      robotsIndex: null,
+      robotsFollow: null,
+      ogTitle: "",
+      ogDescription: "",
+      ogImage: null,
+      sitemapInclude: null,
+      ...overrides,
+    };
+  }
+
+  async function refreshRace(args: {
+    id: string;
+    mutateAtMerge: (mem: ReturnType<typeof memoryCatalog>) => void;
+    expectReject?: boolean;
+  }) {
+    resetAiSeoBlogPromptRateLimitForTests();
+    const mem = memoryCatalog(
+      draft({
+        id: args.id,
+        recommendation: "REFRESH_EXISTING",
+        workflowStatus: "CONTENT_NEEDED",
+        targetPostId: "post-refresh",
+        matchedPublicUrl: "/blogs/how-to-watch-iptv-on-firestick/",
+        payload: {
+          ...(draft().payload as Record<string, unknown>),
+          writingPrompts: {
+            gemini: {
+              chatgptPrompt: "Old current writing prompt",
+              writingFingerprint: "a".repeat(64),
+              model: "gemini-old",
+              generatedAt: "2026-01-01T00:00:00.000Z",
+              briefSpec: SEO_PLANNING_WRITING_BRIEF_SPEC,
+            },
+          },
+        },
+      }),
+    );
+    mem.setCategory(sampleCategory());
+    mem.setPost(samplePost());
+    const beforeUpdatedAt = mem.store.updatedAt;
+    let providerCalls = 0;
+    let mergeCalls = 0;
+    const result = await generateChatgptWritingPromptWithGemini({
+      planningDraftId: mem.store.id,
+      adminId: `d2-${args.id}`,
+      ip: "10.9.0.1",
+      catalog: {
+        ...mem.catalog,
+        async mergeSeoPlanningWritingPromptCache(mergeArgs) {
+          mergeCalls += 1;
+          args.mutateAtMerge(mem);
+          return mem.catalog.mergeSeoPlanningWritingPromptCache(mergeArgs);
+        },
+      },
+      config: blogPromptConfig(),
+      fetchImpl: async () => {
+        providerCalls += 1;
+        return mockJsonResponse(geminiSuccessPayload({ chatgptPrompt: "Boundary writing prompt." }));
+      },
+    });
+    assert.equal(providerCalls, 1, args.id);
+    assert.equal(mergeCalls, 1, args.id);
+    if (args.expectReject === false) {
+      assert.equal(result.ok, true, args.id);
+      assert.equal(
+        readGeminiWritingPromptCache(mem.store.payload)?.chatgptPrompt,
+        "Boundary writing prompt.",
+        args.id,
+      );
+      assert.notEqual(mem.store.updatedAt, beforeUpdatedAt, args.id);
+      return;
+    }
+    assert.equal(result.ok, false, args.id);
+    if (!result.ok) assert.equal(result.code, "brief_changed", args.id);
+    assert.equal(
+      readGeminiWritingPromptCache(mem.store.payload)?.chatgptPrompt,
+      "Old current writing prompt",
+      args.id,
+    );
+    assert.equal(mem.store.updatedAt, beforeUpdatedAt, args.id);
+  }
+
+  await refreshRace({
+    id: "seoplan_d2_wb_body",
+    mutateAtMerge: (mem) =>
+      mem.setPost(samplePost({ content: "<h2>Completely different body</h2><p>New steps.</p>" })),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_title",
+    mutateAtMerge: (mem) => mem.setPost(samplePost({ title: "Completely Different Article Title" })),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_featured",
+    mutateAtMerge: (mem) => mem.setPost(samplePost({ featuredImage: null })),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_category",
+    mutateAtMerge: (mem) => mem.setCategory(sampleCategory({ name: "Troubleshooting" })),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_slug",
+    mutateAtMerge: (mem) => mem.setPost(samplePost({ slug: "completely-different-slug" })),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_missing",
+    mutateAtMerge: (mem) => mem.deletePost("post-refresh"),
+  });
+  await refreshRace({
+    id: "seoplan_d2_wb_ok",
+    mutateAtMerge: () => {
+      /* stable */
+    },
+    expectReject: false,
+  });
+
+  const mysqlSrc = read("lib/cms/mysql-catalog.ts");
+  assert.match(mysqlSrc, /createPromptAcceptReaders/);
+  assert.match(mysqlSrc, /SELECT \* FROM blog_posts WHERE id = \? LIMIT 1 FOR UPDATE/);
+  assert.match(mysqlSrc, /async mergeSeoPlanningWritingPromptCache/);
+  assert.match(mysqlSrc, /const readers = createPromptAcceptReaders\(conn, latest\)/);
+  const jsonSrc = read("lib/cms/json-catalog.ts");
+  assert.match(jsonSrc, /async mergeSeoPlanningWritingPromptCache/);
+  assert.match(jsonSrc, /withBlogContentJsonWriteLock/);
+  const orch = read("lib/cms/seo-planning/writing-prompt.ts");
+  assert.match(orch, /acceptLatest: \(latest, readers\) =>/);
+});
 
 test("LIMITER: dedicated blog-prompt bucket; does not consume explain/draft", () => {
   resetAiSeoBlogPromptRateLimitForTests();

@@ -2,7 +2,7 @@ import type {
   CatalogRepository,
   MergeSeoPlanningImagePromptResult,
   MergeSeoPlanningWritingPromptResult,
-  SeoPlanningImagePromptAcceptReaders,
+  SeoPlanningPromptAcceptReaders,
 } from "@/lib/cms/catalog";
 import {
   defaultBlogCategories,
@@ -338,7 +338,10 @@ export class JsonCatalogRepository implements CatalogRepository {
     id: string;
     provider: WritingPromptProvider;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult> {
     const id = String(args.id || "").trim();
     if (!id) return { ok: false, reason: "not_found" };
@@ -346,36 +349,46 @@ export class JsonCatalogRepository implements CatalogRepository {
       return { ok: false, reason: "rejected" };
     }
 
-    return withSeoPlanningJsonWriteLock(async () => {
-      const items = await this.listSeoPlanningDrafts();
-      const index = items.findIndex((item) => item.id === id);
-      if (index < 0) return { ok: false, reason: "not_found" };
+    // Lock order: Planning file → blog content files (same as Image Prompt / MySQL).
+    return withSeoPlanningJsonWriteLock(() =>
+      withBlogContentJsonWriteLock(async () => {
+        const items = await this.listSeoPlanningDrafts();
+        const index = items.findIndex((item) => item.id === id);
+        if (index < 0) return { ok: false, reason: "not_found" };
 
-      const latest = items[index]!;
-      if (args.acceptLatest && !(await args.acceptLatest(latest))) {
-        return { ok: false, reason: "rejected" };
-      }
+        const latest = items[index]!;
+        const readers: SeoPlanningPromptAcceptReaders = {
+          getPostById: (postId) => this.getPostById(postId),
+          listCategories: () => this.listCategories(),
+        };
+        if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
+          return { ok: false, reason: "rejected" };
+        }
 
-      const basePayload =
-        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
-          ? { ...(latest.payload as Record<string, unknown>) }
-          : {};
-      const nextPayload = mergeWritingPromptCache(basePayload, args.provider, args.entry);
-      const updatedAt = new Date().toISOString();
-      const nextDraft = sanitizeSeoPlanningDraft({
-        ...latest,
-        payload: nextPayload,
-        updatedAt,
-      });
-      const next = items.map((item, i) => (i === index ? nextDraft : item));
-      await saveList(SEO_PLANNING_FILE, next);
-      return { ok: true, draft: nextDraft };
-    });
+        const basePayload =
+          latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+            ? { ...(latest.payload as Record<string, unknown>) }
+            : {};
+        const nextPayload = mergeWritingPromptCache(basePayload, args.provider, args.entry);
+        const updatedAt = new Date().toISOString();
+        const nextDraft = sanitizeSeoPlanningDraft({
+          ...latest,
+          payload: nextPayload,
+          updatedAt,
+        });
+        const next = items.map((item, i) => (i === index ? nextDraft : item));
+        await saveList(SEO_PLANNING_FILE, next);
+        return { ok: true, draft: nextDraft };
+      }),
+    );
   }
   async mergeSeoPlanningGeminiWritingPromptCache(args: {
     id: string;
     entry: WritingPromptCacheEntry;
-    acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningPromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult> {
     return this.mergeSeoPlanningWritingPromptCache({
       id: args.id,
@@ -390,7 +403,7 @@ export class JsonCatalogRepository implements CatalogRepository {
     entry: ImagePromptCacheEntry;
     acceptLatest?: (
       latest: SeoPlanningDraft,
-      readers: SeoPlanningImagePromptAcceptReaders,
+      readers: SeoPlanningPromptAcceptReaders,
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningImagePromptResult> {
     const id = String(args.id || "").trim();
@@ -407,7 +420,7 @@ export class JsonCatalogRepository implements CatalogRepository {
         if (index < 0) return { ok: false, reason: "not_found" };
 
         const latest = items[index]!;
-        const readers: SeoPlanningImagePromptAcceptReaders = {
+        const readers: SeoPlanningPromptAcceptReaders = {
           getPostById: (postId) => this.getPostById(postId),
           listCategories: () => this.listCategories(),
         };

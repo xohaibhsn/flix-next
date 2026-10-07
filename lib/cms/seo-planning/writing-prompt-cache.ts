@@ -102,25 +102,28 @@ export function openAiWritingPromptCacheStatus(args: {
 }
 
 /**
- * Merge one provider cache into a fresh payload without clobbering the other provider or siblings.
+ * Merge one provider cache into a fresh payload without clobbering other providers or siblings.
+ *
+ * Write path preserves RAW writingPrompts keys other than the selected provider.
+ * Parser-ignored/malformed siblings and unknown future keys must survive an unrelated write.
  */
 export function mergeWritingPromptCache(
   payload: Record<string, unknown>,
   provider: WritingPromptProvider,
   entry: WritingPromptCacheEntry,
 ): Record<string, unknown> {
-  const existing = readWritingPromptsPayload(payload);
-  const next: WritingPromptsPayload = {
-    ...(existing.gemini ? { gemini: existing.gemini } : {}),
-    ...(existing.openai ? { openai: existing.openai } : {}),
-  };
-  next[provider] = {
-    ...entry,
+  const existingBlock = asRecord(asRecord(payload)?.writingPrompts) || {};
+  const nextBlock: Record<string, unknown> = { ...existingBlock };
+  nextBlock[provider] = {
+    chatgptPrompt: entry.chatgptPrompt,
+    writingFingerprint: entry.writingFingerprint,
+    model: entry.model,
+    generatedAt: entry.generatedAt,
     briefSpec: entry.briefSpec || SEO_PLANNING_WRITING_BRIEF_SPEC,
   };
   return {
     ...payload,
-    writingPrompts: next,
+    writingPrompts: nextBlock,
   };
 }
 
