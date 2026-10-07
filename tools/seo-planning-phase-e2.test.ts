@@ -1438,7 +1438,7 @@ test("UPDATEDAT: success bumps; failures leave unchanged", async () => {
   assert.notEqual(mem.store.updatedAt, before);
 });
 
-test("UI / ACTION / ENV: placement; Generate/Copy; no OpenAI image/media/publish; schema 3", () => {
+test("UI / ACTION / ENV: placement; Generate/Copy; dual Gemini+OpenAI; no media/publish; schema 3", () => {
   const ui = read("components/sidhu/SeoPlanningImagePrompt.tsx");
   const detail = read("components/sidhu/SeoPlanningDetail.tsx");
   const actions = read("lib/cms/seo-planning-actions.ts");
@@ -1448,8 +1448,9 @@ test("UI / ACTION / ENV: placement; Generate/Copy; no OpenAI image/media/publish
 
   assert.match(ui, /Generate with Gemini/);
   assert.match(ui, /Generate again with Gemini/);
+  assert.match(ui, /Generate with OpenAI/);
+  assert.match(ui, /Generate again with OpenAI/);
   assert.match(ui, /Copy Prompt/);
-  assert.doesNotMatch(ui, /Generate with OpenAI/);
   assert.doesNotMatch(ui, /useEffect\(/);
   assert.doesNotMatch(ui, /dangerouslySetInnerHTML/);
   assert.doesNotMatch(ui, /Cloudinary|MediaAsset|type=["']file["']/);
@@ -1457,16 +1458,22 @@ test("UI / ACTION / ENV: placement; Generate/Copy; no OpenAI image/media/publish
   assert.match(detail, /SeoPlanningImageBrief/);
   assert.match(detail, /SeoPlanningImagePrompt/);
   assert.match(detail, /geminiImagePromptConfigured/);
+  assert.match(detail, /openaiImagePromptConfigured/);
   const briefIdx = detail.indexOf("SeoPlanningImageBrief");
   const imagePromptIdx = detail.indexOf("SeoPlanningImagePrompt");
   const workflowIdx = detail.indexOf('h3 className="text-sm font-semibold text-ink">Workflow');
   assert.ok(briefIdx > 0 && imagePromptIdx > briefIdx && workflowIdx > imagePromptIdx);
   assert.match(actions, /generateChatgptImagePromptWithGeminiAction/);
+  assert.match(actions, /generateChatgptImagePromptWithOpenAiAction/);
   assert.match(actions, /requireAdminActor\("seo"\)/);
-  assert.doesNotMatch(actions, /GEMINI_IMAGE_PROMPT_MODEL|apiKey|endpoint/);
+  assert.doesNotMatch(actions, /GEMINI_IMAGE_PROMPT_MODEL|OPENAI_IMAGE_PROMPT_MODEL|apiKey|endpoint/);
   assert.match(page, /geminiImagePromptConfigured|isGeminiImagePromptConfigured/);
+  assert.match(page, /openaiImagePromptConfigured|isOpenAiImagePromptConfigured/);
   assert.match(page, /readGeminiImagePromptCache/);
+  assert.match(page, /readOpenAiImagePromptCache/);
+  assert.match(page, /selectInitialImagePromptProvider/);
   assert.match(env, /^GEMINI_IMAGE_PROMPT_MODEL=$/m);
+  assert.match(env, /^OPENAI_IMAGE_PROMPT_MODEL=$/m);
   assert.doesNotMatch(briefUi, /Generate with Gemini/);
   assert.doesNotMatch(read("db/cms-schema.sql"), /image_prompt|imagePrompts/);
   assert.doesNotMatch(read("lib/db/schema.ts"), /image_prompt|imagePrompts/);
@@ -1478,5 +1485,11 @@ test("UI / ACTION / ENV: placement; Generate/Copy; no OpenAI image/media/publish
   assert.match(providerSrc, /Do not instruct ChatGPT to render brand names, logos/);
   assert.doesNotMatch(providerSrc, /responseMimeType/);
   assert.match(read("lib/cms/ai-seo/gemini-provider.ts"), /APPLICATION_JSON/);
+  const openaiProviderSrc = read("lib/cms/ai-seo/image-prompt-openai.ts");
+  assert.match(openaiProviderSrc, /Sidhu AI Image Prompt Assistant/);
+  assert.match(openaiProviderSrc, /buildOpenAiStructuredRequestBody/);
+  assert.match(openaiProviderSrc, /requestOpenAiStructuredJson/);
+  assert.match(openaiProviderSrc, /IMAGE_PROMPT_OPENAI_SCHEMA_NAME/);
+  assert.doesNotMatch(openaiProviderSrc, /web_search|tools|image_generation/);
   assert.match(ui, /inFlight/);
 });

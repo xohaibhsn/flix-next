@@ -6,6 +6,7 @@ import {
   isGeminiBlogPromptConfigured,
   isGeminiImagePromptConfigured,
   isOpenAiBlogPromptConfigured,
+  isOpenAiImagePromptConfigured,
 } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import {
@@ -18,6 +19,7 @@ import {
 } from "@/lib/cms/seo-planning/suggestions";
 import {
   generateChatgptImagePromptWithGemini,
+  generateChatgptImagePromptWithOpenAi,
   type GenerateChatgptImagePromptResult,
 } from "@/lib/cms/seo-planning/image-prompt";
 import {
@@ -303,6 +305,7 @@ export async function generateChatgptWritingPromptWithOpenAiAction(
 
 export type GenerateChatgptImagePromptActionResult = GenerateChatgptImagePromptResult & {
   geminiImagePromptConfigured?: boolean;
+  openaiImagePromptConfigured?: boolean;
 };
 
 /**
@@ -314,6 +317,7 @@ export async function generateChatgptImagePromptWithGeminiAction(
   rawInput: unknown,
 ): Promise<GenerateChatgptImagePromptActionResult> {
   const geminiImagePromptConfigured = isGeminiImagePromptConfigured();
+  const openaiImagePromptConfigured = isOpenAiImagePromptConfigured();
   const actor = await requireAdminActor("seo");
   if (!actor.ok) {
     return {
@@ -321,6 +325,7 @@ export async function generateChatgptImagePromptWithGeminiAction(
       code: "unauthorized",
       error: actor.error,
       geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
     };
   }
 
@@ -335,6 +340,7 @@ export async function generateChatgptImagePromptWithGeminiAction(
       code: "invalid_input",
       error: "Planning draft id is required.",
       geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
     };
   }
 
@@ -344,6 +350,7 @@ export async function generateChatgptImagePromptWithGeminiAction(
       code: "not_configured",
       error: "Gemini image-prompt generation is not configured yet.",
       geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
     };
   }
 
@@ -355,5 +362,62 @@ export async function generateChatgptImagePromptWithGeminiAction(
     catalog: imagePromptCatalog(),
   });
 
-  return { ...result, geminiImagePromptConfigured };
+  return { ...result, geminiImagePromptConfigured, openaiImagePromptConfigured };
+}
+
+/**
+ * Explicit Generate with OpenAI — creates a private ChatGPT image prompt from the E1 Image Brief.
+ * Does not generate images, upload media, modify BlogPosts, call Gemini, or call GSC.
+ * One click = one OpenAI request (never a silent cache return). No tools / web search / image APIs.
+ */
+export async function generateChatgptImagePromptWithOpenAiAction(
+  rawInput: unknown,
+): Promise<GenerateChatgptImagePromptActionResult> {
+  const geminiImagePromptConfigured = isGeminiImagePromptConfigured();
+  const openaiImagePromptConfigured = isOpenAiImagePromptConfigured();
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      code: "unauthorized",
+      error: actor.error,
+      geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
+    };
+  }
+
+  const input =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>)
+      : null;
+  const planningDraftId = typeof input?.planningDraftId === "string" ? input.planningDraftId.trim() : "";
+  if (!planningDraftId || Object.keys(input || {}).some((key) => key !== "planningDraftId")) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "Planning draft id is required.",
+      geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
+    };
+  }
+
+  if (!openaiImagePromptConfigured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "OpenAI image-prompt generation is not configured yet.",
+      geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
+    };
+  }
+
+  const headerStore = await headers();
+  const result = await generateChatgptImagePromptWithOpenAi({
+    planningDraftId,
+    adminId: actor.user.id,
+    ip: clientIp(headerStore),
+    catalog: imagePromptCatalog(),
+  });
+
+  return { ...result, geminiImagePromptConfigured, openaiImagePromptConfigured };
 }

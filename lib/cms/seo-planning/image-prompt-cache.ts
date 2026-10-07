@@ -137,6 +137,13 @@ export function mergeGeminiImagePromptCache(
   return mergeImagePromptCache(payload, "gemini", entry);
 }
 
+export function mergeOpenAiImagePromptCache(
+  payload: Record<string, unknown>,
+  entry: ImagePromptCacheEntry,
+): Record<string, unknown> {
+  return mergeImagePromptCache(payload, "openai", entry);
+}
+
 export function buildImagePromptCacheEntry(args: {
   chatgptImagePrompt: string;
   imageFingerprint: string;
@@ -153,6 +160,15 @@ export function buildImagePromptCacheEntry(args: {
 }
 
 export function buildGeminiImagePromptCacheEntry(args: {
+  chatgptImagePrompt: string;
+  imageFingerprint: string;
+  model: string;
+  generatedAt?: string;
+}): ImagePromptCacheEntry {
+  return buildImagePromptCacheEntry(args);
+}
+
+export function buildOpenAiImagePromptCacheEntry(args: {
   chatgptImagePrompt: string;
   imageFingerprint: string;
   model: string;

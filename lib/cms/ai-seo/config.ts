@@ -27,6 +27,9 @@ export const OPENAI_BLOG_PROMPT_MAX_OUTPUT_TOKENS = 3500;
 /** Phase E2 ChatGPT image-prompt generation (not SEO / writing prompt / image APIs). */
 export const GEMINI_IMAGE_PROMPT_TIMEOUT_MS = 30_000;
 export const GEMINI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS = 1500;
+/** Phase E3 ChatGPT image-prompt generation (not SEO / writing prompt / image APIs). */
+export const OPENAI_IMAGE_PROMPT_TIMEOUT_MS = 30_000;
+export const OPENAI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS = 1500;
 export const CHATGPT_IMAGE_PROMPT_MAX_CHARS = 4_000;
 
 export type OpenAiSeoConfig = {
@@ -63,6 +66,9 @@ export type GeminiImagePromptConfig = GeminiGenerateContentConfig & {
 
 /** Same transport shape as OpenAiSeoConfig; model comes only from OPENAI_BLOG_PROMPT_MODEL. */
 export type OpenAiBlogPromptConfig = OpenAiSeoConfig;
+
+/** Same transport shape as OpenAiSeoConfig; model comes only from OPENAI_IMAGE_PROMPT_MODEL. */
+export type OpenAiImagePromptConfig = OpenAiSeoConfig;
 
 export function isOpenAiSeoConfigured() {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -184,5 +190,24 @@ export function getGeminiImagePromptConfig(): GeminiImagePromptConfig {
       : "",
     timeoutMs: GEMINI_IMAGE_PROMPT_TIMEOUT_MS,
     maxOutputTokens: GEMINI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS,
+  };
+}
+
+/** OpenAI Image Prompt requires key + explicit OPENAI_IMAGE_PROMPT_MODEL (never SEO/blog fallback). */
+export function isOpenAiImagePromptConfigured() {
+  return Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_IMAGE_PROMPT_MODEL?.trim());
+}
+
+export function getOpenAiImagePromptConfig(): OpenAiImagePromptConfig {
+  const apiKey = process.env.OPENAI_API_KEY?.trim() || "";
+  const model = process.env.OPENAI_IMAGE_PROMPT_MODEL?.trim() || "";
+  const configured = Boolean(apiKey && model);
+  return {
+    configured,
+    apiKey,
+    model,
+    endpoint: OPENAI_RESPONSES_ENDPOINT,
+    timeoutMs: OPENAI_IMAGE_PROMPT_TIMEOUT_MS,
+    maxOutputTokens: OPENAI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS,
   };
 }

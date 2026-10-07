@@ -1,17 +1,21 @@
 /**
- * Phase E2 — generate a private ChatGPT image prompt with Gemini.
+ * Phase E2/E3 — generate a private ChatGPT image prompt with Gemini or OpenAI.
  * One deliberate click = one provider call; no media / BlogPost / image API writes.
  */
 
 import "server-only";
 
-import type { GeminiImagePromptConfig } from "@/lib/cms/ai-seo/config";
+import type { GeminiImagePromptConfig, OpenAiImagePromptConfig } from "@/lib/cms/ai-seo/config";
 import {
   getGeminiImagePromptConfig,
+  getOpenAiImagePromptConfig,
   isGeminiImagePromptConfigured,
+  isOpenAiImagePromptConfigured,
 } from "@/lib/cms/ai-seo/config";
 import { requestGeminiChatgptImagePrompt } from "@/lib/cms/ai-seo/image-prompt-gemini";
+import { requestOpenAiChatgptImagePrompt } from "@/lib/cms/ai-seo/image-prompt-openai";
 import type { GeminiFetch } from "@/lib/cms/ai-seo/gemini-provider";
+import type { OpenAiFetch } from "@/lib/cms/ai-seo/provider";
 import { checkAiSeoImagePromptRateLimit } from "@/lib/cms/ai-seo/rate-limit";
 import type {
   MergeSeoPlanningImagePromptResult,
@@ -104,22 +108,19 @@ async function briefStillMatchesFingerprint(
   return fingerprintImageBrief(brief) === expectedFingerprint;
 }
 
-export async function generateChatgptImagePromptWithGemini(args: {
+async function generateChatgptImagePrompt(args: {
   planningDraftId: string;
   adminId: string;
   ip: string;
   catalog: ImagePromptCatalog;
-  fetchImpl?: GeminiFetch;
-  config?: GeminiImagePromptConfig;
+  provider: ImagePromptProvider;
+  callProvider: (
+    canonicalInput: string,
+  ) => Promise<
+    | { ok: true; prompt: { chatgptImagePrompt: string }; model: string }
+    | { ok: false; code: NonNullable<GenerateChatgptImagePromptFailure["code"]>; message: string }
+  >;
 }): Promise<GenerateChatgptImagePromptResult> {
-  if (!isGeminiImagePromptConfigured() && !args.config?.configured) {
-    return {
-      ok: false,
-      code: "not_configured",
-      error: "Gemini image-prompt generation is not configured yet.",
-    };
-  }
-
   const id = String(args.planningDraftId || "").trim();
   if (!id) {
     return { ok: false, code: "invalid_input", error: "Planning draft id is required." };
@@ -162,10 +163,7 @@ export async function generateChatgptImagePromptWithGemini(args: {
     };
   }
 
-  const provider = await requestGeminiChatgptImagePrompt(canonicalInput, {
-    fetchImpl: args.fetchImpl,
-    config: args.config ?? getGeminiImagePromptConfig(),
-  });
+  const provider = await args.callProvider(canonicalInput);
   if (!provider.ok) {
     return { ok: false, code: provider.code, error: provider.message };
   }
@@ -193,7 +191,7 @@ export async function generateChatgptImagePromptWithGemini(args: {
   try {
     const merged = await args.catalog.mergeSeoPlanningImagePromptCache({
       id,
-      provider: "gemini",
+      provider: args.provider,
       entry: cache,
       // Write-boundary MUST use transaction/lock-scoped readers from the catalog merge,
       // not the ambient pool/catalog connection (REFRESH article TOCTOU).
@@ -211,8 +209,68 @@ export async function generateChatgptImagePromptWithGemini(args: {
           "The Image Brief changed while the prompt was being generated. Generate again from the current saved brief.",
       };
     }
-    return { ok: true, draft: merged.draft, cache, provider: "gemini" };
+    return { ok: true, draft: merged.draft, cache, provider: args.provider };
   } catch {
     return { ok: false, code: "unavailable", error: "Could not save the image prompt. Please try again." };
   }
+}
+
+export async function generateChatgptImagePromptWithGemini(args: {
+  planningDraftId: string;
+  adminId: string;
+  ip: string;
+  catalog: ImagePromptCatalog;
+  fetchImpl?: GeminiFetch;
+  config?: GeminiImagePromptConfig;
+}): Promise<GenerateChatgptImagePromptResult> {
+  if (!isGeminiImagePromptConfigured() && !args.config?.configured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "Gemini image-prompt generation is not configured yet.",
+    };
+  }
+
+  return generateChatgptImagePrompt({
+    planningDraftId: args.planningDraftId,
+    adminId: args.adminId,
+    ip: args.ip,
+    catalog: args.catalog,
+    provider: "gemini",
+    callProvider: (canonicalInput) =>
+      requestGeminiChatgptImagePrompt(canonicalInput, {
+        fetchImpl: args.fetchImpl,
+        config: args.config ?? getGeminiImagePromptConfig(),
+      }),
+  });
+}
+
+export async function generateChatgptImagePromptWithOpenAi(args: {
+  planningDraftId: string;
+  adminId: string;
+  ip: string;
+  catalog: ImagePromptCatalog;
+  fetchImpl?: OpenAiFetch;
+  config?: OpenAiImagePromptConfig;
+}): Promise<GenerateChatgptImagePromptResult> {
+  if (!isOpenAiImagePromptConfigured() && !args.config?.configured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "OpenAI image-prompt generation is not configured yet.",
+    };
+  }
+
+  return generateChatgptImagePrompt({
+    planningDraftId: args.planningDraftId,
+    adminId: args.adminId,
+    ip: args.ip,
+    catalog: args.catalog,
+    provider: "openai",
+    callProvider: (canonicalInput) =>
+      requestOpenAiChatgptImagePrompt(canonicalInput, {
+        fetchImpl: args.fetchImpl,
+        config: args.config ?? getOpenAiImagePromptConfig(),
+      }),
+  });
 }

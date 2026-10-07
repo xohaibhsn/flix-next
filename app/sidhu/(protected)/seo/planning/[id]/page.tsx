@@ -6,6 +6,7 @@ import {
   isGeminiBlogPromptConfigured,
   isGeminiImagePromptConfigured,
   isOpenAiBlogPromptConfigured,
+  isOpenAiImagePromptConfigured,
 } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import { buildImageBrief } from "@/lib/cms/seo-planning/image-brief";
@@ -13,6 +14,8 @@ import { fingerprintImageBrief } from "@/lib/cms/seo-planning/image-fingerprint"
 import {
   imagePromptCacheStatus,
   readGeminiImagePromptCache,
+  readOpenAiImagePromptCache,
+  selectInitialImagePromptProvider,
 } from "@/lib/cms/seo-planning/image-prompt-cache";
 import { buildWritingBrief } from "@/lib/cms/seo-planning/writing-brief";
 import { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
@@ -60,10 +63,20 @@ export default async function SidhuSeoPlanningDetailPage({
   const imageBrief = buildImageBrief(draft, writingArticle);
   const imageFingerprint = fingerprintImageBrief(imageBrief);
   const geminiImageCache = readGeminiImagePromptCache(draft.payload);
+  const openaiImageCache = readOpenAiImagePromptCache(draft.payload);
   const geminiImageStatus = imagePromptCacheStatus({
     entry: geminiImageCache,
     currentFingerprint: imageFingerprint,
     providerEligible: imageBrief.providerEligible,
+  });
+  const openaiImageStatus = imagePromptCacheStatus({
+    entry: openaiImageCache,
+    currentFingerprint: imageFingerprint,
+    providerEligible: imageBrief.providerEligible,
+  });
+  const imageSelected = selectInitialImagePromptProvider({
+    gemini: { entry: geminiImageCache, status: geminiImageStatus },
+    openai: { entry: openaiImageCache, status: openaiImageStatus },
   });
 
   return (
@@ -84,14 +97,16 @@ export default async function SidhuSeoPlanningDetailPage({
           geminiBlogPromptConfigured={isGeminiBlogPromptConfigured()}
           openaiBlogPromptConfigured={isOpenAiBlogPromptConfigured()}
           geminiImagePromptConfigured={isGeminiImagePromptConfigured()}
+          openaiImagePromptConfigured={isOpenAiImagePromptConfigured()}
           initialWritingPromptState={{
             gemini: { status: geminiStatus, cache: geminiCache },
             openai: { status: openaiStatus, cache: openaiCache },
             selected,
           }}
           initialImagePromptState={{
-            status: geminiImageStatus,
-            cache: geminiImageCache,
+            gemini: { status: geminiImageStatus, cache: geminiImageCache },
+            openai: { status: openaiImageStatus, cache: openaiImageCache },
+            selected: imageSelected,
           }}
         />
       </SeoModuleChrome>

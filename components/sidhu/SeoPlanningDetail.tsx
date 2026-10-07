@@ -96,12 +96,17 @@ export function SeoPlanningDetail({
   geminiBlogPromptConfigured = false,
   openaiBlogPromptConfigured = false,
   geminiImagePromptConfigured = false,
+  openaiImagePromptConfigured = false,
   initialWritingPromptState = {
     gemini: { status: "none", cache: null },
     openai: { status: "none", cache: null },
     selected: null,
   },
-  initialImagePromptState = { status: "none", cache: null },
+  initialImagePromptState = {
+    gemini: { status: "none", cache: null },
+    openai: { status: "none", cache: null },
+    selected: null,
+  },
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
@@ -109,6 +114,7 @@ export function SeoPlanningDetail({
   geminiBlogPromptConfigured?: boolean;
   openaiBlogPromptConfigured?: boolean;
   geminiImagePromptConfigured?: boolean;
+  openaiImagePromptConfigured?: boolean;
   initialWritingPromptState?: WritingPromptUiState;
   initialImagePromptState?: ImagePromptUiState;
 }) {
@@ -326,6 +332,7 @@ export function SeoPlanningDetail({
       <SeoPlanningImagePrompt
         planningDraftId={draft.id}
         geminiImagePromptConfigured={geminiImagePromptConfigured}
+        openaiImagePromptConfigured={openaiImagePromptConfigured}
         providerEligible={imageBrief.providerEligible}
         providerIneligibleReason={imageBrief.providerIneligibleReason}
         dirty={dirty}

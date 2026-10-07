@@ -121,10 +121,12 @@ export {
 export {
   buildGeminiImagePromptCacheEntry,
   buildImagePromptCacheEntry,
+  buildOpenAiImagePromptCacheEntry,
   geminiImagePromptCacheStatus,
   imagePromptCacheStatus,
   mergeGeminiImagePromptCache,
   mergeImagePromptCache,
+  mergeOpenAiImagePromptCache,
   openAiImagePromptCacheStatus,
   readGeminiImagePromptCache,
   readImagePromptCache,
@@ -136,4 +138,7 @@ export {
   type ImagePromptProvider,
   type ImagePromptsPayload,
 } from "@/lib/cms/seo-planning/image-prompt-cache";
-export { generateChatgptImagePromptWithGemini } from "@/lib/cms/seo-planning/image-prompt";
+export {
+  generateChatgptImagePromptWithGemini,
+  generateChatgptImagePromptWithOpenAi,
+} from "@/lib/cms/seo-planning/image-prompt";
