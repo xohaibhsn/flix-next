@@ -1,4 +1,9 @@
-import type { CatalogRepository, MergeSeoPlanningWritingPromptResult } from "@/lib/cms/catalog";
+import type {
+  CatalogRepository,
+  MergeSeoPlanningImagePromptResult,
+  MergeSeoPlanningWritingPromptResult,
+  SeoPlanningImagePromptAcceptReaders,
+} from "@/lib/cms/catalog";
 import {
   defaultBlogCategories,
   defaultBlogPosts,
@@ -11,6 +16,11 @@ import { applySubscriptionRedirectMigration } from "@/lib/cms/subscription-url-m
 import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
+import {
+  mergeImagePromptCache,
+  type ImagePromptCacheEntry,
+  type ImagePromptProvider,
+} from "@/lib/cms/seo-planning/image-prompt-cache";
 import {
   mergeWritingPromptCache,
   type WritingPromptCacheEntry,
@@ -64,6 +74,21 @@ let seoPlanningJsonWriteChain: Promise<void> = Promise.resolve();
 function withSeoPlanningJsonWriteLock<T>(operation: () => Promise<T>): Promise<T> {
   const run = seoPlanningJsonWriteChain.then(operation, operation);
   seoPlanningJsonWriteChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+/**
+ * Process-local queue serializing blog post/category file mutations with E2
+ * image-prompt write-boundary article reads (Planning lock alone is not enough).
+ */
+let blogContentJsonWriteChain: Promise<void> = Promise.resolve();
+
+function withBlogContentJsonWriteLock<T>(operation: () => Promise<T>): Promise<T> {
+  const run = blogContentJsonWriteChain.then(operation, operation);
+  blogContentJsonWriteChain = run.then(
     () => undefined,
     () => undefined,
   );
@@ -153,20 +178,24 @@ export class JsonCatalogRepository implements CatalogRepository {
     return (Array.isArray(items) ? items : defaultBlogCategories()).map(sanitizeCategory);
   }
   async saveCategory(category: BlogCategory) {
-    const safe = sanitizeCategory(category);
-    const items = await this.listCategories();
-    const next = items.some((row) => row.id === safe.id)
-      ? items.map((row) => (row.id === safe.id ? safe : row))
-      : [...items, safe];
-    await saveList(CATEGORIES_FILE, next);
-    return safe;
+    return withBlogContentJsonWriteLock(async () => {
+      const safe = sanitizeCategory(category);
+      const items = await this.listCategories();
+      const next = items.some((row) => row.id === safe.id)
+        ? items.map((row) => (row.id === safe.id ? safe : row))
+        : [...items, safe];
+      await saveList(CATEGORIES_FILE, next);
+      return safe;
+    });
   }
   async deleteCategory(id: string) {
-    const items = await this.listCategories();
-    await saveList(
-      CATEGORIES_FILE,
-      items.filter((item) => item.id !== id),
-    );
+    return withBlogContentJsonWriteLock(async () => {
+      const items = await this.listCategories();
+      await saveList(
+        CATEGORIES_FILE,
+        items.filter((item) => item.id !== id),
+      );
+    });
   }
   async listPosts() {
     const items = await readJsonFile<BlogPost[]>(POSTS_FILE, defaultBlogPosts());
@@ -189,23 +218,27 @@ export class JsonCatalogRepository implements CatalogRepository {
     return items.find((item) => item.id === id) ?? null;
   }
   async savePost(post: BlogPost) {
-    const safe = sanitizePost(post);
-    const items = await this.listPosts();
-    if (items.some((item) => item.slug === safe.slug && item.id !== safe.id)) {
-      throw new Error("That blog slug is already in use.");
-    }
-    const next = items.some((item) => item.id === safe.id)
-      ? items.map((item) => (item.id === safe.id ? safe : item))
-      : [...items, safe];
-    await saveList(POSTS_FILE, next);
-    return safe;
+    return withBlogContentJsonWriteLock(async () => {
+      const safe = sanitizePost(post);
+      const items = await this.listPosts();
+      if (items.some((item) => item.slug === safe.slug && item.id !== safe.id)) {
+        throw new Error("That blog slug is already in use.");
+      }
+      const next = items.some((item) => item.id === safe.id)
+        ? items.map((item) => (item.id === safe.id ? safe : item))
+        : [...items, safe];
+      await saveList(POSTS_FILE, next);
+      return safe;
+    });
   }
   async deletePost(id: string) {
-    const items = await this.listPosts();
-    await saveList(
-      POSTS_FILE,
-      items.filter((item) => item.id !== id),
-    );
+    return withBlogContentJsonWriteLock(async () => {
+      const items = await this.listPosts();
+      await saveList(
+        POSTS_FILE,
+        items.filter((item) => item.id !== id),
+      );
+    });
   }
   async listRedirects() {
     const items = await readJsonFile<RedirectRule[]>(REDIRECTS_FILE, []);
@@ -350,6 +383,54 @@ export class JsonCatalogRepository implements CatalogRepository {
       entry: args.entry,
       acceptLatest: args.acceptLatest,
     });
+  }
+  async mergeSeoPlanningImagePromptCache(args: {
+    id: string;
+    provider: ImagePromptProvider;
+    entry: ImagePromptCacheEntry;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningImagePromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningImagePromptResult> {
+    const id = String(args.id || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+    if (args.provider !== "gemini" && args.provider !== "openai") {
+      return { ok: false, reason: "rejected" };
+    }
+
+    // Lock order: Planning file → blog content files (mirrors MySQL Planning → Post → Category).
+    return withSeoPlanningJsonWriteLock(() =>
+      withBlogContentJsonWriteLock(async () => {
+        const items = await this.listSeoPlanningDrafts();
+        const index = items.findIndex((item) => item.id === id);
+        if (index < 0) return { ok: false, reason: "not_found" };
+
+        const latest = items[index]!;
+        const readers: SeoPlanningImagePromptAcceptReaders = {
+          getPostById: (postId) => this.getPostById(postId),
+          listCategories: () => this.listCategories(),
+        };
+        if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
+          return { ok: false, reason: "rejected" };
+        }
+
+        const basePayload =
+          latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+            ? { ...(latest.payload as Record<string, unknown>) }
+            : {};
+        const nextPayload = mergeImagePromptCache(basePayload, args.provider, args.entry);
+        const updatedAt = new Date().toISOString();
+        const nextDraft = sanitizeSeoPlanningDraft({
+          ...latest,
+          payload: nextPayload,
+          updatedAt,
+        });
+        const next = items.map((item, i) => (i === index ? nextDraft : item));
+        await saveList(SEO_PLANNING_FILE, next);
+        return { ok: true, draft: nextDraft };
+      }),
+    );
   }
   async dashboardStats(): Promise<CmsDashboardStats> {
     const [pages, posts, faqs, plans, media, redirects, messages] = await Promise.all([

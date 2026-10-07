@@ -24,6 +24,10 @@ export const CHATGPT_WRITING_PROMPT_MAX_CHARS = 12_000;
 /** Phase D3 ChatGPT writing-prompt generation (not SEO explain/draft/research). */
 export const OPENAI_BLOG_PROMPT_TIMEOUT_MS = 30_000;
 export const OPENAI_BLOG_PROMPT_MAX_OUTPUT_TOKENS = 3500;
+/** Phase E2 ChatGPT image-prompt generation (not SEO / writing prompt / image APIs). */
+export const GEMINI_IMAGE_PROMPT_TIMEOUT_MS = 30_000;
+export const GEMINI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS = 1500;
+export const CHATGPT_IMAGE_PROMPT_MAX_CHARS = 4_000;
 
 export type OpenAiSeoConfig = {
   configured: boolean;
@@ -50,6 +54,10 @@ export type GeminiSeoConfig = GeminiGenerateContentConfig & {
 };
 
 export type GeminiBlogPromptConfig = GeminiGenerateContentConfig & {
+  maxOutputTokens: number;
+};
+
+export type GeminiImagePromptConfig = GeminiGenerateContentConfig & {
   maxOutputTokens: number;
 };
 
@@ -155,5 +163,26 @@ export function getOpenAiBlogPromptConfig(): OpenAiBlogPromptConfig {
     endpoint: OPENAI_RESPONSES_ENDPOINT,
     timeoutMs: OPENAI_BLOG_PROMPT_TIMEOUT_MS,
     maxOutputTokens: OPENAI_BLOG_PROMPT_MAX_OUTPUT_TOKENS,
+  };
+}
+
+/** Gemini Image Prompt requires key + explicit GEMINI_IMAGE_PROMPT_MODEL (never SEO/blog fallback). */
+export function isGeminiImagePromptConfigured() {
+  return Boolean(process.env.GEMINI_API_KEY?.trim() && process.env.GEMINI_IMAGE_PROMPT_MODEL?.trim());
+}
+
+export function getGeminiImagePromptConfig(): GeminiImagePromptConfig {
+  const apiKey = process.env.GEMINI_API_KEY?.trim() || "";
+  const model = process.env.GEMINI_IMAGE_PROMPT_MODEL?.trim() || "";
+  const configured = Boolean(apiKey && model);
+  return {
+    configured,
+    apiKey,
+    model,
+    endpoint: configured
+      ? `${GEMINI_GENERATE_CONTENT_BASE}/${encodeURIComponent(model)}:generateContent`
+      : "",
+    timeoutMs: GEMINI_IMAGE_PROMPT_TIMEOUT_MS,
+    maxOutputTokens: GEMINI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS,
   };
 }

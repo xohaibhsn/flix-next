@@ -2,8 +2,18 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/sidhu/AdminShell";
 import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoPlanningDetail } from "@/components/sidhu/SeoPlanningDetail";
-import { isGeminiBlogPromptConfigured, isOpenAiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
+import {
+  isGeminiBlogPromptConfigured,
+  isGeminiImagePromptConfigured,
+  isOpenAiBlogPromptConfigured,
+} from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
+import { buildImageBrief } from "@/lib/cms/seo-planning/image-brief";
+import { fingerprintImageBrief } from "@/lib/cms/seo-planning/image-fingerprint";
+import {
+  imagePromptCacheStatus,
+  readGeminiImagePromptCache,
+} from "@/lib/cms/seo-planning/image-prompt-cache";
 import { buildWritingBrief } from "@/lib/cms/seo-planning/writing-brief";
 import { buildWritingArticleContext } from "@/lib/cms/seo-planning/writing-context";
 import { fingerprintWritingBrief } from "@/lib/cms/seo-planning/writing-fingerprint";
@@ -47,6 +57,15 @@ export default async function SidhuSeoPlanningDetailPage({
     openai: { entry: openaiCache, status: openaiStatus },
   });
 
+  const imageBrief = buildImageBrief(draft, writingArticle);
+  const imageFingerprint = fingerprintImageBrief(imageBrief);
+  const geminiImageCache = readGeminiImagePromptCache(draft.payload);
+  const geminiImageStatus = imagePromptCacheStatus({
+    entry: geminiImageCache,
+    currentFingerprint: imageFingerprint,
+    providerEligible: imageBrief.providerEligible,
+  });
+
   return (
     <AdminShell
       title="SEO"
@@ -64,10 +83,15 @@ export default async function SidhuSeoPlanningDetailPage({
           writingArticle={writingArticle}
           geminiBlogPromptConfigured={isGeminiBlogPromptConfigured()}
           openaiBlogPromptConfigured={isOpenAiBlogPromptConfigured()}
+          geminiImagePromptConfigured={isGeminiImagePromptConfigured()}
           initialWritingPromptState={{
             gemini: { status: geminiStatus, cache: geminiCache },
             openai: { status: openaiStatus, cache: openaiCache },
             selected,
+          }}
+          initialImagePromptState={{
+            status: geminiImageStatus,
+            cache: geminiImageCache,
           }}
         />
       </SeoModuleChrome>

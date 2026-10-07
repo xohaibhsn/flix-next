@@ -19,6 +19,11 @@ import { SeoPlanningSuggestions } from "@/components/sidhu/SeoPlanningSuggestion
 import { SeoPlanningWritingBrief } from "@/components/sidhu/SeoPlanningWritingBrief";
 import { SeoPlanningImageBrief } from "@/components/sidhu/SeoPlanningImageBrief";
 import {
+  markImagePromptStale,
+  SeoPlanningImagePrompt,
+  type ImagePromptUiState,
+} from "@/components/sidhu/SeoPlanningImagePrompt";
+import {
   markWritingPromptStale,
   SeoPlanningWritingPrompt,
   type WritingPromptUiState,
@@ -90,18 +95,22 @@ export function SeoPlanningDetail({
   writingArticle = { status: "skipped" },
   geminiBlogPromptConfigured = false,
   openaiBlogPromptConfigured = false,
+  geminiImagePromptConfigured = false,
   initialWritingPromptState = {
     gemini: { status: "none", cache: null },
     openai: { status: "none", cache: null },
     selected: null,
   },
+  initialImagePromptState = { status: "none", cache: null },
 }: {
   draft: SeoPlanningDraft;
   targetPostTitle: string | null;
   writingArticle?: WritingArticleContext;
   geminiBlogPromptConfigured?: boolean;
   openaiBlogPromptConfigured?: boolean;
+  geminiImagePromptConfigured?: boolean;
   initialWritingPromptState?: WritingPromptUiState;
+  initialImagePromptState?: ImagePromptUiState;
 }) {
   const [draft, setDraft] = useState(initialDraft);
   const [form, setForm] = useState<FormState>(() => formFromDraft(initialDraft));
@@ -110,6 +119,8 @@ export function SeoPlanningDetail({
   const [suggestionBusy, setSuggestionBusy] = useState(false);
   const [writingPromptState, setWritingPromptState] =
     useState<WritingPromptUiState>(initialWritingPromptState);
+  const [imagePromptState, setImagePromptState] =
+    useState<ImagePromptUiState>(initialImagePromptState);
   const [pending, startTransition] = useTransition();
   const controlsLocked = pending || suggestionBusy;
 
@@ -158,6 +169,7 @@ export function SeoPlanningDetail({
       setForm(nextForm);
       setSavedForm(nextForm);
       setWritingPromptState((prev) => markWritingPromptStale(prev));
+      setImagePromptState((prev) => markImagePromptStale(prev));
       setMessage({ tone: "ok", text: "Planning draft saved. Still private — nothing was published." });
     });
   }
@@ -168,6 +180,7 @@ export function SeoPlanningDetail({
     setForm(nextForm);
     setSavedForm(nextForm);
     setWritingPromptState((prev) => markWritingPromptStale(prev));
+    setImagePromptState((prev) => markImagePromptStale(prev));
   }
 
   return (
@@ -308,6 +321,18 @@ export function SeoPlanningDetail({
         brief={imageBrief}
         dirty={dirty}
         dirtyMessage={SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE}
+      />
+
+      <SeoPlanningImagePrompt
+        planningDraftId={draft.id}
+        geminiImagePromptConfigured={geminiImagePromptConfigured}
+        providerEligible={imageBrief.providerEligible}
+        providerIneligibleReason={imageBrief.providerIneligibleReason}
+        dirty={dirty}
+        state={imagePromptState}
+        onState={setImagePromptState}
+        onDraft={setDraft}
+        onMessage={setMessage}
       />
 
       <SectionCard className="space-y-3">

@@ -1,11 +1,21 @@
 import type { RowDataPacket } from "mysql2/promise";
-import type { CatalogRepository, MergeSeoPlanningWritingPromptResult } from "@/lib/cms/catalog";
+import type {
+  CatalogRepository,
+  MergeSeoPlanningImagePromptResult,
+  MergeSeoPlanningWritingPromptResult,
+  SeoPlanningImagePromptAcceptReaders,
+} from "@/lib/cms/catalog";
 import {
   fromMysqlDateTime,
   parseJsonColumn,
   toMysqlDateTime,
 } from "@/lib/cms/mysql-migrate";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
+import {
+  mergeImagePromptCache,
+  type ImagePromptCacheEntry,
+  type ImagePromptProvider,
+} from "@/lib/cms/seo-planning/image-prompt-cache";
 import {
   mergeWritingPromptCache,
   type WritingPromptCacheEntry,
@@ -669,6 +679,92 @@ export class MysqlCatalogRepository implements CatalogRepository {
       provider: "gemini",
       entry: args.entry,
       acceptLatest: args.acceptLatest,
+    });
+  }
+  async mergeSeoPlanningImagePromptCache(args: {
+    id: string;
+    provider: ImagePromptProvider;
+    entry: ImagePromptCacheEntry;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningImagePromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningImagePromptResult> {
+    await this.ready();
+    const id = String(args.id || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+    if (args.provider !== "gemini" && args.provider !== "openai") {
+      return { ok: false, reason: "rejected" };
+    }
+
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [id],
+      );
+      if (!rows[0]) return { ok: false, reason: "not_found" };
+
+      const latest = mapPlanningDraft(rows[0]);
+
+      // Lock order: Planning → target BlogPost → relevant category (REFRESH only).
+      // Same connection as Planning FOR UPDATE — closes article-context TOCTOU.
+      let lockedPost: BlogPost | null | undefined;
+      let lockedCategory: BlogCategory | null | undefined;
+
+      const readers: SeoPlanningImagePromptAcceptReaders = {
+        async getPostById(postId: string) {
+          const want = String(postId || "").trim();
+          if (!want) {
+            lockedPost = null;
+            return null;
+          }
+          const [postRows] = await conn.query<PostRow[]>(
+            "SELECT * FROM blog_posts WHERE id = ? LIMIT 1 FOR UPDATE",
+            [want],
+          );
+          lockedPost = postRows[0] ? mapPost(postRows[0]) : null;
+          lockedCategory = undefined;
+          return lockedPost;
+        },
+        async listCategories() {
+          if (latest.recommendation !== "REFRESH_EXISTING") return [];
+          const categoryId = lockedPost?.categoryId?.trim() || "";
+          if (!categoryId) return [];
+          if (lockedCategory !== undefined) {
+            return lockedCategory ? [lockedCategory] : [];
+          }
+          const [catRows] = await conn.query<CategoryRow[]>(
+            "SELECT * FROM blog_categories WHERE id = ? LIMIT 1 FOR UPDATE",
+            [categoryId],
+          );
+          lockedCategory = catRows[0] ? mapCategory(catRows[0]) : null;
+          return lockedCategory ? [lockedCategory] : [];
+        },
+      };
+
+      if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
+        return { ok: false, reason: "rejected" };
+      }
+
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeImagePromptCache(basePayload, args.provider, args.entry);
+      const updatedAt = new Date().toISOString();
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",
+        [JSON.stringify(nextPayload), toMysqlDateTime(updatedAt), id],
+      );
+
+      return {
+        ok: true,
+        draft: sanitizeSeoPlanningDraft({
+          ...latest,
+          payload: nextPayload,
+          updatedAt,
+        }),
+      };
     });
   }
   async dashboardStats() {

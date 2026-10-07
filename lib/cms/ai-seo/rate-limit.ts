@@ -129,3 +129,35 @@ export const AI_SEO_BLOG_PROMPT_RATE_LIMITS = {
   dailyMax: BLOG_PROMPT_DAILY_MAX,
   dailyWindowMs: DAILY_WINDOW_MS,
 } as const;
+
+/** Image Prompt limiter — dedicated bucket; shared by Gemini E2 + future OpenAI E3. Not Writing Prompt. */
+const IMAGE_PROMPT_BURST_MAX = 2;
+const IMAGE_PROMPT_DAILY_MAX = 20;
+const imagePromptBurstAttempts = new Map<string, WindowState>();
+const imagePromptDailyAttempts = new Map<string, WindowState>();
+
+export function aiSeoImagePromptRateLimitKey(adminId: string, ip: string) {
+  const material = `${adminId || "unknown"}:${ip || "unknown"}`;
+  return createHash("sha256").update(`flix-ai-seo-image-prompt:${material}`).digest("hex");
+}
+
+export function checkAiSeoImagePromptRateLimit(adminId: string, ip: string): AiSeoRateLimitResult {
+  const key = aiSeoImagePromptRateLimitKey(adminId, ip);
+  const burst = consume(imagePromptBurstAttempts, key, IMAGE_PROMPT_BURST_MAX, BURST_WINDOW_MS);
+  if (!burst.ok) return burst;
+  const daily = consume(imagePromptDailyAttempts, key, IMAGE_PROMPT_DAILY_MAX, DAILY_WINDOW_MS);
+  if (!daily.ok) return daily;
+  return { ok: true };
+}
+
+export function resetAiSeoImagePromptRateLimitForTests() {
+  imagePromptBurstAttempts.clear();
+  imagePromptDailyAttempts.clear();
+}
+
+export const AI_SEO_IMAGE_PROMPT_RATE_LIMITS = {
+  burstMax: IMAGE_PROMPT_BURST_MAX,
+  burstWindowMs: BURST_WINDOW_MS,
+  dailyMax: IMAGE_PROMPT_DAILY_MAX,
+  dailyWindowMs: DAILY_WINDOW_MS,
+} as const;

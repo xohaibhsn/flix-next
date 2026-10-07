@@ -118,3 +118,22 @@ export {
   generateChatgptWritingPromptWithGemini,
   generateChatgptWritingPromptWithOpenAi,
 } from "@/lib/cms/seo-planning/writing-prompt";
+export {
+  buildGeminiImagePromptCacheEntry,
+  buildImagePromptCacheEntry,
+  geminiImagePromptCacheStatus,
+  imagePromptCacheStatus,
+  mergeGeminiImagePromptCache,
+  mergeImagePromptCache,
+  openAiImagePromptCacheStatus,
+  readGeminiImagePromptCache,
+  readImagePromptCache,
+  readImagePromptsPayload,
+  readOpenAiImagePromptCache,
+  selectInitialImagePromptProvider,
+  type ImagePromptCacheEntry,
+  type ImagePromptCacheStatus,
+  type ImagePromptProvider,
+  type ImagePromptsPayload,
+} from "@/lib/cms/seo-planning/image-prompt-cache";
+export { generateChatgptImagePromptWithGemini } from "@/lib/cms/seo-planning/image-prompt";

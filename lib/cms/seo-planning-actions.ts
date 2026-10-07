@@ -2,7 +2,11 @@
 
 import { headers } from "next/headers";
 import { requireAdminActor } from "@/lib/auth/guards";
-import { isGeminiBlogPromptConfigured, isOpenAiBlogPromptConfigured } from "@/lib/cms/ai-seo/config";
+import {
+  isGeminiBlogPromptConfigured,
+  isGeminiImagePromptConfigured,
+  isOpenAiBlogPromptConfigured,
+} from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import {
   proceedSeoOpportunityToPlanningDraft,
@@ -12,6 +16,10 @@ import {
   applySeoPlanningSuggestionCommand,
   parseSeoPlanningSuggestionInput,
 } from "@/lib/cms/seo-planning/suggestions";
+import {
+  generateChatgptImagePromptWithGemini,
+  type GenerateChatgptImagePromptResult,
+} from "@/lib/cms/seo-planning/image-prompt";
 import {
   generateChatgptWritingPromptWithGemini,
   generateChatgptWritingPromptWithOpenAi,
@@ -40,6 +48,17 @@ function writingPromptCatalog() {
     mergeSeoPlanningGeminiWritingPromptCache: (
       args: Parameters<typeof cms.mergeSeoPlanningGeminiWritingPromptCache>[0],
     ) => cms.mergeSeoPlanningGeminiWritingPromptCache(args),
+    getPostById: (id: string) => cms.getPostById(id),
+    listCategories: () => cms.listCategories(),
+  };
+}
+
+function imagePromptCatalog() {
+  return {
+    getSeoPlanningDraftById: (id: string) => cms.getSeoPlanningDraftById(id),
+    mergeSeoPlanningImagePromptCache: (
+      args: Parameters<typeof cms.mergeSeoPlanningImagePromptCache>[0],
+    ) => cms.mergeSeoPlanningImagePromptCache(args),
     getPostById: (id: string) => cms.getPostById(id),
     listCategories: () => cms.listCategories(),
   };
@@ -280,4 +299,61 @@ export async function generateChatgptWritingPromptWithOpenAiAction(
   });
 
   return { ...result, geminiBlogPromptConfigured, openaiBlogPromptConfigured };
+}
+
+export type GenerateChatgptImagePromptActionResult = GenerateChatgptImagePromptResult & {
+  geminiImagePromptConfigured?: boolean;
+};
+
+/**
+ * Explicit Generate with Gemini — creates a private ChatGPT image prompt from the E1 Image Brief.
+ * Does not generate images, upload media, modify BlogPosts, call OpenAI, or call GSC.
+ * One click = one Gemini request (never a silent cache return).
+ */
+export async function generateChatgptImagePromptWithGeminiAction(
+  rawInput: unknown,
+): Promise<GenerateChatgptImagePromptActionResult> {
+  const geminiImagePromptConfigured = isGeminiImagePromptConfigured();
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      code: "unauthorized",
+      error: actor.error,
+      geminiImagePromptConfigured,
+    };
+  }
+
+  const input =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>)
+      : null;
+  const planningDraftId = typeof input?.planningDraftId === "string" ? input.planningDraftId.trim() : "";
+  if (!planningDraftId || Object.keys(input || {}).some((key) => key !== "planningDraftId")) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "Planning draft id is required.",
+      geminiImagePromptConfigured,
+    };
+  }
+
+  if (!geminiImagePromptConfigured) {
+    return {
+      ok: false,
+      code: "not_configured",
+      error: "Gemini image-prompt generation is not configured yet.",
+      geminiImagePromptConfigured,
+    };
+  }
+
+  const headerStore = await headers();
+  const result = await generateChatgptImagePromptWithGemini({
+    planningDraftId,
+    adminId: actor.user.id,
+    ip: clientIp(headerStore),
+    catalog: imagePromptCatalog(),
+  });
+
+  return { ...result, geminiImagePromptConfigured };
 }

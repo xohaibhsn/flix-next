@@ -1,4 +1,8 @@
 import type {
+  ImagePromptCacheEntry,
+  ImagePromptProvider,
+} from "@/lib/cms/seo-planning/image-prompt-cache";
+import type {
   WritingPromptCacheEntry,
   WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
@@ -20,6 +24,20 @@ export type MergeSeoPlanningWritingPromptResult =
 
 /** @deprecated Prefer MergeSeoPlanningWritingPromptResult — kept for D2 compatibility. */
 export type MergeSeoPlanningGeminiWritingPromptResult = MergeSeoPlanningWritingPromptResult;
+
+/** Result of an atomic Planning image-prompt cache merge. */
+export type MergeSeoPlanningImagePromptResult =
+  | { ok: true; draft: SeoPlanningDraft }
+  | { ok: false; reason: "not_found" | "rejected" };
+
+/**
+ * Transaction/lock-scoped readers for final E2 write-boundary validation.
+ * MySQL must satisfy these via the same connection that holds Planning FOR UPDATE.
+ */
+export type SeoPlanningImagePromptAcceptReaders = {
+  getPostById(id: string): Promise<BlogPost | null>;
+  listCategories(): Promise<BlogCategory[]>;
+};
 
 export interface CatalogRepository {
   listPlans(): Promise<PricingPlan[]>;
@@ -65,5 +83,19 @@ export interface CatalogRepository {
     entry: WritingPromptCacheEntry;
     acceptLatest?: (latest: SeoPlanningDraft) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningGeminiWritingPromptResult>;
+  /**
+   * Atomic image-prompt cache write: re-read latest under write lock/transaction,
+   * merge ONLY the selected imagePrompts provider sibling.
+   * acceptLatest receives transaction/lock-scoped article readers for REFRESH safety.
+   */
+  mergeSeoPlanningImagePromptCache(args: {
+    id: string;
+    provider: ImagePromptProvider;
+    entry: ImagePromptCacheEntry;
+    acceptLatest?: (
+      latest: SeoPlanningDraft,
+      readers: SeoPlanningImagePromptAcceptReaders,
+    ) => boolean | Promise<boolean>;
+  }): Promise<MergeSeoPlanningImagePromptResult>;
   dashboardStats(): Promise<CmsDashboardStats>;
 }
