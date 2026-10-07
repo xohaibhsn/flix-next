@@ -12,6 +12,14 @@ import {
 } from "@/lib/cms/mysql-migrate";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
 import {
+  archiveSeoPlanningDraftRecord,
+  assertArchivedForPermanentDelete,
+  assertSeoPlanningDraftMutableForOrdinarySave,
+  restoreSeoPlanningDraftRecord,
+  SEO_PLANNING_MISSING_DRAFT_MESSAGE,
+  type SeoPlanningListLifecycle,
+} from "@/lib/cms/seo-planning/lifecycle";
+import {
   mergeImagePromptCache,
   type ImagePromptCacheEntry,
   type ImagePromptProvider,
@@ -162,6 +170,7 @@ type PlanningRow = RowDataPacket & {
   linked_post_id: string | null;
   created_by: string;
   payload: unknown;
+  archived_at: unknown;
   created_at: unknown;
   updated_at: unknown;
 };
@@ -314,6 +323,10 @@ function createPromptAcceptReaders(
 }
 
 function mapPlanningDraft(row: PlanningRow): SeoPlanningDraft {
+  const archivedAt =
+    row.archived_at == null || row.archived_at === ""
+      ? null
+      : fromMysqlDateTime(row.archived_at);
   return sanitizeSeoPlanningDraft({
     id: row.id,
     recommendation: row.recommendation,
@@ -330,6 +343,7 @@ function mapPlanningDraft(row: PlanningRow): SeoPlanningDraft {
     createdBy: row.created_by,
     createdAt: fromMysqlDateTime(row.created_at),
     updatedAt: fromMysqlDateTime(row.updated_at),
+    archivedAt,
     payload: parseJsonColumn<Record<string, unknown>>(row.payload, {}),
   });
 }
@@ -576,11 +590,14 @@ export class MysqlCatalogRepository implements CatalogRepository {
     );
     return safe;
   }
-  async listSeoPlanningDrafts() {
+  async listSeoPlanningDrafts(options?: { lifecycle?: SeoPlanningListLifecycle }) {
     await this.ready();
-    const [rows] = await getDbPool().query<PlanningRow[]>(
-      "SELECT * FROM seo_planning_drafts ORDER BY updated_at DESC",
-    );
+    const lifecycle = options?.lifecycle || "active";
+    let sql = "SELECT * FROM seo_planning_drafts";
+    if (lifecycle === "active") sql += " WHERE archived_at IS NULL";
+    else if (lifecycle === "archived") sql += " WHERE archived_at IS NOT NULL";
+    sql += " ORDER BY updated_at DESC";
+    const [rows] = await getDbPool().query<PlanningRow[]>(sql);
     return rows.map(mapPlanningDraft);
   }
   async getSeoPlanningDraftById(id: string) {
@@ -607,19 +624,62 @@ export class MysqlCatalogRepository implements CatalogRepository {
     if (!safe.id || !safe.fingerprint) {
       throw new Error("Planning draft requires id and fingerprint.");
     }
-    const fingerprintOwner = await this.getSeoPlanningDraftByFingerprint(safe.fingerprint);
-    if (fingerprintOwner && fingerprintOwner.id !== safe.id) {
-      throw new Error("Planning draft fingerprint already exists.");
-    }
-    const existing = await this.getSeoPlanningDraftById(safe.id);
-    if (existing) {
-      await getDbPool().execute(
-        `UPDATE seo_planning_drafts SET
-          recommendation = ?, workflow_status = ?, fingerprint = ?, topic = ?, working_title = ?,
-          proposed_slug = ?, target_post_id = ?, matched_public_url = ?, restore_path = ?,
-          search_intent = ?, linked_post_id = ?, payload = ?, updated_at = ?
-         WHERE id = ?`,
+    return withTransaction(async (conn) => {
+      const [fpRows] = await conn.query<PlanningRow[]>(
+        "SELECT id FROM seo_planning_drafts WHERE fingerprint = ? LIMIT 1",
+        [safe.fingerprint],
+      );
+      if (fpRows[0] && fpRows[0].id !== safe.id) {
+        throw new Error("Planning draft fingerprint already exists.");
+      }
+
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [safe.id],
+      );
+      if (rows[0]) {
+        const latest = mapPlanningDraft(rows[0]);
+        // Final boundary: ordinary save cannot clear Archive or mutate archived drafts.
+        assertSeoPlanningDraftMutableForOrdinarySave(latest);
+        // Do not write archived_at — Restore is the only path that may clear it.
+        await conn.execute(
+          `UPDATE seo_planning_drafts SET
+            recommendation = ?, workflow_status = ?, fingerprint = ?, topic = ?, working_title = ?,
+            proposed_slug = ?, target_post_id = ?, matched_public_url = ?, restore_path = ?,
+            search_intent = ?, linked_post_id = ?, payload = ?, updated_at = ?
+           WHERE id = ?`,
+          [
+            safe.recommendation,
+            safe.workflowStatus,
+            safe.fingerprint,
+            safe.topic,
+            safe.workingTitle,
+            safe.proposedSlug,
+            safe.targetPostId,
+            safe.matchedPublicUrl,
+            safe.restorePath,
+            safe.searchIntent,
+            safe.linkedPostId,
+            JSON.stringify(safe.payload || {}),
+            toMysqlDateTime(safe.updatedAt),
+            safe.id,
+          ],
+        );
+        return sanitizeSeoPlanningDraft({
+          ...safe,
+          archivedAt: latest.archivedAt ?? null,
+        });
+      }
+
+      const archivedAtSql = safe.archivedAt ? toMysqlDateTime(safe.archivedAt) : null;
+      await conn.execute(
+        `INSERT INTO seo_planning_drafts (
+          id, recommendation, workflow_status, fingerprint, topic, working_title, proposed_slug,
+          target_post_id, matched_public_url, restore_path, search_intent, linked_post_id,
+          created_by, payload, archived_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          safe.id,
           safe.recommendation,
           safe.workflowStatus,
           safe.fingerprint,
@@ -631,39 +691,74 @@ export class MysqlCatalogRepository implements CatalogRepository {
           safe.restorePath,
           safe.searchIntent,
           safe.linkedPostId,
+          safe.createdBy,
           JSON.stringify(safe.payload || {}),
+          archivedAtSql,
+          toMysqlDateTime(safe.createdAt),
           toMysqlDateTime(safe.updatedAt),
-          safe.id,
         ],
       );
       return safe;
-    }
-    await getDbPool().execute(
-      `INSERT INTO seo_planning_drafts (
-        id, recommendation, workflow_status, fingerprint, topic, working_title, proposed_slug,
-        target_post_id, matched_public_url, restore_path, search_intent, linked_post_id,
-        created_by, payload, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        safe.id,
-        safe.recommendation,
-        safe.workflowStatus,
-        safe.fingerprint,
-        safe.topic,
-        safe.workingTitle,
-        safe.proposedSlug,
-        safe.targetPostId,
-        safe.matchedPublicUrl,
-        safe.restorePath,
-        safe.searchIntent,
-        safe.linkedPostId,
-        safe.createdBy,
-        JSON.stringify(safe.payload || {}),
-        toMysqlDateTime(safe.createdAt),
-        toMysqlDateTime(safe.updatedAt),
-      ],
-    );
-    return safe;
+    });
+  }
+  async archiveSeoPlanningDraft(id: string) {
+    await this.ready();
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [want],
+      );
+      if (!rows[0]) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const latest = mapPlanningDraft(rows[0]);
+      const applied = archiveSeoPlanningDraftRecord(latest);
+      if (!applied.ok) return applied;
+      const safe = sanitizeSeoPlanningDraft(applied.draft);
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET archived_at = ?, updated_at = ? WHERE id = ?",
+        [toMysqlDateTime(safe.archivedAt!), toMysqlDateTime(safe.updatedAt), want],
+      );
+      return { ok: true as const, draft: safe };
+    });
+  }
+  async restoreSeoPlanningDraft(id: string) {
+    await this.ready();
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [want],
+      );
+      if (!rows[0]) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const latest = mapPlanningDraft(rows[0]);
+      const applied = restoreSeoPlanningDraftRecord(latest);
+      if (!applied.ok) return applied;
+      const safe = sanitizeSeoPlanningDraft(applied.draft);
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET archived_at = NULL, updated_at = ? WHERE id = ?",
+        [toMysqlDateTime(safe.updatedAt), want],
+      );
+      return { ok: true as const, draft: safe };
+    });
+  }
+  async deleteSeoPlanningDraftPermanently(id: string) {
+    await this.ready();
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [want],
+      );
+      if (!rows[0]) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const latest = mapPlanningDraft(rows[0]);
+      const gate = assertArchivedForPermanentDelete(latest);
+      if (!gate.ok) return gate;
+      await conn.execute("DELETE FROM seo_planning_drafts WHERE id = ?", [want]);
+      return { ok: true as const };
+    });
   }
   async mergeSeoPlanningWritingPromptCache(args: {
     id: string;
@@ -689,6 +784,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
       if (!rows[0]) return { ok: false, reason: "not_found" };
 
       const latest = mapPlanningDraft(rows[0]);
+      if (latest.archivedAt) return { ok: false, reason: "rejected" };
       // Lock order: Planning → BlogPost → category (REFRESH only). Same conn.
       const readers = createPromptAcceptReaders(conn, latest);
       if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {
@@ -755,6 +851,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
       if (!rows[0]) return { ok: false, reason: "not_found" };
 
       const latest = mapPlanningDraft(rows[0]);
+      if (latest.archivedAt) return { ok: false, reason: "rejected" };
       // Lock order: Planning → BlogPost → category (REFRESH only). Same conn.
       const readers = createPromptAcceptReaders(conn, latest);
       if (args.acceptLatest && !(await args.acceptLatest(latest, readers))) {

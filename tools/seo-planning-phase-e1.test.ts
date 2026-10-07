@@ -349,7 +349,7 @@ test("UI / SAFETY: Image Brief after Writing Prompt; no providers/media/BlogPost
   assert.doesNotMatch(ui, /Generate with Gemini|Generate with OpenAI|requestGemini|requestOpenAi/);
   assert.doesNotMatch(briefMod, /requestGemini|requestOpenAi|cloudinary|uploadImage|savePost/);
   assert.doesNotMatch(fp, /requestGemini|requestOpenAi|cloudinary/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
 });
 
 test("canonical input stays bounded and includes safety/policy", () => {

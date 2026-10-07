@@ -326,7 +326,8 @@ test("Phase B action/source safety: permission, no public writes, no stale guard
   const workspace = read("lib/cms/seo-planning/workspace.ts");
   assert.match(actions, /saveSeoPlanningWorkspaceAction/);
   assert.match(actions, /requireAdminActor\("seo"\)/);
-  assert.match(actions, /That planning draft could not be found/);
+  assert.match(actions, /SEO_PLANNING_MISSING_DRAFT_MESSAGE/);
+  assert.match(read("lib/cms/seo-planning/lifecycle.ts"), /That planning draft could not be found/);
   assert.doesNotMatch(actions, /expectedUpdatedAt/);
   assert.doesNotMatch(workspace, /expectedUpdatedAt/);
   assert.match(actions, /Last save wins/i);
@@ -358,7 +359,7 @@ test("Phase B UI: editable workspace without publish/create/restore/free workflo
 });
 
 test("Phase B: no schema version bump; humanNotes cap constant present", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
   assert.equal(SEO_PLANNING_HUMAN_NOTES_CAP, 4000);
   const schema = read("lib/db/schema.ts");
   assert.doesNotMatch(schema, /human_notes/);

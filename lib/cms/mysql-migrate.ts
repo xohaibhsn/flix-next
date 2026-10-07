@@ -115,6 +115,7 @@ const REQUIRED_COLUMNS: Array<{ table: string; column: string; definition: strin
   { table: "admin_users", column: "session_version", definition: "session_version INT NOT NULL DEFAULT 1" },
   { table: "admin_users", column: "last_login_at", definition: "last_login_at DATETIME NULL" },
   { table: "admin_users", column: "created_by", definition: "created_by VARCHAR(80) NULL" },
+  { table: "seo_planning_drafts", column: "archived_at", definition: "archived_at DATETIME NULL" },
 ];
 
 async function ensureMissingColumns() {

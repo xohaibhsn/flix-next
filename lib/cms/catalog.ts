@@ -68,10 +68,27 @@ export interface CatalogRepository {
   deleteRedirect(id: string): Promise<void>;
   listMessages(): Promise<ContactMessage[]>;
   addMessage(message: ContactMessage): Promise<ContactMessage>;
-  listSeoPlanningDrafts(): Promise<SeoPlanningDraft[]>;
+  listSeoPlanningDrafts(options?: {
+    lifecycle?: "active" | "archived" | "all";
+  }): Promise<SeoPlanningDraft[]>;
   getSeoPlanningDraftById(id: string): Promise<SeoPlanningDraft | null>;
   getSeoPlanningDraftByFingerprint(fingerprint: string): Promise<SeoPlanningDraft | null>;
   saveSeoPlanningDraft(draft: SeoPlanningDraft): Promise<SeoPlanningDraft>;
+  /** Atomic archive under Planning write lock / row lock. Planning-only. */
+  archiveSeoPlanningDraft(id: string): Promise<
+    { ok: true; draft: SeoPlanningDraft } | { ok: false; error: string }
+  >;
+  /** Atomic restore under Planning write lock / row lock. Planning-only. */
+  restoreSeoPlanningDraft(id: string): Promise<
+    { ok: true; draft: SeoPlanningDraft } | { ok: false; error: string }
+  >;
+  /**
+   * Hard-delete an already-archived Planning draft under write lock.
+   * Removes only the Planning row/payload. Never BlogPost/Media/redirects.
+   */
+  deleteSeoPlanningDraftPermanently(id: string): Promise<
+    { ok: true } | { ok: false; error: string }
+  >;
   /**
    * Atomic prompt-cache write: re-read latest under write lock/transaction,
    * merge ONLY the selected writingPrompts provider sibling.

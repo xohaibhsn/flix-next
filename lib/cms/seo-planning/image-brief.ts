@@ -5,6 +5,10 @@
 
 import type { WritingArticleContext } from "@/lib/cms/seo-planning/writing-brief";
 import { SEO_PLANNING_FIELD_CAPS } from "@/lib/cms/seo-planning/constants";
+import {
+  isSeoPlanningDraftArchived,
+  SEO_PLANNING_ARCHIVED_PROVIDER_MESSAGE,
+} from "@/lib/cms/seo-planning/lifecycle";
 import type { SeoPlanningDraft, SeoPlanningWorkflowStatus } from "@/lib/cms/types";
 
 export const SEO_PLANNING_IMAGE_BRIEF_SPEC = "e1-1";
@@ -242,7 +246,14 @@ function eligibility(args: {
   workingTitle: string;
   searchIntent: string;
   article: WritingArticleContext;
+  archived: boolean;
 }): { providerEligible: boolean; providerIneligibleReason: string } {
+  if (args.archived) {
+    return {
+      providerEligible: false,
+      providerIneligibleReason: SEO_PLANNING_ARCHIVED_PROVIDER_MESSAGE,
+    };
+  }
   if (args.task === "INTERNAL_LINK_ONLY") {
     return {
       providerEligible: false,
@@ -304,6 +315,7 @@ export function buildImageBrief(
     workingTitle: draft.workingTitle.trim(),
     searchIntent: draft.searchIntent.trim(),
     article,
+    archived: isSeoPlanningDraftArchived(draft),
   });
 
   return {

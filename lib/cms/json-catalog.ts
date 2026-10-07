@@ -17,6 +17,15 @@ import { applyBlogIndexRedirectUpsert } from "@/lib/cms/blog-index";
 import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
 import {
+  archiveSeoPlanningDraftRecord,
+  assertArchivedForPermanentDelete,
+  assertSeoPlanningDraftMutableForOrdinarySave,
+  filterSeoPlanningDraftsByLifecycle,
+  restoreSeoPlanningDraftRecord,
+  SEO_PLANNING_MISSING_DRAFT_MESSAGE,
+  type SeoPlanningListLifecycle,
+} from "@/lib/cms/seo-planning/lifecycle";
+import {
   mergeImagePromptCache,
   type ImagePromptCacheEntry,
   type ImagePromptProvider,
@@ -297,20 +306,28 @@ export class JsonCatalogRepository implements CatalogRepository {
     await saveList(MESSAGES_FILE, [safe, ...items]);
     return safe;
   }
-  async listSeoPlanningDrafts() {
+  async listSeoPlanningDrafts(options?: { lifecycle?: SeoPlanningListLifecycle }) {
+    const lifecycle = options?.lifecycle || "active";
+    const items = await readJsonFile<SeoPlanningDraft[]>(SEO_PLANNING_FILE, []);
+    const all = (Array.isArray(items) ? items : [])
+      .map(sanitizeSeoPlanningDraft)
+      .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+    return filterSeoPlanningDraftsByLifecycle(all, lifecycle);
+  }
+  async #readAllSeoPlanningDrafts() {
     const items = await readJsonFile<SeoPlanningDraft[]>(SEO_PLANNING_FILE, []);
     return (Array.isArray(items) ? items : [])
       .map(sanitizeSeoPlanningDraft)
       .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
   }
   async getSeoPlanningDraftById(id: string) {
-    const items = await this.listSeoPlanningDrafts();
+    const items = await this.#readAllSeoPlanningDrafts();
     return items.find((item) => item.id === id) || null;
   }
   async getSeoPlanningDraftByFingerprint(fingerprint: string) {
     const fp = String(fingerprint || "").trim();
     if (!fp) return null;
-    const items = await this.listSeoPlanningDrafts();
+    const items = await this.#readAllSeoPlanningDrafts();
     return items.find((item) => item.fingerprint === fp) || null;
   }
   async saveSeoPlanningDraft(draft: SeoPlanningDraft) {
@@ -320,18 +337,73 @@ export class JsonCatalogRepository implements CatalogRepository {
     }
     return withSeoPlanningJsonWriteLock(async () => {
       // Re-read inside the lock so waiters observe the prior writer's commit.
-      const items = await this.listSeoPlanningDrafts();
+      const items = await this.#readAllSeoPlanningDrafts();
       const fingerprintOwner = items.find(
         (item) => item.fingerprint === safe.fingerprint && item.id !== safe.id,
       );
       if (fingerprintOwner) {
         throw new Error("Planning draft fingerprint already exists.");
       }
-      const next = items.some((item) => item.id === safe.id)
-        ? items.map((item) => (item.id === safe.id ? safe : item))
-        : [...items, safe];
+      const existing = items.find((item) => item.id === safe.id);
+      if (existing) {
+        // Final boundary: ordinary save cannot clear Archive or mutate archived drafts.
+        assertSeoPlanningDraftMutableForOrdinarySave(existing);
+        const toWrite = sanitizeSeoPlanningDraft({
+          ...safe,
+          // Preserve authoritative lifecycle; only Restore may clear archivedAt.
+          archivedAt: existing.archivedAt ?? null,
+        });
+        const next = items.map((item) => (item.id === safe.id ? toWrite : item));
+        await saveList(SEO_PLANNING_FILE, next);
+        return toWrite;
+      }
+      const next = [...items, safe];
       await saveList(SEO_PLANNING_FILE, next);
       return safe;
+    });
+  }
+  async archiveSeoPlanningDraft(id: string) {
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.#readAllSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === want);
+      if (index < 0) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const applied = archiveSeoPlanningDraftRecord(items[index]!);
+      if (!applied.ok) return applied;
+      const safe = sanitizeSeoPlanningDraft(applied.draft);
+      const next = items.map((item, i) => (i === index ? safe : item));
+      await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true as const, draft: safe };
+    });
+  }
+  async restoreSeoPlanningDraft(id: string) {
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.#readAllSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === want);
+      if (index < 0) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const applied = restoreSeoPlanningDraftRecord(items[index]!);
+      if (!applied.ok) return applied;
+      const safe = sanitizeSeoPlanningDraft(applied.draft);
+      const next = items.map((item, i) => (i === index ? safe : item));
+      await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true as const, draft: safe };
+    });
+  }
+  async deleteSeoPlanningDraftPermanently(id: string) {
+    const want = String(id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.#readAllSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === want);
+      if (index < 0) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const gate = assertArchivedForPermanentDelete(items[index]!);
+      if (!gate.ok) return gate;
+      const next = items.filter((_, i) => i !== index);
+      await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true as const };
     });
   }
   async mergeSeoPlanningWritingPromptCache(args: {
@@ -352,11 +424,12 @@ export class JsonCatalogRepository implements CatalogRepository {
     // Lock order: Planning file → blog content files (same as Image Prompt / MySQL).
     return withSeoPlanningJsonWriteLock(() =>
       withBlogContentJsonWriteLock(async () => {
-        const items = await this.listSeoPlanningDrafts();
+        const items = await this.#readAllSeoPlanningDrafts();
         const index = items.findIndex((item) => item.id === id);
         if (index < 0) return { ok: false, reason: "not_found" };
 
         const latest = items[index]!;
+        if (latest.archivedAt) return { ok: false, reason: "rejected" };
         const readers: SeoPlanningPromptAcceptReaders = {
           getPostById: (postId) => this.getPostById(postId),
           listCategories: () => this.listCategories(),
@@ -415,11 +488,12 @@ export class JsonCatalogRepository implements CatalogRepository {
     // Lock order: Planning file → blog content files (mirrors MySQL Planning → Post → Category).
     return withSeoPlanningJsonWriteLock(() =>
       withBlogContentJsonWriteLock(async () => {
-        const items = await this.listSeoPlanningDrafts();
+        const items = await this.#readAllSeoPlanningDrafts();
         const index = items.findIndex((item) => item.id === id);
         if (index < 0) return { ok: false, reason: "not_found" };
 
         const latest = items[index]!;
+        if (latest.archivedAt) return { ok: false, reason: "rejected" };
         const readers: SeoPlanningPromptAcceptReaders = {
           getPostById: (postId) => this.getPostById(postId),
           listCategories: () => this.listCategories(),

@@ -506,8 +506,8 @@ test("phase D1 source stays off the network and off CMS writes", () => {
     /writing-fingerprint|from "node:crypto"|server-only/,
   );
   assert.match(read("lib/cms/seo-planning/index.ts"), /writing-brief|article-snapshot|writing-fingerprint/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
-  assert.doesNotMatch(read("lib/db/schema.ts"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*4/);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.match(read("lib/db/schema.ts"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*4/);
 });
 
 test("writing brief UI is read-only and has no provider buttons", () => {

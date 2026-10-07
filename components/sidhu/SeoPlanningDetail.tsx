@@ -37,10 +37,12 @@ import {
   buildImageBrief,
   SEO_PLANNING_IMAGE_BRIEF_DIRTY_MESSAGE,
 } from "@/lib/cms/seo-planning/image-brief";
+import { SeoPlanningLifecycleControls } from "@/components/sidhu/SeoPlanningLifecycleControls";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
 import { Button } from "@/components/sidhu/ui/Button";
+import { isSeoPlanningDraftArchived } from "@/lib/cms/seo-planning/lifecycle";
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -128,7 +130,8 @@ export function SeoPlanningDetail({
   const [imagePromptState, setImagePromptState] =
     useState<ImagePromptUiState>(initialImagePromptState);
   const [pending, startTransition] = useTransition();
-  const controlsLocked = pending || suggestionBusy;
+  const archived = isSeoPlanningDraftArchived(draft);
+  const controlsLocked = pending || suggestionBusy || archived;
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
   const writingBrief = useMemo(
@@ -190,11 +193,17 @@ export function SeoPlanningDetail({
   }
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className={archived ? "space-y-5" : "space-y-5 pb-24"}>
       <SectionCard className="space-y-2">
         <p className="text-xs font-semibold tracking-wide text-amber-900 uppercase">
           Private planning draft · Not published
+          {archived ? " · Archived" : ""}
         </p>
+        {archived ? (
+          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+            Archived — restore before editing, changing workflow, or generating prompts.
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wide uppercase">
           <span className="rounded-md border border-line bg-paper px-2 py-1 text-ink">
             {recommendationLabel(draft.recommendation)}
@@ -202,13 +211,23 @@ export function SeoPlanningDetail({
           <span className="rounded-md border border-line bg-paper px-2 py-1 text-ink">
             {workflowLabel(form.workflowStatus)}
           </span>
+          {archived ? (
+            <span className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-amber-950">
+              Archived
+            </span>
+          ) : null}
         </div>
         <h2 className="text-lg font-semibold text-ink">{form.workingTitle || "Untitled plan"}</h2>
         <p className="text-sm text-muted">{form.topic}</p>
         <p className="text-xs text-muted">Updated {formatUpdated(draft.updatedAt)}</p>
+        {archived && draft.archivedAt ? (
+          <p className="text-xs text-muted">Archived {formatUpdated(draft.archivedAt)}</p>
+        ) : null}
       </SectionCard>
 
       {message ? <Banner tone={message.tone}>{message.text}</Banner> : null}
+
+      <SeoPlanningLifecycleControls draft={draft} archived={archived} />
 
       <SectionCard className="space-y-3">
         <h3 className="text-sm font-semibold text-ink">Target</h3>
@@ -363,7 +382,9 @@ export function SeoPlanningDetail({
                 Still private — this does not publish anything.
               </p>
             ) : null}
-            {transitions.length ? (
+            {archived ? (
+              <p className="text-muted">Workflow transitions are unavailable while archived.</p>
+            ) : transitions.length ? (
               <div className="flex flex-wrap gap-2">
                 {transitions.map((to) => (
                   <Button
@@ -465,13 +486,15 @@ export function SeoPlanningDetail({
         ) : null}
       </SectionCard>
 
-      <StickyEditorBar
-        title={form.workingTitle || "Planning draft"}
-        dirty={dirty}
-        saving={controlsLocked}
-        saveLabel="Save planning draft"
-        onSave={() => saveWithWorkflow(form.workflowStatus)}
-      />
+      {archived ? null : (
+        <StickyEditorBar
+          title={form.workingTitle || "Planning draft"}
+          dirty={dirty}
+          saving={controlsLocked}
+          saveLabel="Save planning draft"
+          onSave={() => saveWithWorkflow(form.workflowStatus)}
+        />
+      )}
     </div>
   );
 }

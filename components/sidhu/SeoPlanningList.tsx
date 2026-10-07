@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
+import { cn } from "@/components/sidhu/ui/cn";
 
 function recommendationLabel(value: string) {
   return value.replaceAll("_", " ");
@@ -35,7 +36,19 @@ function formatUpdated(value: string) {
   });
 }
 
-export function SeoPlanningList({ drafts }: { drafts: SeoPlanningDraft[] }) {
+export function SeoPlanningList({
+  drafts,
+  view,
+  activeCount,
+  archivedCount,
+}: {
+  drafts: SeoPlanningDraft[];
+  view: "active" | "archived";
+  activeCount: number;
+  archivedCount: number;
+}) {
+  const archivedView = view === "archived";
+
   return (
     <div className="space-y-5">
       <SectionCard className="space-y-2">
@@ -45,10 +58,47 @@ export function SeoPlanningList({ drafts }: { drafts: SeoPlanningDraft[] }) {
         </p>
       </SectionCard>
 
+      <div
+        role="tablist"
+        aria-label="Planning lifecycle"
+        className="flex flex-wrap gap-1 border-b border-line"
+      >
+        <Link
+          href="/sidhu/seo/planning/"
+          role="tab"
+          aria-selected={!archivedView}
+          className={cn(
+            "inline-flex min-h-10 items-center gap-2 border-b-2 px-3 text-sm font-semibold transition-colors",
+            !archivedView ? "border-brand text-ink" : "border-transparent text-muted hover:text-ink",
+          )}
+        >
+          Active
+          <span className="rounded-md bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+            {activeCount}
+          </span>
+        </Link>
+        <Link
+          href="/sidhu/seo/planning/?view=archived"
+          role="tab"
+          aria-selected={archivedView}
+          className={cn(
+            "inline-flex min-h-10 items-center gap-2 border-b-2 px-3 text-sm font-semibold transition-colors",
+            archivedView ? "border-brand text-ink" : "border-transparent text-muted hover:text-ink",
+          )}
+        >
+          Archived
+          <span className="rounded-md bg-paper px-1.5 py-0.5 text-[11px] font-semibold text-muted">
+            {archivedCount}
+          </span>
+        </Link>
+      </div>
+
       {!drafts.length ? (
         <SectionCard padding="sm">
           <p className="text-sm text-muted">
-            No planning drafts yet. Research UK opportunities, then use Proceed with this.
+            {archivedView
+              ? "No archived planning drafts."
+              : "No planning drafts yet. Research UK opportunities, then use Proceed with this."}
           </p>
         </SectionCard>
       ) : (
@@ -60,7 +110,7 @@ export function SeoPlanningList({ drafts }: { drafts: SeoPlanningDraft[] }) {
                 <th className="px-3 py-2">Recommendation</th>
                 <th className="px-3 py-2">Status</th>
                 <th className="px-3 py-2">Target</th>
-                <th className="px-3 py-2">Updated</th>
+                <th className="px-3 py-2">{archivedView ? "Archived" : "Updated"}</th>
                 <th className="px-3 py-2" />
               </tr>
             </thead>
@@ -71,12 +121,18 @@ export function SeoPlanningList({ drafts }: { drafts: SeoPlanningDraft[] }) {
                     <p className="font-medium text-ink">{draft.workingTitle || "Untitled plan"}</p>
                     <p className="text-xs text-muted">{draft.topic}</p>
                   </td>
-                  <td className="px-3 py-3 align-top text-ink">{recommendationLabel(draft.recommendation)}</td>
-                  <td className="px-3 py-3 align-top text-ink">{draft.workflowStatus.replaceAll("_", " ")}</td>
+                  <td className="px-3 py-3 align-top text-ink">
+                    {recommendationLabel(draft.recommendation)}
+                  </td>
+                  <td className="px-3 py-3 align-top text-ink">
+                    {draft.workflowStatus.replaceAll("_", " ")}
+                  </td>
                   <td className="max-w-[220px] break-all px-3 py-3 align-top text-muted">
                     {effectiveTarget(draft)}
                   </td>
-                  <td className="px-3 py-3 align-top text-muted">{formatUpdated(draft.updatedAt)}</td>
+                  <td className="px-3 py-3 align-top text-muted">
+                    {formatUpdated(archivedView ? draft.archivedAt || draft.updatedAt : draft.updatedAt)}
+                  </td>
                   <td className="px-3 py-3 align-top text-right">
                     <Link
                       href={`/sidhu/seo/planning/${draft.id}/`}

@@ -190,10 +190,12 @@ CREATE TABLE IF NOT EXISTS seo_planning_drafts (
   linked_post_id VARCHAR(80) NULL,
   created_by VARCHAR(80) NOT NULL DEFAULT '',
   payload LONGTEXT NOT NULL,
+  archived_at DATETIME NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   UNIQUE KEY seo_planning_drafts_fingerprint_unique (fingerprint),
   KEY seo_planning_drafts_workflow (workflow_status),
-  KEY seo_planning_drafts_target_post (target_post_id)
+  KEY seo_planning_drafts_target_post (target_post_id),
+  KEY seo_planning_drafts_archived_at (archived_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

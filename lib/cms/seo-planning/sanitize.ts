@@ -285,6 +285,15 @@ export function sanitizeSeoPlanningDraft(input: SeoPlanningDraft): SeoPlanningDr
     }
   }
 
+  const archivedRaw =
+    input.archivedAt == null || input.archivedAt === ""
+      ? ""
+      : sanitizeText(input.archivedAt, 40).trim();
+  const archivedAt =
+    archivedRaw && !Number.isNaN(new Date(archivedRaw).getTime())
+      ? new Date(archivedRaw).toISOString()
+      : null;
+
   return {
     id: sanitizeText(input.id, SEO_PLANNING_FIELD_CAPS.id).trim(),
     recommendation,
@@ -306,6 +315,7 @@ export function sanitizeSeoPlanningDraft(input: SeoPlanningDraft): SeoPlanningDr
     createdBy: sanitizeText(input.createdBy, SEO_PLANNING_FIELD_CAPS.createdBy).trim(),
     createdAt: sanitizeText(input.createdAt, 40).trim() || now,
     updatedAt: sanitizeText(input.updatedAt, 40).trim() || now,
+    archivedAt,
     payload,
   };
 }

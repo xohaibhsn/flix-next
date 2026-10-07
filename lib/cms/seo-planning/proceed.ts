@@ -14,6 +14,10 @@ import {
   normalizePlanningRestorePath,
 } from "@/lib/cms/seo-planning/fingerprint";
 import {
+  isSeoPlanningDraftArchived,
+  SEO_PLANNING_ARCHIVED_PROCEED_MESSAGE,
+} from "@/lib/cms/seo-planning/lifecycle";
+import {
   buildPlanningPayload,
   parseProceedOpportunityInput,
   sanitizeProceedGscMeta,
@@ -260,6 +264,9 @@ export async function proceedSeoOpportunityToPlanningDraft(args: {
 
   const existing = await args.catalog.getSeoPlanningDraftByFingerprint(validated.value.fingerprint);
   if (existing) {
+    if (isSeoPlanningDraftArchived(existing)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_PROCEED_MESSAGE };
+    }
     return { ok: true, id: existing.id, created: false };
   }
 
@@ -283,6 +290,7 @@ export async function proceedSeoOpportunityToPlanningDraft(args: {
     createdBy: args.adminId,
     createdAt: now,
     updatedAt: now,
+    archivedAt: null,
     payload: buildPlanningPayload({
       opportunity: {
         ...parsed.value,
@@ -303,12 +311,22 @@ export async function proceedSeoOpportunityToPlanningDraft(args: {
   } catch (error) {
     if (mysqlDuplicateError(error)) {
       const raced = await args.catalog.getSeoPlanningDraftByFingerprint(validated.value.fingerprint);
-      if (raced) return { ok: true, id: raced.id, created: false };
+      if (raced) {
+        if (isSeoPlanningDraftArchived(raced)) {
+          return { ok: false, error: SEO_PLANNING_ARCHIVED_PROCEED_MESSAGE };
+        }
+        return { ok: true, id: raced.id, created: false };
+      }
     }
     // JSON catalog may throw a plain Error for fingerprint conflict.
     if (error instanceof Error && /fingerprint/i.test(error.message)) {
       const raced = await args.catalog.getSeoPlanningDraftByFingerprint(validated.value.fingerprint);
-      if (raced) return { ok: true, id: raced.id, created: false };
+      if (raced) {
+        if (isSeoPlanningDraftArchived(raced)) {
+          return { ok: false, error: SEO_PLANNING_ARCHIVED_PROCEED_MESSAGE };
+        }
+        return { ok: true, id: raced.id, created: false };
+      }
     }
     return {
       ok: false,

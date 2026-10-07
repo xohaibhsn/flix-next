@@ -28,6 +28,15 @@ import {
   type GenerateChatgptWritingPromptResult,
 } from "@/lib/cms/seo-planning/writing-prompt";
 import {
+  confirmSeoPlanningPermanentDelete,
+  isSeoPlanningArchivedMutationError,
+  isSeoPlanningDraftArchived,
+  parseSeoPlanningLifecycleId,
+  parseSeoPlanningPermanentDeleteInput,
+  SEO_PLANNING_ARCHIVED_EDIT_MESSAGE,
+  SEO_PLANNING_MISSING_DRAFT_MESSAGE,
+} from "@/lib/cms/seo-planning/lifecycle";
+import {
   applySeoPlanningWorkspaceUpdate,
   parseSeoPlanningWorkspaceInput,
 } from "@/lib/cms/seo-planning/workspace";
@@ -131,7 +140,10 @@ export async function saveSeoPlanningWorkspaceAction(
 
   const stored = await cms.getSeoPlanningDraftById(parsed.value.id);
   if (!stored) {
-    return { ok: false, error: "That planning draft could not be found." };
+    return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+  }
+  if (isSeoPlanningDraftArchived(stored)) {
+    return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
   }
 
   const applied = applySeoPlanningWorkspaceUpdate(stored, parsed.value);
@@ -140,7 +152,10 @@ export async function saveSeoPlanningWorkspaceAction(
   try {
     const saved = await cms.saveSeoPlanningDraft(applied.draft);
     return { ok: true, draft: saved };
-  } catch {
+  } catch (error) {
+    if (isSeoPlanningArchivedMutationError(error)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
+    }
     return { ok: false, error: "Could not save the planning draft. Please try again." };
   }
 }
@@ -164,7 +179,10 @@ export async function updateSeoPlanningSuggestionAction(
   try {
     const stored = await cms.getSeoPlanningDraftById(parsed.value.id);
     if (!stored) {
-      return { ok: false, error: "That planning draft could not be found." };
+      return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    }
+    if (isSeoPlanningDraftArchived(stored)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
     }
 
     const applied = applySeoPlanningSuggestionCommand(stored, parsed.value);
@@ -179,7 +197,10 @@ export async function updateSeoPlanningSuggestionAction(
 
     const saved = await cms.saveSeoPlanningDraft(applied.draft);
     return { ok: true, draft: saved };
-  } catch {
+  } catch (error) {
+    if (isSeoPlanningArchivedMutationError(error)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
+    }
     return { ok: false, error: "Could not save the planning draft. Please try again." };
   }
 }
@@ -420,4 +441,78 @@ export async function generateChatgptImagePromptWithOpenAiAction(
   });
 
   return { ...result, geminiImagePromptConfigured, openaiImagePromptConfigured };
+}
+
+export type SeoPlanningLifecycleActionResult =
+  | { ok: true; draft: SeoPlanningDraft }
+  | { ok: false; error: string };
+
+export type SeoPlanningPermanentDeleteActionResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/**
+ * Archive an active private Planning draft. Keeps payload/caches/evidence.
+ * Does not call providers, touch BlogPost/Media, or change public routes.
+ */
+export async function archiveSeoPlanningDraftAction(
+  rawInput: unknown,
+): Promise<SeoPlanningLifecycleActionResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) return { ok: false, error: actor.error };
+
+  const parsed = parseSeoPlanningLifecycleId(rawInput);
+  if (!parsed.ok) return parsed;
+
+  try {
+    return await cms.archiveSeoPlanningDraft(parsed.id);
+  } catch {
+    return { ok: false, error: "Could not archive the planning draft. Please try again." };
+  }
+}
+
+/**
+ * Restore an archived Planning draft to the Active list (same id).
+ * Does not regenerate AI content or touch BlogPost/Media.
+ */
+export async function restoreSeoPlanningDraftAction(
+  rawInput: unknown,
+): Promise<SeoPlanningLifecycleActionResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) return { ok: false, error: actor.error };
+
+  const parsed = parseSeoPlanningLifecycleId(rawInput);
+  if (!parsed.ok) return parsed;
+
+  try {
+    return await cms.restoreSeoPlanningDraft(parsed.id);
+  } catch {
+    return { ok: false, error: "Could not restore the planning draft. Please try again." };
+  }
+}
+
+/**
+ * Permanently delete an already-archived Planning draft only.
+ * Requires confirmation matching working title (or id). Never deletes BlogPost/Media.
+ */
+export async function deleteSeoPlanningDraftPermanentlyAction(
+  rawInput: unknown,
+): Promise<SeoPlanningPermanentDeleteActionResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) return { ok: false, error: actor.error };
+
+  const parsed = parseSeoPlanningPermanentDeleteInput(rawInput);
+  if (!parsed.ok) return parsed;
+
+  const stored = await cms.getSeoPlanningDraftById(parsed.id);
+  if (!stored) return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+
+  const confirmed = confirmSeoPlanningPermanentDelete(stored, parsed.confirmation);
+  if (!confirmed.ok) return confirmed;
+
+  try {
+    return await cms.deleteSeoPlanningDraftPermanently(parsed.id);
+  } catch {
+    return { ok: false, error: "Could not permanently delete the planning draft. Please try again." };
+  }
 }

@@ -520,11 +520,12 @@ test("Phase C action boundary: parser ignores browser payload, unknown keys fail
   const suggestions = read("lib/cms/seo-planning/suggestions.ts");
   assert.match(actions, /updateSeoPlanningSuggestionAction/);
   assert.match(actions, /requireAdminActor\("seo"\)/);
-  assert.match(actions, /That planning draft could not be found/);
+  assert.match(actions, /SEO_PLANNING_MISSING_DRAFT_MESSAGE/);
+  assert.match(read("lib/cms/seo-planning/lifecycle.ts"), /That planning draft could not be found/);
   assert.match(actions, /Could not save the planning draft/);
   assert.doesNotMatch(actions, /savePost\(|saveRedirect\(|requestOpenAi|buildUkGscEvidencePack|web_search|revalidatePath/);
   assert.doesNotMatch(suggestions, /savePost\(|saveRedirect\(|requestOpenAi|buildUkGscEvidencePack|web_search|from "@\/lib\/cms\/repository"/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
 });
 
 test("Phase C UI: planning value is distinct, dirty state blocks actions, replace is explicit, no public actions", () => {

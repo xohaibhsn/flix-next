@@ -985,7 +985,7 @@ test("SERVICE: one Gemini call; OpenAI 0; no BlogPost helpers in module", async 
   assert.doesNotMatch(src, /\b(?:savePost|updatePost|createPost|publish)\b/);
   assert.doesNotMatch(src, /web_search|GSC_/);
   assert.doesNotMatch(src, /openai\.com/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
 });
 
 test("UI / ACTION / ENV: Generate with Gemini and OpenAI; copy/render safety; schema 3", () => {

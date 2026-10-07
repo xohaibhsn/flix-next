@@ -133,7 +133,7 @@ function memoryCatalog(seed: {
 }
 
 test("schema version is 3 and seo_planning_drafts table exists", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 3);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
   const joined = CMS_SCHEMA_STATEMENTS.join("\n");
   assert.match(joined, /CREATE TABLE IF NOT EXISTS seo_planning_drafts/);
   assert.match(joined, /UNIQUE KEY seo_planning_drafts_fingerprint_unique/);
@@ -854,7 +854,14 @@ test("Planning list/detail admin UI has no publish/create/restore actions", () =
       sources: [],
     },
   };
-  const listHtml = renderToStaticMarkup(createElement(SeoPlanningList, { drafts: [draft] }));
+  const listHtml = renderToStaticMarkup(
+    createElement(SeoPlanningList, {
+      drafts: [draft],
+      view: "active",
+      activeCount: 1,
+      archivedCount: 0,
+    }),
+  );
   const detailHtml = renderToStaticMarkup(
     createElement(SeoPlanningDetail, { draft, targetPostTitle: null }),
   );

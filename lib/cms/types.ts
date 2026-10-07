@@ -503,6 +503,12 @@ export type SeoPlanningDraft = {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Lifecycle archive marker. Null/absent = active (default Planning list).
+   * Orthogonal to workflowStatus. Does not publish or touch BlogPost/Media.
+   * Legacy records without this field are treated as active.
+   */
+  archivedAt?: string | null;
   /** Bounded evidence/planning snapshot — not authoritative for publish. */
   payload: Record<string, unknown>;
 };
