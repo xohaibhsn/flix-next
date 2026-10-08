@@ -6,8 +6,10 @@ import {
   type SeoResearchInventory,
 } from "@/lib/cms/ai-seo/research-inventory";
 import type {
+  SeoResearchIncompleteReasonCode,
   SeoResearchInvalidDiagnostic,
   SeoResearchResult,
+  SeoResearchSemanticIssueCode,
 } from "@/lib/cms/ai-seo/research-schemas";
 import type { GscResearchFusionContext } from "@/lib/cms/gsc/research-fusion";
 import type { BlogCategory, BlogPost, SiteSettings } from "@/lib/cms/types";
@@ -30,6 +32,12 @@ export type ResearchUkOpportunitiesFailure = {
     | "empty";
   /** Safe admin diagnostic stage — never raw provider content. */
   diagnostic?: SeoResearchInvalidDiagnostic;
+  /** Bounded semantic rejection rule — only with SEMANTIC_PAYLOAD_INVALID. */
+  semanticIssueCode?: SeoResearchSemanticIssueCode;
+  /** 0-based opportunity index when the failing rule is per-item. */
+  semanticOpportunityIndex?: number;
+  /** Bounded incomplete_details.reason class — only with RESPONSE_INCOMPLETE. */
+  incompleteReasonCode?: SeoResearchIncompleteReasonCode;
 };
 
 export type ResearchUkOpportunitiesResult =
@@ -89,6 +97,15 @@ export async function researchUkContentOpportunities(args: {
       code: provider.code,
       error: provider.message,
       ...(provider.diagnostic ? { diagnostic: provider.diagnostic } : {}),
+      ...(provider.semanticIssueCode
+        ? { semanticIssueCode: provider.semanticIssueCode }
+        : {}),
+      ...(provider.semanticOpportunityIndex !== undefined
+        ? { semanticOpportunityIndex: provider.semanticOpportunityIndex }
+        : {}),
+      ...(provider.incompleteReasonCode
+        ? { incompleteReasonCode: provider.incompleteReasonCode }
+        : {}),
     };
   }
 

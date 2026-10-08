@@ -6,12 +6,15 @@ import {
 } from "@/lib/cms/ai-seo/config";
 import type { SeoResearchInventory } from "@/lib/cms/ai-seo/research-inventory";
 import {
-  normalizeSeoResearchResult,
+  classifyOpenAiIncompleteReason,
+  evaluateSeoResearchResult,
   normalizeSeoResearchSources,
   SEO_RESEARCH_JSON_SCHEMA,
   SEO_RESEARCH_SYSTEM_INSTRUCTION,
+  type SeoResearchIncompleteReasonCode,
   type SeoResearchInvalidDiagnostic,
   type SeoResearchResult,
+  type SeoResearchSemanticIssueCode,
 } from "@/lib/cms/ai-seo/research-schemas";
 import {
   normalizeSeoDraftResult,
@@ -50,6 +53,12 @@ export type OpenAiResearchProviderResult =
       message: string;
       /** Safe stage code for Sidhu admin diagnosis — never raw provider content. */
       diagnostic?: SeoResearchInvalidDiagnostic;
+      /** Bounded semantic rejection rule — only with SEMANTIC_PAYLOAD_INVALID. */
+      semanticIssueCode?: SeoResearchSemanticIssueCode;
+      /** 0-based opportunity index when the failing rule is per-item. */
+      semanticOpportunityIndex?: number;
+      /** Bounded incomplete_details.reason class — only with RESPONSE_INCOMPLETE. */
+      incompleteReasonCode?: SeoResearchIncompleteReasonCode;
     };
 
 export type OpenAiFetch = typeof fetch;
@@ -126,15 +135,22 @@ export function extractResponsesOutputText(payload: unknown): string {
 
 const RESEARCH_UNUSABLE_MESSAGE = "AI returned an unusable response. Please try again.";
 
+export type InspectOpenAiResearchResponsesResult =
+  | { ok: true }
+  | {
+      ok: false;
+      diagnostic: SeoResearchInvalidDiagnostic;
+      /** Present only for RESPONSE_INCOMPLETE — allowlisted reason class, never raw text. */
+      incompleteReasonCode?: SeoResearchIncompleteReasonCode;
+    };
+
 /**
  * Inspect Responses API metadata for research failures without leaking content.
  * Refusal/incomplete text is never returned — only safe diagnostic codes.
  */
 export function inspectOpenAiResearchResponsesPayload(
   payload: unknown,
-):
-  | { ok: true }
-  | { ok: false; diagnostic: SeoResearchInvalidDiagnostic } {
+): InspectOpenAiResearchResponsesResult {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     return { ok: false, diagnostic: "RESPONSE_JSON_INVALID" };
   }
@@ -143,7 +159,15 @@ export function inspectOpenAiResearchResponsesPayload(
   const status = typeof root.status === "string" ? root.status.toLowerCase() : "";
 
   if (status === "incomplete") {
-    return { ok: false, diagnostic: "RESPONSE_INCOMPLETE" };
+    const details =
+      root.incomplete_details && typeof root.incomplete_details === "object"
+        ? (root.incomplete_details as Record<string, unknown>)
+        : null;
+    return {
+      ok: false,
+      diagnostic: "RESPONSE_INCOMPLETE",
+      incompleteReasonCode: classifyOpenAiIncompleteReason(details?.reason),
+    };
   }
 
   if (typeof root.refusal === "string" && root.refusal.trim()) {
@@ -544,6 +568,7 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
       code: OpenAiProviderErrorCode;
       message: string;
       diagnostic?: SeoResearchInvalidDiagnostic;
+      incompleteReasonCode?: SeoResearchIncompleteReasonCode;
     }
 > {
   if (!args.config.configured || !args.config.apiKey) {
@@ -604,6 +629,9 @@ async function requestOpenAiStructuredJsonWithPayload(args: {
         code: "invalid_response",
         message: RESEARCH_UNUSABLE_MESSAGE,
         diagnostic: inspected.diagnostic,
+        ...(inspected.incompleteReasonCode
+          ? { incompleteReasonCode: inspected.incompleteReasonCode }
+          : {}),
       };
     }
 
@@ -665,22 +693,27 @@ export async function requestOpenAiUkOpportunityResearch(
   if (!result.ok) return result;
 
   const allowlisted = new Set(inventory.allowlistedPublicUrls);
-  const research = normalizeSeoResearchResult(result.json, allowlisted, {
+  const evaluated = evaluateSeoResearchResult(result.json, allowlisted, {
     gscEvidenceById: gscFusion?.byId,
     gscMeta: gscFusion?.meta,
     restorationPathAllowlist: new Set(
       (gscFusion?.restorationCandidates || []).map((candidate) => candidate.path),
     ),
   });
-  if (!research) {
+  if (!evaluated.ok) {
     return {
       ok: false,
       code: "invalid_response",
       message: RESEARCH_UNUSABLE_MESSAGE,
       diagnostic: "SEMANTIC_PAYLOAD_INVALID",
+      semanticIssueCode: evaluated.issueCode,
+      ...(evaluated.opportunityIndex !== undefined
+        ? { semanticOpportunityIndex: evaluated.opportunityIndex }
+        : {}),
     };
   }
 
+  const research = evaluated.research;
   research.sources = extractWebSearchSources(result.payload);
   return { ok: true, research, model: result.model };
 }

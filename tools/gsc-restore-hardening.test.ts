@@ -310,7 +310,11 @@ test("inspect: incomplete status → RESPONSE_INCOMPLETE", () => {
     output: [],
   });
   assert.equal(result.ok, false);
-  if (!result.ok) assert.equal(result.diagnostic, "RESPONSE_INCOMPLETE");
+  if (!result.ok) {
+    assert.equal(result.diagnostic, "RESPONSE_INCOMPLETE");
+    assert.equal(result.incompleteReasonCode, "MAX_OUTPUT_TOKENS");
+    assert.doesNotMatch(JSON.stringify(result), /max_output_tokens/);
+  }
 });
 
 test("inspect: refusal → RESPONSE_REFUSAL without leaking text", () => {
@@ -336,8 +340,10 @@ test("14–17. provider maps incomplete/refusal/missing text/invalid JSON to dia
   if (!incomplete.ok) {
     assert.equal(incomplete.code, "invalid_response");
     assert.equal(incomplete.diagnostic, "RESPONSE_INCOMPLETE");
+    assert.equal(incomplete.incompleteReasonCode, "MAX_OUTPUT_TOKENS");
     assert.equal(incomplete.message, "AI returned an unusable response. Please try again.");
     assert.doesNotMatch(incomplete.message, /max_output_tokens|SECRET|Bearer/i);
+    assert.doesNotMatch(JSON.stringify(incomplete), /max_output_tokens/);
   }
 
   const refusal = await requestOpenAiUkOpportunityResearch(inventory, {
@@ -382,7 +388,12 @@ test("14–17. provider maps incomplete/refusal/missing text/invalid JSON to dia
       ),
   });
   assert.equal(semantic.ok, false);
-  if (!semantic.ok) assert.equal(semantic.diagnostic, "SEMANTIC_PAYLOAD_INVALID");
+  if (!semantic.ok) {
+    assert.equal(semantic.diagnostic, "SEMANTIC_PAYLOAD_INVALID");
+    assert.equal(semantic.semanticIssueCode, "INVALID_SEARCH_INTENT");
+    assert.equal(semantic.semanticOpportunityIndex, 0);
+    assert.doesNotMatch(JSON.stringify(semantic), /NOT_A_REAL_INTENT/);
+  }
 });
 
 test("empty after fail-closed RESTORE uses calm empty code not unusable", async () => {
@@ -413,6 +424,8 @@ test("empty after fail-closed RESTORE uses calm empty code not unusable", async 
 test("18. UI surfaces diagnostic without mutation actions or secrets", () => {
   const panel = read("components/sidhu/SeoOpportunitiesPanel.tsx");
   assert.match(panel, /Diagnostic: \{diagnostic\}/);
+  assert.match(panel, /semanticIssueCode/);
+  assert.match(panel, /incompleteReasonCode/);
   assert.doesNotMatch(panel, /Create Blog|Save opportunity|Publish|onRestore/);
   assert.doesNotMatch(panel, /output_text|GSC_PRIVATE_KEY|access_token|Bearer /);
 });

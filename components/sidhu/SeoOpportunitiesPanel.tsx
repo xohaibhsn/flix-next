@@ -99,6 +99,9 @@ export function SeoOpportunitiesPanel({
   const [probePending, startProbeTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [diagnostic, setDiagnostic] = useState<string | null>(null);
+  const [semanticIssueCode, setSemanticIssueCode] = useState<string | null>(null);
+  const [semanticOpportunityIndex, setSemanticOpportunityIndex] = useState<number | null>(null);
+  const [incompleteReasonCode, setIncompleteReasonCode] = useState<string | null>(null);
   const [research, setResearch] = useState<SeoResearchResult | null>(null);
   const [probe, setProbe] = useState<GscProbeResult | null>(null);
   const [probeError, setProbeError] = useState<string | null>(null);
@@ -118,16 +121,29 @@ export function SeoOpportunitiesPanel({
     if (pending || probePending) return;
     setError(null);
     setDiagnostic(null);
+    setSemanticIssueCode(null);
+    setSemanticOpportunityIndex(null);
+    setIncompleteReasonCode(null);
     startTransition(async () => {
       const result = await researchAction();
       if (!result.ok) {
         setResearch(null);
         setError(result.error);
         setDiagnostic(result.diagnostic || null);
+        setSemanticIssueCode(result.semanticIssueCode || null);
+        setSemanticOpportunityIndex(
+          typeof result.semanticOpportunityIndex === "number"
+            ? result.semanticOpportunityIndex
+            : null,
+        );
+        setIncompleteReasonCode(result.incompleteReasonCode || null);
         return;
       }
       setError(null);
       setDiagnostic(null);
+      setSemanticIssueCode(null);
+      setSemanticOpportunityIndex(null);
+      setIncompleteReasonCode(null);
       setResearch(result.research);
     });
   }
@@ -181,6 +197,11 @@ export function SeoOpportunitiesPanel({
         {diagnostic ? (
           <p className="text-xs text-muted">
             Diagnostic: {diagnostic}
+            {semanticIssueCode ? ` · Semantic: ${semanticIssueCode}` : ""}
+            {semanticOpportunityIndex !== null
+              ? ` · Opportunity index: ${semanticOpportunityIndex}`
+              : ""}
+            {incompleteReasonCode ? ` · Incomplete reason: ${incompleteReasonCode}` : ""}
           </p>
         ) : null}
         {probeError ? <Banner tone="error">{probeError}</Banner> : null}

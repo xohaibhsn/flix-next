@@ -20,6 +20,63 @@ export const SEO_RESEARCH_INVALID_DIAGNOSTICS = [
 ] as const;
 export type SeoResearchInvalidDiagnostic = (typeof SEO_RESEARCH_INVALID_DIAGNOSTICS)[number];
 
+/**
+ * Bounded semantic-rejection codes for Research normalization failures.
+ * Never include raw rejected values, prompts, or provider payloads.
+ */
+export const SEO_RESEARCH_SEMANTIC_ISSUE_CODES = [
+  "INVALID_TOP_LEVEL",
+  "UNEXPECTED_TOP_LEVEL_FIELD",
+  "INVALID_OPPORTUNITY_OBJECT",
+  "UNEXPECTED_OPPORTUNITY_FIELD",
+  "MISSING_REQUIRED_TEXT",
+  "INVALID_SEARCH_INTENT",
+  "INVALID_COVERAGE",
+  "INVALID_RECOMMENDATION",
+  "INVALID_CONFIDENCE",
+  "INVALID_RESTORE_PATH_TYPE",
+  "REFRESH_TARGET_NOT_ALLOWLISTED",
+  "INTERNAL_LINK_TARGET_NOT_ALLOWLISTED",
+] as const;
+export type SeoResearchSemanticIssueCode = (typeof SEO_RESEARCH_SEMANTIC_ISSUE_CODES)[number];
+
+/**
+ * Allowlisted Responses API incomplete_details.reason classifications.
+ * Unknown provider reasons map to UNKNOWN — never echo raw provider text.
+ */
+export const SEO_RESEARCH_INCOMPLETE_REASON_CODES = [
+  "MAX_OUTPUT_TOKENS",
+  "CONTENT_FILTER",
+  "UNKNOWN",
+] as const;
+export type SeoResearchIncompleteReasonCode =
+  (typeof SEO_RESEARCH_INCOMPLETE_REASON_CODES)[number];
+
+export function classifyOpenAiIncompleteReason(raw: unknown): SeoResearchIncompleteReasonCode {
+  if (typeof raw !== "string") return "UNKNOWN";
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "max_output_tokens") return "MAX_OUTPUT_TOKENS";
+  if (normalized === "content_filter") return "CONTENT_FILTER";
+  return "UNKNOWN";
+}
+
+const OPPORTUNITY_KNOWN_KEYS = [
+  "topic",
+  "workingTitle",
+  "searchIntent",
+  "whyNow",
+  "webEvidence",
+  "existingCoverage",
+  "matchedTitle",
+  "matchedPublicUrl",
+  "recommendation",
+  "restorePath",
+  "suggestedAngle",
+  "nextStep",
+  "confidence",
+  "gscEvidenceRefs",
+] as const;
+
 /** GSC run statuses (GSC-2) — client-safe labels come from the server result. */
 export const SEO_RESEARCH_GSC_STATUSES = [
   "AVAILABLE",
@@ -311,51 +368,69 @@ export type NormalizeSeoResearchOptions = {
   restorationPathAllowlist?: ReadonlySet<string>;
 };
 
+export type EvaluateSeoResearchSuccess = {
+  ok: true;
+  research: SeoResearchResult;
+};
+
+export type EvaluateSeoResearchFailure = {
+  ok: false;
+  issueCode: SeoResearchSemanticIssueCode;
+  /** 0-based index into the model opportunities array when the failing rule is per-item. */
+  opportunityIndex?: number;
+};
+
+export type EvaluateSeoResearchOutcome = EvaluateSeoResearchSuccess | EvaluateSeoResearchFailure;
+
+function semanticFail(
+  issueCode: SeoResearchSemanticIssueCode,
+  opportunityIndex?: number,
+): EvaluateSeoResearchFailure {
+  return opportunityIndex === undefined
+    ? { ok: false, issueCode }
+    : { ok: false, issueCode, opportunityIndex };
+}
+
 /**
- * Normalize model JSON against the allowlisted Flix public URLs.
- * GSC evidence refs are resolved against the server catalog when provided.
- * RESTORE_HISTORICAL is server-gated via restorationPathAllowlist.
+ * Authoritative Research semantic validation with privacy-safe rejection codes.
+ * Same accept/reject rules as normalizeSeoResearchResult — diagnostics do not relax validation.
  *
  * Fail-closed RESTORE rules drop that opportunity only (never coerce to another
- * recommendation). Malformed top-level/schema-unusable data still returns null.
+ * recommendation). Malformed top-level/schema-unusable data fails the whole payload.
  * An empty opportunities array is a valid result when every RESTORE was dropped.
  */
-export function normalizeSeoResearchResult(
+export function evaluateSeoResearchResult(
   raw: unknown,
   allowlistedPublicUrls: ReadonlySet<string>,
   options?: NormalizeSeoResearchOptions,
-): SeoResearchResult | null {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+): EvaluateSeoResearchOutcome {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return semanticFail("INVALID_TOP_LEVEL");
+  }
   const data = raw as Record<string, unknown>;
-  if (!Array.isArray(data.opportunities)) return null;
-  if (Object.keys(data).some((key) => key !== "opportunities")) return null;
+  if (!Array.isArray(data.opportunities)) {
+    return semanticFail("INVALID_TOP_LEVEL");
+  }
+  if (Object.keys(data).some((key) => key !== "opportunities")) {
+    return semanticFail("UNEXPECTED_TOP_LEVEL_FIELD");
+  }
 
   const gscById = options?.gscEvidenceById;
   const restoreAllowlist = options?.restorationPathAllowlist ?? new Set<string>();
   const opportunities: SeoResearchOpportunity[] = [];
-  for (const item of data.opportunities.slice(0, SEO_RESEARCH_FIELD_CAPS.opportunityCount)) {
-    if (!item || typeof item !== "object" || Array.isArray(item)) return null;
+  const knownKeys = OPPORTUNITY_KNOWN_KEYS as readonly string[];
+
+  for (let index = 0; index < data.opportunities.length; index++) {
+    if (index >= SEO_RESEARCH_FIELD_CAPS.opportunityCount) break;
+    const item = data.opportunities[index];
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return semanticFail("INVALID_OPPORTUNITY_OBJECT", index);
+    }
     const row = item as Record<string, unknown>;
-    const unexpected = Object.keys(row).filter(
-      (key) =>
-        ![
-          "topic",
-          "workingTitle",
-          "searchIntent",
-          "whyNow",
-          "webEvidence",
-          "existingCoverage",
-          "matchedTitle",
-          "matchedPublicUrl",
-          "recommendation",
-          "restorePath",
-          "suggestedAngle",
-          "nextStep",
-          "confidence",
-          "gscEvidenceRefs",
-        ].includes(key),
-    );
-    if (unexpected.length) return null;
+    const unexpected = Object.keys(row).filter((key) => !knownKeys.includes(key));
+    if (unexpected.length) {
+      return semanticFail("UNEXPECTED_OPPORTUNITY_FIELD", index);
+    }
 
     const topic = trimTo(row.topic, SEO_RESEARCH_FIELD_CAPS.topic);
     const workingTitle = trimTo(row.workingTitle, SEO_RESEARCH_FIELD_CAPS.workingTitle);
@@ -363,13 +438,25 @@ export function normalizeSeoResearchResult(
     const webEvidence = trimTo(row.webEvidence, SEO_RESEARCH_FIELD_CAPS.webEvidence);
     const suggestedAngle = trimTo(row.suggestedAngle, SEO_RESEARCH_FIELD_CAPS.suggestedAngle);
     const nextStep = trimTo(row.nextStep, SEO_RESEARCH_FIELD_CAPS.nextStep);
-    if (!topic || !workingTitle || !whyNow || !webEvidence || !suggestedAngle || !nextStep) return null;
-    if (!isEnum(row.searchIntent, SEO_RESEARCH_INTENTS)) return null;
-    if (!isEnum(row.existingCoverage, SEO_RESEARCH_COVERAGE)) return null;
-    if (!isEnum(row.recommendation, SEO_RESEARCH_RECOMMENDATIONS)) return null;
-    if (!isEnum(row.confidence, SEO_RESEARCH_CONFIDENCE)) return null;
+    if (!topic || !workingTitle || !whyNow || !webEvidence || !suggestedAngle || !nextStep) {
+      return semanticFail("MISSING_REQUIRED_TEXT", index);
+    }
+    if (!isEnum(row.searchIntent, SEO_RESEARCH_INTENTS)) {
+      return semanticFail("INVALID_SEARCH_INTENT", index);
+    }
+    if (!isEnum(row.existingCoverage, SEO_RESEARCH_COVERAGE)) {
+      return semanticFail("INVALID_COVERAGE", index);
+    }
+    if (!isEnum(row.recommendation, SEO_RESEARCH_RECOMMENDATIONS)) {
+      return semanticFail("INVALID_RECOMMENDATION", index);
+    }
+    if (!isEnum(row.confidence, SEO_RESEARCH_CONFIDENCE)) {
+      return semanticFail("INVALID_CONFIDENCE", index);
+    }
 
-    if (typeof row.restorePath !== "string") return null;
+    if (typeof row.restorePath !== "string") {
+      return semanticFail("INVALID_RESTORE_PATH_TYPE", index);
+    }
     const restoreTrimmed = String(row.restorePath).replace(/\s+/g, " ").trim();
     const restorePathNormalized =
       restoreTrimmed === ""
@@ -396,13 +483,15 @@ export function normalizeSeoResearchResult(
     } else {
       // restorePath is non-authoritative outside RESTORE — canonical empty string.
       restorePath = "";
-      if (
-        row.recommendation === "REFRESH_EXISTING" ||
-        row.recommendation === "INTERNAL_LINK_ONLY"
-      ) {
+      if (row.recommendation === "REFRESH_EXISTING") {
         if (!matchedUrlRaw || !allowlistedPublicUrls.has(matchedUrlRaw)) {
-          // Unsupported internal mapping — reject the whole payload rather than invent coverage.
-          return null;
+          return semanticFail("REFRESH_TARGET_NOT_ALLOWLISTED", index);
+        }
+        matchedPublicUrl = matchedUrlRaw;
+        if (!matchedTitle) matchedTitle = matchedUrlRaw;
+      } else if (row.recommendation === "INTERNAL_LINK_ONLY") {
+        if (!matchedUrlRaw || !allowlistedPublicUrls.has(matchedUrlRaw)) {
+          return semanticFail("INTERNAL_LINK_TARGET_NOT_ALLOWLISTED", index);
         }
         matchedPublicUrl = matchedUrlRaw;
         if (!matchedTitle) matchedTitle = matchedUrlRaw;
@@ -448,10 +537,26 @@ export function normalizeSeoResearchResult(
   }
 
   return {
-    opportunities,
-    sources: [],
-    ...(options?.gscMeta ? { gsc: options.gscMeta } : {}),
+    ok: true,
+    research: {
+      opportunities,
+      sources: [],
+      ...(options?.gscMeta ? { gsc: options.gscMeta } : {}),
+    },
   };
+}
+
+/**
+ * Normalize model JSON against the allowlisted Flix public URLs.
+ * Compatibility wrapper over evaluateSeoResearchResult — same accept/reject behavior.
+ */
+export function normalizeSeoResearchResult(
+  raw: unknown,
+  allowlistedPublicUrls: ReadonlySet<string>,
+  options?: NormalizeSeoResearchOptions,
+): SeoResearchResult | null {
+  const evaluated = evaluateSeoResearchResult(raw, allowlistedPublicUrls, options);
+  return evaluated.ok ? evaluated.research : null;
 }
 
 function resolveOpportunityGscRefs(
