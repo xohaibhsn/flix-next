@@ -25,3 +25,12 @@ export {
 } from "@/lib/cms/seo-experiment-ledger/types";
 
 export { mapResearchSnapshotToLedgerPlan } from "@/lib/cms/seo-experiment-ledger/map";
+
+export {
+  attachLedgerDurabilityToResearchResult,
+  bridgeResultToLedgerSnapshot,
+  durabilityMetaFromPersistResult,
+  runResearchBridgeThenPersistLedger,
+  type ResearchLedgerDurabilityMeta,
+  type ResearchWithLedgerDurability,
+} from "@/lib/cms/seo-experiment-ledger/attach-research-durability";

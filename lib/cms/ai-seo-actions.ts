@@ -15,6 +15,9 @@ import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
 import { parseSeoDraftInput } from "@/lib/cms/ai-seo/schemas";
 import { researchUkContentOpportunitiesWithDecisionPipelineFromCms } from "@/lib/cms/seo-decision-pipeline/research-bridge";
 import type { SeoResearchDecisionPipelineAttachment } from "@/lib/cms/seo-decision-pipeline/research-bridge-types";
+import type { ResearchLedgerDurabilityMeta } from "@/lib/cms/seo-experiment-ledger/attach-research-durability";
+import { runResearchBridgeThenPersistLedger } from "@/lib/cms/seo-experiment-ledger/attach-research-durability";
+import { insertResearchRunWithDecisions } from "@/lib/cms/seo-experiment-ledger/persist-mysql";
 
 function clientIp(headerStore: Headers) {
   const forwarded = headerStore.get("x-forwarded-for");
@@ -140,7 +143,7 @@ export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult 
   configured?: boolean;
   /** Present on successful Research when Decision Pipeline ran (or CONTEXT_ERROR). */
   decisionPipeline?: SeoResearchDecisionPipelineAttachment;
-};
+} & ResearchLedgerDurabilityMeta;
 
 /**
  * Explicit user-triggered UK content opportunity research (web_search).
@@ -148,6 +151,8 @@ export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult 
  * OpenAI-only — Gemini is not offered for research.
  * After Research succeeds, evaluates Decision Pipeline (RF→NBA→Priority) once;
  * pipeline context failure still returns Research for manual use.
+ * After the Bridge returns, attempts Experiment Ledger persistence exactly once.
+ * Ledger failure never converts successful Research into failed Research.
  */
 export async function researchUkContentOpportunitiesAction(): Promise<ResearchUkOpportunitiesActionResult> {
   const actor = await requireAdminActor("seo");
@@ -165,9 +170,18 @@ export async function researchUkContentOpportunitiesAction(): Promise<ResearchUk
   }
 
   const headerStore = await headers();
-  const result = await researchUkContentOpportunitiesWithDecisionPipelineFromCms({
-    adminId: actor.user.id,
-    ip: clientIp(headerStore),
+  const adminId = actor.user.id;
+  const ip = clientIp(headerStore);
+
+  const result = await runResearchBridgeThenPersistLedger({
+    actorAdminId: adminId,
+    source: "manual",
+    runResearch: () =>
+      researchUkContentOpportunitiesWithDecisionPipelineFromCms({
+        adminId,
+        ip,
+      }),
+    persist: (input) => insertResearchRunWithDecisions(input),
   });
 
   return { ...result, configured: true };

@@ -482,7 +482,10 @@ test("bridge core and action wiring: no second GSC/provider; barrel stays pure",
   assert.doesNotMatch(indexSrc, /from ["']@\/lib\/cms\/seo-decision-pipeline\/research-bridge["']/);
 
   assert.match(actions, /researchUkContentOpportunitiesWithDecisionPipelineFromCms/);
-  assert.doesNotMatch(panel, /decisionPipeline|seo-decision-pipeline/);
+  assert.match(actions, /runResearchBridgeThenPersistLedger/);
+  assert.match(actions, /insertResearchRunWithDecisions/);
+  assert.doesNotMatch(bridge, /seo-experiment-ledger|insertResearchRunWithDecisions/);
+  assert.doesNotMatch(panel, /decisionPipeline|seo-decision-pipeline|ledgerPersisted|insertResearchRunWithDecisions/);
 });
 
 test("UI / Proceed unchanged by bridge", () => {

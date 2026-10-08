@@ -155,6 +155,8 @@ test("pure barrel does not export server-only persist-mysql", () => {
   assert.doesNotMatch(index, /from ["']\.\/persist-mysql["']/);
   assert.doesNotMatch(index, /from ["']@\/lib\/cms\/seo-experiment-ledger\/persist-mysql["']/);
   assert.match(index, /mapResearchSnapshotToLedgerPlan/);
+  assert.match(index, /runResearchBridgeThenPersistLedger/);
+  assert.match(index, /attachLedgerDurabilityToResearchResult/);
   const persist = read("lib/cms/seo-experiment-ledger/persist-mysql.ts");
   assert.match(persist, /import "server-only"/);
 });
@@ -916,8 +918,13 @@ test("successful mocked TX inserts run then decisions once", async () => {
 test("persist module has no provider / Planning / Blog write imports", () => {
   const persist = read("lib/cms/seo-experiment-ledger/persist-mysql.ts");
   const map = read("lib/cms/seo-experiment-ledger/map.ts");
+  const attach = read("lib/cms/seo-experiment-ledger/attach-research-durability.ts");
   assert.doesNotMatch(persist, /openai|gemini|buildUkGscEvidencePack|listPosts|listSeoPlanning|savePost|saveSeoPlanning/i);
   assert.doesNotMatch(map, /openai|gemini|buildUkGscEvidencePack|listPosts/i);
-  assert.doesNotMatch(read("lib/cms/ai-seo-actions.ts"), /seo-experiment-ledger|insertResearchRunWithDecisions/);
+  assert.doesNotMatch(attach, /from ["'][^"']*(openai|gemini|mysql2|server-only)["']/i);
+  assert.doesNotMatch(attach, /buildUkGscEvidencePack|listPosts|listSeoPlanning/);
+  // L2 wires Ledger at the Research action; Bridge remains Ledger-free.
+  assert.match(read("lib/cms/ai-seo-actions.ts"), /runResearchBridgeThenPersistLedger/);
+  assert.match(read("lib/cms/ai-seo-actions.ts"), /insertResearchRunWithDecisions/);
   assert.doesNotMatch(read("lib/cms/seo-decision-pipeline/research-bridge.ts"), /seo-experiment-ledger/);
 });
