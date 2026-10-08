@@ -4,7 +4,7 @@
  * starts can skip a verified full ensureCmsSchema pass. Forgetting to bump leaves
  * new tables/columns unverified on DBs that already hold the previous version.
  */
-export const CURRENT_CMS_SCHEMA_VERSION = 4;
+export const CURRENT_CMS_SCHEMA_VERSION = 5;
 
 export const CMS_SCHEMA_STATEMENTS = [
   // Tables are created IF NOT EXISTS. Missing columns are added at runtime in ensureCmsSchema().
@@ -203,5 +203,61 @@ export const CMS_SCHEMA_STATEMENTS = [
     KEY seo_planning_drafts_workflow (workflow_status),
     KEY seo_planning_drafts_target_post (target_post_id),
     KEY seo_planning_drafts_archived_at (archived_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // Experiment Ledger V1 — Research run + per-opportunity decision history (MySQL-only).
+  `CREATE TABLE IF NOT EXISTS seo_research_runs (
+    id VARCHAR(80) NOT NULL,
+    created_at DATETIME NOT NULL,
+    completed_at DATETIME NOT NULL,
+    source VARCHAR(20) NOT NULL DEFAULT 'manual',
+    actor_admin_id VARCHAR(80) NULL,
+    research_ok TINYINT(1) NOT NULL,
+    research_error_code VARCHAR(80) NULL,
+    pipeline_run_status VARCHAR(40) NOT NULL,
+    pipeline_version VARCHAR(20) NULL,
+    pipeline_error_code VARCHAR(80) NULL,
+    opportunity_count INT NOT NULL DEFAULT 0,
+    gsc_status VARCHAR(40) NULL,
+    durability_status VARCHAR(20) NOT NULL DEFAULT 'COMPLETE',
+    PRIMARY KEY (id),
+    KEY seo_research_runs_created (created_at),
+    KEY seo_research_runs_source_created (source, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS seo_opportunity_decisions (
+    id VARCHAR(80) NOT NULL,
+    run_id VARCHAR(80) NOT NULL,
+    opportunity_index INT NOT NULL,
+    opportunity_identity VARCHAR(80) NOT NULL,
+    created_at DATETIME NOT NULL,
+    topic VARCHAR(160) NOT NULL DEFAULT '',
+    working_title VARCHAR(180) NOT NULL DEFAULT '',
+    research_recommendation VARCHAR(40) NOT NULL DEFAULT '',
+    research_confidence VARCHAR(20) NULL,
+    existing_coverage VARCHAR(20) NULL,
+    matched_public_url VARCHAR(300) NOT NULL DEFAULT '',
+    restore_path VARCHAR(300) NOT NULL DEFAULT '',
+    target_post_id VARCHAR(80) NULL,
+    evaluation_status VARCHAR(40) NOT NULL,
+    rf_verdict VARCHAR(40) NULL,
+    rf_fingerprint VARCHAR(80) NULL,
+    nba_action VARCHAR(40) NULL,
+    nba_status VARCHAR(40) NULL,
+    nba_autonomous_eligible TINYINT(1) NULL,
+    nba_fingerprint VARCHAR(80) NULL,
+    priority_score INT NULL,
+    priority_tier VARCHAR(20) NULL,
+    priority_score_version VARCHAR(20) NULL,
+    priority_automation_selectable TINYINT(1) NULL,
+    priority_fingerprint VARCHAR(80) NULL,
+    pipeline_fingerprint VARCHAR(80) NULL,
+    selected TINYINT(1) NOT NULL DEFAULT 0,
+    selection_source VARCHAR(40) NOT NULL DEFAULT 'none',
+    PRIMARY KEY (id),
+    UNIQUE KEY seo_opportunity_decisions_run_index (run_id, opportunity_index),
+    KEY seo_opportunity_decisions_identity (opportunity_identity),
+    KEY seo_opportunity_decisions_target (target_post_id),
+    KEY seo_opportunity_decisions_nba_selected (nba_action, selected),
+    CONSTRAINT seo_opportunity_decisions_run_fk
+      FOREIGN KEY (run_id) REFERENCES seo_research_runs(id) ON DELETE RESTRICT
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ] as const;

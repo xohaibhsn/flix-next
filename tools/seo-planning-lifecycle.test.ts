@@ -101,7 +101,7 @@ function baseDraft(overrides: Partial<SeoPlanningDraft> = {}): SeoPlanningDraft 
 }
 
 test("schema version bumped for archived_at column", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
   const schema = read("lib/db/schema.ts");
   const ddl = read("db/cms-schema.sql");
   const migrate = read("lib/cms/mysql-migrate.ts");

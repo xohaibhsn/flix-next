@@ -699,7 +699,7 @@ test("CACHE: current/stale/unusable; openai sibling preserved; malformed ignored
   );
   assert.equal(readGeminiImagePromptCache({}), null);
   assert.equal(readGeminiImagePromptCache({ imagePrompts: { gemini: { bad: true } } }), null);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
 
   // Write path must preserve RAW siblings that the read parser ignores.
   const rawPreserved = mergeGeminiImagePromptCache(
@@ -773,7 +773,7 @@ test("SCHEMA: Planning workspace save preserves imagePrompts; sanitizer round-tr
   );
   const roundTrip = sanitizeSeoPlanningDraft(applied.draft);
   assert.equal(readGeminiImagePromptCache(roundTrip.payload)?.chatgptImagePrompt, "Persist across workspace save");
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
 });
 
 test("CONCURRENCY: F1==F2==write persists; topic/notes/featured/disposition/title changes reject", async () => {
@@ -1477,7 +1477,7 @@ test("UI / ACTION / ENV: placement; Generate/Copy; dual Gemini+OpenAI; no media/
   assert.doesNotMatch(briefUi, /Generate with Gemini/);
   assert.doesNotMatch(read("db/cms-schema.sql"), /image_prompt|imagePrompts/);
   assert.doesNotMatch(read("lib/db/schema.ts"), /image_prompt|imagePrompts/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
 
   const providerSrc = read("lib/cms/ai-seo/image-prompt-gemini.ts");
   assert.match(providerSrc, /Sidhu AI Image Prompt Assistant/);

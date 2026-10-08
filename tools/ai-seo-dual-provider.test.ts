@@ -678,8 +678,8 @@ test("RESOURCE + SCHEMA: no render calls; no dual/retry/poll; schema remains 3",
   assert.doesNotMatch(draftUi, /openDrawer[\s\S]{0,80}runDraft\(/);
   assert.doesNotMatch(gemini, /\bretry\b|setInterval|setTimeout\(\s*\(\)\s*=>\s*request/);
   assert.doesNotMatch(openAi, /\bretry\b/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
-  assert.match(readFileSync(path.join(root, "lib/db/schema.ts"), "utf8"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*4/);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.match(readFileSync(path.join(root, "lib/db/schema.ts"), "utf8"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*5/);
   assert.doesNotMatch(
     readFileSync(path.join(root, "db/cms-schema.sql"), "utf8"),
     /gemini|openai_seo|writing_brief/i,

@@ -133,7 +133,7 @@ function memoryCatalog(seed: {
 }
 
 test("schema version is 3 and seo_planning_drafts table exists", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
   const joined = CMS_SCHEMA_STATEMENTS.join("\n");
   assert.match(joined, /CREATE TABLE IF NOT EXISTS seo_planning_drafts/);
   assert.match(joined, /UNIQUE KEY seo_planning_drafts_fingerprint_unique/);

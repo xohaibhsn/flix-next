@@ -359,7 +359,7 @@ test("Phase B UI: editable workspace without publish/create/restore/free workflo
 });
 
 test("Phase B: no schema version bump; humanNotes cap constant present", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 4);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
   assert.equal(SEO_PLANNING_HUMAN_NOTES_CAP, 4000);
   const schema = read("lib/db/schema.ts");
   assert.doesNotMatch(schema, /human_notes/);
