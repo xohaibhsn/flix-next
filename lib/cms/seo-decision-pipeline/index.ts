@@ -1,9 +1,11 @@
 /**
  * SEO Decision Pipeline Adapter V1 — public exports.
  * Composes Research → Refresh-First → NBA → Priority.
- * Zero providers / GSC API / writes. Not wired into Opportunities UI / Proceed.
+ * Zero providers / GSC API / writes.
  *
- * Server CMS context builder lives in `./context-cms` (server-only).
+ * Server-only modules (do not import from this barrel):
+ * - `./context-cms` — CMS context builder
+ * - `./research-bridge` — Research + Pipeline server wrapper
  */
 
 export {
@@ -50,3 +52,19 @@ export {
   evaluateSeoOpportunityPipeline,
   evaluateSeoOpportunityPipelineBatch,
 } from "@/lib/cms/seo-decision-pipeline/evaluate";
+
+export {
+  SEO_RESEARCH_DECISION_PIPELINE_RUN_STATUSES,
+  type ResearchUkOpportunitiesWithPipelineResult,
+  type ResearchUkOpportunitiesWithPipelineSuccess,
+  type SeoResearchDecisionPipelineAttachment,
+  type SeoResearchDecisionPipelineEvaluation,
+  type SeoResearchDecisionPipelineRunStatus,
+} from "@/lib/cms/seo-decision-pipeline/research-bridge-types";
+
+export {
+  buildContextErrorDecisionPipelineAttachment,
+  buildOkDecisionPipelineAttachment,
+  combineResearchWithDecisionPipeline,
+  toResearchDecisionPipelineEvaluation,
+} from "@/lib/cms/seo-decision-pipeline/research-bridge-core";

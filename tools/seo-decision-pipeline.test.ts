@@ -801,16 +801,18 @@ test("proposedSlug derived only for NEW_BLOG via slugify(workingTitle)", () => {
   assert.notEqual(result.refreshFirst?.verdict, "PASS_NEW_CONTENT");
 });
 
-test("UI / Proceed / Research action files unchanged by this module (no imports yet)", () => {
+test("UI / Proceed remain unwired; Research action may call research-bridge only", () => {
   const panel = readFileSync(
     path.join(root, "components/sidhu/SeoOpportunitiesPanel.tsx"),
     "utf8",
   );
   const actions = readFileSync(path.join(root, "lib/cms/ai-seo-actions.ts"), "utf8");
   const proceed = readFileSync(path.join(root, "lib/cms/seo-planning/proceed.ts"), "utf8");
-  assert.doesNotMatch(panel, /seo-decision-pipeline/);
-  assert.doesNotMatch(actions, /seo-decision-pipeline/);
-  assert.doesNotMatch(proceed, /seo-decision-pipeline/);
+  assert.doesNotMatch(panel, /seo-decision-pipeline|decisionPipeline/);
+  assert.doesNotMatch(proceed, /seo-decision-pipeline|decisionPipeline/);
+  // Server action may invoke the Research bridge; must not pull pure barrel into client UI.
+  assert.match(actions, /researchUkContentOpportunitiesWithDecisionPipelineFromCms/);
+  assert.match(actions, /seo-decision-pipeline\/research-bridge/);
 });
 
 // --- Review-gap tests ---

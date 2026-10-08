@@ -12,8 +12,9 @@ import { draftSeoTitleMeta, type DraftSeoTitleMetaResult } from "@/lib/cms/ai-se
 import { explainSeoFinding, type ExplainSeoFindingResult } from "@/lib/cms/ai-seo/explain";
 import { parseSeoAiProviderRequest } from "@/lib/cms/ai-seo/provider-type";
 import type { ResearchUkOpportunitiesResult } from "@/lib/cms/ai-seo/research";
-import { researchUkContentOpportunitiesFromCms } from "@/lib/cms/ai-seo/research-run";
 import { parseSeoDraftInput } from "@/lib/cms/ai-seo/schemas";
+import { researchUkContentOpportunitiesWithDecisionPipelineFromCms } from "@/lib/cms/seo-decision-pipeline/research-bridge";
+import type { SeoResearchDecisionPipelineAttachment } from "@/lib/cms/seo-decision-pipeline/research-bridge-types";
 
 function clientIp(headerStore: Headers) {
   const forwarded = headerStore.get("x-forwarded-for");
@@ -137,12 +138,16 @@ export async function draftSeoTitleMetaAction(rawInput: unknown): Promise<DraftS
 
 export type ResearchUkOpportunitiesActionResult = ResearchUkOpportunitiesResult & {
   configured?: boolean;
+  /** Present on successful Research when Decision Pipeline ran (or CONTEXT_ERROR). */
+  decisionPipeline?: SeoResearchDecisionPipelineAttachment;
 };
 
 /**
  * Explicit user-triggered UK content opportunity research (web_search).
  * Never creates, edits, saves, or publishes CMS content.
  * OpenAI-only — Gemini is not offered for research.
+ * After Research succeeds, evaluates Decision Pipeline (RF→NBA→Priority) once;
+ * pipeline context failure still returns Research for manual use.
  */
 export async function researchUkContentOpportunitiesAction(): Promise<ResearchUkOpportunitiesActionResult> {
   const actor = await requireAdminActor("seo");
@@ -160,7 +165,7 @@ export async function researchUkContentOpportunitiesAction(): Promise<ResearchUk
   }
 
   const headerStore = await headers();
-  const result = await researchUkContentOpportunitiesFromCms({
+  const result = await researchUkContentOpportunitiesWithDecisionPipelineFromCms({
     adminId: actor.user.id,
     ip: clientIp(headerStore),
   });
