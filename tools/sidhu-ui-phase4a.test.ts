@@ -118,13 +118,14 @@ test("SEO diagnostic reports use RelatedWorkspaces instead of brand underline du
   }
 });
 
-test("SEO subnav includes Planning after Opportunities", () => {
+test("SEO subnav includes Experiment Ledger and Planning after Opportunities", () => {
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.id),
     [
       "overview",
       "issues",
       "opportunities",
+      "ledger",
       "planning",
       "content",
       "metadata",

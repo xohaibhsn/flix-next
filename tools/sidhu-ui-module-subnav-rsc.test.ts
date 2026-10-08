@@ -46,13 +46,14 @@ test("ModuleSubNav public props stay JSON-serializable", () => {
 test("SEO nav active matching covers all subsections with Overview exact", () => {
   type SidhuSeoId = (typeof SIDHU_SEO_NAV)[number]["id"];
 
-  assert.equal(SIDHU_SEO_NAV.length, 9);
+  assert.equal(SIDHU_SEO_NAV.length, 10);
   assert.deepEqual(
     SIDHU_SEO_NAV.map((item) => item.label),
     [
       "Overview",
       "Issues",
       "Opportunities",
+      "Experiment Ledger",
       "Planning",
       "Content",
       "Metadata",
@@ -68,6 +69,8 @@ test("SEO nav active matching covers all subsections with Overview exact", () =>
     { path: "/sidhu/seo", activeId: "overview" },
     { path: "/sidhu/seo/health/", activeId: "issues" },
     { path: "/sidhu/seo/opportunities/", activeId: "opportunities" },
+    { path: "/sidhu/seo/ledger/", activeId: "ledger" },
+    { path: "/sidhu/seo/ledger/seorun_demo/", activeId: "ledger" },
     { path: "/sidhu/seo/planning/", activeId: "planning" },
     { path: "/sidhu/seo/planning/demo/", activeId: "planning" },
     { path: "/sidhu/seo/content/", activeId: "content" },

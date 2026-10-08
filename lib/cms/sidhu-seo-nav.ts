@@ -5,6 +5,7 @@ export type SidhuSeoNavItem = ModuleSubNavItem & {
     | "overview"
     | "issues"
     | "opportunities"
+    | "ledger"
     | "planning"
     | "content"
     | "metadata"
@@ -18,6 +19,7 @@ export const SIDHU_SEO_NAV: readonly SidhuSeoNavItem[] = [
   { id: "overview", label: "Overview", href: "/sidhu/seo/", exact: true },
   { id: "issues", label: "Issues", href: "/sidhu/seo/health/" },
   { id: "opportunities", label: "Opportunities", href: "/sidhu/seo/opportunities/" },
+  { id: "ledger", label: "Experiment Ledger", href: "/sidhu/seo/ledger/" },
   { id: "planning", label: "Planning", href: "/sidhu/seo/planning/" },
   { id: "content", label: "Content", href: "/sidhu/seo/content/" },
   { id: "metadata", label: "Metadata", href: "/sidhu/seo/metadata-diagnostics/" },
