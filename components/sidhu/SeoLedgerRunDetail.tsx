@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { formatLedgerMysqlUtcLabel } from "@/lib/cms/seo-experiment-ledger/read-cursor";
+import type { LedgerTargetBlogLinkState } from "@/lib/cms/seo-experiment-ledger/target-blog-links";
 import type {
   SeoOpportunityDecisionRow,
   SeoResearchRunRow,
@@ -41,14 +42,63 @@ function safePublicPath(value: string): string | null {
   return trimmed;
 }
 
+function TargetBlogField({ state }: { state: LedgerTargetBlogLinkState | undefined }) {
+  if (!state || state.kind === "none") {
+    return <Field label="Existing target Blog">—</Field>;
+  }
+  if (state.kind === "unsafe_id") {
+    return (
+      <Field label="Existing target Blog">
+        <span className="text-muted">Stored target id is not a safe Blog identifier.</span>
+      </Field>
+    );
+  }
+  if (state.kind === "missing") {
+    return (
+      <Field label="Existing target Blog">
+        <span className="text-muted">
+          Target Blog not found ({state.targetPostId}). This does not prove Planning or publication
+          lineage.
+        </span>
+      </Field>
+    );
+  }
+  const label = state.title ? `${state.title} (${state.targetPostId})` : state.targetPostId;
+  if (state.kind === "exists_editable") {
+    return (
+      <Field label="Existing target Blog">
+        <Link href={state.editorHref} className="font-semibold text-ink underline">
+          {label}
+        </Link>
+        <span className="mt-0.5 block text-xs font-normal text-muted">
+          Opens the current Blog editor for this stored target id. Not proof that Research created
+          Planning or published this article.
+        </span>
+      </Field>
+    );
+  }
+  return (
+    <Field label="Existing target Blog">
+      <span>{label}</span>
+      <span className="mt-0.5 block text-xs text-muted">
+        Blog editor link hidden — Blog permission required. Target id only; not Research→Planning
+        provenance.
+      </span>
+    </Field>
+  );
+}
+
 export function SeoLedgerRunDetail({
   run,
   decisions,
   decisionOverflow,
+  targetBlogByPostId,
 }: {
   run: SeoResearchRunRow;
   decisions: SeoOpportunityDecisionRow[];
   decisionOverflow?: boolean;
+  /** L4A: resolved by targetPostId. Omitted → show raw id only (no existence claim). */
+  targetBlogByPostId?: Readonly<Record<string, LedgerTargetBlogLinkState>>;
 }) {
   return (
     <div className="space-y-5">
@@ -136,6 +186,15 @@ export function SeoLedgerRunDetail({
                       )}
                     </Field>
                     <Field label="Target post ID">{nullableText(d.targetPostId)}</Field>
+                    <TargetBlogField
+                      state={
+                        d.targetPostId && targetBlogByPostId
+                          ? targetBlogByPostId[d.targetPostId]
+                          : d.targetPostId
+                            ? undefined
+                            : { kind: "none" }
+                      }
+                    />
                     <Field label="RF verdict">{nullableText(d.rfVerdict)}</Field>
                     <Field label="RF fingerprint">
                       <span className="font-mono text-xs">{nullableText(d.rfFingerprint)}</span>

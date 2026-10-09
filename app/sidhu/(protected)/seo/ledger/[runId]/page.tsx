@@ -5,8 +5,11 @@ import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoLedgerRunDetail } from "@/components/sidhu/SeoLedgerRunDetail";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { requirePermission } from "@/lib/auth/guards";
+import { adminHasPermission } from "@/lib/auth/session";
 import { isValidLedgerRunId } from "@/lib/cms/seo-experiment-ledger/read-cursor";
 import { getSeoResearchRunDetail } from "@/lib/cms/seo-experiment-ledger/read-mysql";
+import { resolveLedgerTargetBlogLinks } from "@/lib/cms/seo-experiment-ledger/target-blog-links";
+import { cms } from "@/lib/cms/repository";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -18,7 +21,7 @@ export default async function SidhuSeoLedgerRunDetailPage({
 }: {
   params: Promise<{ runId: string }>;
 }) {
-  await requirePermission("seo");
+  const user = await requirePermission("seo");
   const { runId: rawId } = await params;
   const runId = decodeURIComponent(rawId || "");
 
@@ -54,6 +57,14 @@ export default async function SidhuSeoLedgerRunDetailPage({
     );
   }
 
+  // L4A: bounded existence check for stored targetPostId values only.
+  // Does not look up Planning drafts or imply Research→Planning provenance.
+  const targetBlogByPostId = await resolveLedgerTargetBlogLinks({
+    decisions: result.decisions,
+    getPostById: (id) => cms.getPostById(id),
+    canEditBlog: adminHasPermission(user, "blog"),
+  });
+
   return (
     <AdminShell
       title="SEO"
@@ -69,6 +80,7 @@ export default async function SidhuSeoLedgerRunDetailPage({
           run={result.run}
           decisions={result.decisions}
           decisionOverflow={result.decisionOverflow}
+          targetBlogByPostId={targetBlogByPostId}
         />
       </SeoModuleChrome>
     </AdminShell>
