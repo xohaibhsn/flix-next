@@ -62,7 +62,8 @@ import type { SeoHealthFinding } from "../lib/cms/seo-health";
 
 const root = process.cwd();
 const SAMPLE_OPENAI_KEY = "sk-test-dual-provider-openai-not-real";
-const SAMPLE_GEMINI_KEY = "AIzaSy-test-dual-provider-gemini-not-real";
+/** Deterministic non-secret fixture — must not match Google API key secret-scanning patterns. */
+const SAMPLE_GEMINI_KEY = "test-gemini-fixture-not-a-google-api-key";
 
 const sampleFinding: SeoExplainFindingInput = {
   issueCode: "MISSING_META_DESCRIPTION",

@@ -60,7 +60,8 @@ import { CURRENT_CMS_SCHEMA_VERSION } from "../lib/db/schema";
 import type { BlogCategory, BlogPost, SeoPlanningDraft } from "../lib/cms/types";
 
 const root = process.cwd();
-const SAMPLE_GEMINI_KEY = "AIzaSy-test-image-prompt-gemini-not-real";
+/** Deterministic non-secret fixture — must not match Google API key secret-scanning patterns. */
+const SAMPLE_GEMINI_KEY = "test-gemini-fixture-not-a-google-api-key";
 
 function read(rel: string) {
   return readFileSync(path.join(root, rel), "utf8");

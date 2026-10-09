@@ -54,7 +54,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const root = process.cwd();
-const SAMPLE_GEMINI_KEY = "AIzaSy-test-blog-prompt-gemini-not-real";
+/** Deterministic non-secret fixture — must not match Google API key secret-scanning patterns. */
+const SAMPLE_GEMINI_KEY = "test-gemini-fixture-not-a-google-api-key";
 
 function read(rel: string) {
   return readFileSync(path.join(root, rel), "utf8");
