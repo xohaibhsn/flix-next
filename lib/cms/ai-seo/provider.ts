@@ -273,6 +273,16 @@ export async function requestOpenAiStructuredJson(args: {
   notConfiguredMessage?: string;
   timeoutMessage?: string;
   unavailableMessage?: string;
+  /**
+   * Optional Responses API status/refusal gate (used by blog article generation).
+   * Runs after HTTP JSON parse and before output-text extraction — never retries.
+   * Omitted for SEO explain/draft/blog-prompt/image-prompt callers.
+   */
+  inspectPayload?: (
+    payload: unknown,
+  ) =>
+    | { ok: true }
+    | { ok: false; code: OpenAiProviderErrorCode; message: string };
 }): Promise<{ ok: true; json: unknown; model: string } | { ok: false; code: OpenAiProviderErrorCode; message: string }> {
   if (!args.config.configured || !args.config.apiKey) {
     return {
@@ -324,6 +334,11 @@ export async function requestOpenAiStructuredJson(args: {
         code: "invalid_response",
         message: "AI returned an unusable response. Please try again.",
       };
+    }
+
+    if (args.inspectPayload) {
+      const inspected = args.inspectPayload(payload);
+      if (!inspected.ok) return inspected;
     }
 
     const text = extractResponsesOutputText(payload);

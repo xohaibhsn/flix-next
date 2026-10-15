@@ -6,10 +6,16 @@ import { adminHasPermission } from "@/lib/auth/session";
 import {
   isGeminiBlogPromptConfigured,
   isGeminiImagePromptConfigured,
+  isOpenAiBlogArticleConfigured,
   isOpenAiBlogPromptConfigured,
   isOpenAiImagePromptConfigured,
+  isSeoAiArticleGenerationEnabled,
 } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
+import {
+  generateNewBlogArticlePreview,
+  type GenerateArticlePreviewResult,
+} from "@/lib/cms/seo-planning/article-generation";
 import {
   parseSeoPlanningHandoffInput,
   SEO_PLANNING_HANDOFF_BLOG_PERMISSION_MESSAGE,
@@ -521,6 +527,82 @@ export async function deleteSeoPlanningDraftPermanentlyAction(
   } catch {
     return { ok: false, error: "Could not permanently delete the planning draft. Please try again." };
   }
+}
+
+function articleGenerationCatalog() {
+  return {
+    getSeoPlanningDraftById: (id: string) => cms.getSeoPlanningDraftById(id),
+    getPostById: (id: string) => cms.getPostById(id),
+    listCategories: () => cms.listCategories(),
+  };
+}
+
+export type GenerateNewBlogArticlePreviewActionResult = GenerateArticlePreviewResult & {
+  openaiBlogArticleConfigured?: boolean;
+  featureEnabled?: boolean;
+};
+
+/**
+ * Phase A1 Preview-Only RC — closed-by-default Generate Article preview.
+ * Inactive unless SEO_AI_ARTICLE_GENERATION_ENABLED=1. Never called from page render.
+ * Does not save Blog content, publish, call Gemini, Research, or GSC.
+ * Blog Apply is intentionally not exported in this release candidate.
+ */
+export async function generateNewBlogArticlePreviewAction(
+  rawInput: unknown,
+): Promise<GenerateNewBlogArticlePreviewActionResult> {
+  const featureEnabled = isSeoAiArticleGenerationEnabled();
+  const openaiBlogArticleConfigured = isOpenAiBlogArticleConfigured();
+  if (!featureEnabled) {
+    return {
+      ok: false,
+      code: "feature_disabled",
+      error: "AI article generation is not enabled in this environment.",
+      blogSaved: false,
+      providerRequests: 0,
+      featureEnabled,
+      openaiBlogArticleConfigured,
+    };
+  }
+
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      code: "unauthorized",
+      error: actor.error,
+      blogSaved: false,
+      providerRequests: 0,
+      featureEnabled,
+      openaiBlogArticleConfigured,
+    };
+  }
+
+  const input =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>)
+      : null;
+  const planningDraftId = typeof input?.planningDraftId === "string" ? input.planningDraftId.trim() : "";
+  if (!planningDraftId || Object.keys(input || {}).some((key) => key !== "planningDraftId")) {
+    return {
+      ok: false,
+      code: "invalid_input",
+      error: "Planning draft id is required.",
+      blogSaved: false,
+      providerRequests: 0,
+      featureEnabled,
+      openaiBlogArticleConfigured,
+    };
+  }
+
+  const headerStore = await headers();
+  const result = await generateNewBlogArticlePreview({
+    planningDraftId,
+    adminId: actor.user.id,
+    ip: clientIp(headerStore),
+    catalog: articleGenerationCatalog(),
+  });
+  return { ...result, featureEnabled, openaiBlogArticleConfigured };
 }
 
 /**

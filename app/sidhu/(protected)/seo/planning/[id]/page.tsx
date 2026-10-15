@@ -5,8 +5,10 @@ import { SeoPlanningDetail } from "@/components/sidhu/SeoPlanningDetail";
 import {
   isGeminiBlogPromptConfigured,
   isGeminiImagePromptConfigured,
+  isOpenAiBlogArticleConfigured,
   isOpenAiBlogPromptConfigured,
   isOpenAiImagePromptConfigured,
+  isSeoAiArticleGenerationEnabled,
 } from "@/lib/cms/ai-seo/config";
 import { cms } from "@/lib/cms/repository";
 import { buildImageBrief } from "@/lib/cms/seo-planning/image-brief";
@@ -98,6 +100,8 @@ export default async function SidhuSeoPlanningDetailPage({
           openaiBlogPromptConfigured={isOpenAiBlogPromptConfigured()}
           geminiImagePromptConfigured={isGeminiImagePromptConfigured()}
           openaiImagePromptConfigured={isOpenAiImagePromptConfigured()}
+          aiArticleGenerationEnabled={isSeoAiArticleGenerationEnabled()}
+          openaiBlogArticleConfigured={isOpenAiBlogArticleConfigured()}
           initialWritingPromptState={{
             gemini: { status: geminiStatus, cache: geminiCache },
             openai: { status: openaiStatus, cache: openaiCache },

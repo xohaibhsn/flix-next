@@ -161,3 +161,35 @@ export const AI_SEO_IMAGE_PROMPT_RATE_LIMITS = {
   dailyMax: IMAGE_PROMPT_DAILY_MAX,
   dailyWindowMs: DAILY_WINDOW_MS,
 } as const;
+
+/** Blog Article limiter — dedicated bucket; does not share prompt/SEO/research ceilings. */
+const BLOG_ARTICLE_BURST_MAX = 1;
+const BLOG_ARTICLE_DAILY_MAX = 10;
+const blogArticleBurstAttempts = new Map<string, WindowState>();
+const blogArticleDailyAttempts = new Map<string, WindowState>();
+
+export function aiSeoBlogArticleRateLimitKey(adminId: string, ip: string) {
+  const material = `${adminId || "unknown"}:${ip || "unknown"}`;
+  return createHash("sha256").update(`flix-ai-seo-blog-article:${material}`).digest("hex");
+}
+
+export function checkAiSeoBlogArticleRateLimit(adminId: string, ip: string): AiSeoRateLimitResult {
+  const key = aiSeoBlogArticleRateLimitKey(adminId, ip);
+  const burst = consume(blogArticleBurstAttempts, key, BLOG_ARTICLE_BURST_MAX, BURST_WINDOW_MS);
+  if (!burst.ok) return burst;
+  const daily = consume(blogArticleDailyAttempts, key, BLOG_ARTICLE_DAILY_MAX, DAILY_WINDOW_MS);
+  if (!daily.ok) return daily;
+  return { ok: true };
+}
+
+export function resetAiSeoBlogArticleRateLimitForTests() {
+  blogArticleBurstAttempts.clear();
+  blogArticleDailyAttempts.clear();
+}
+
+export const AI_SEO_BLOG_ARTICLE_RATE_LIMITS = {
+  burstMax: BLOG_ARTICLE_BURST_MAX,
+  burstWindowMs: BURST_WINDOW_MS,
+  dailyMax: BLOG_ARTICLE_DAILY_MAX,
+  dailyWindowMs: DAILY_WINDOW_MS,
+} as const;

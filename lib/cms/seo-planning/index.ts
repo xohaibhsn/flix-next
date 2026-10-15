@@ -6,6 +6,21 @@ export {
   isSeoPlanningActionableRecommendation,
 } from "@/lib/cms/seo-planning/constants";
 export {
+  SEO_PLANNING_EDITORIAL_EVIDENCE_CAPS,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_PAYLOAD_KEY,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_TYPES,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_VERSION,
+  SEO_PLANNING_EDITORIAL_TRUST,
+  isSafeEditorialEvidenceUrl,
+  mergeEditorialEvidenceIntoPayload,
+  parseSeoPlanningEditorialEvidence,
+  readSeoPlanningEditorialEvidence,
+  type SeoPlanningEditorialEvidenceEntry,
+  type SeoPlanningEditorialEvidenceParseResult,
+  type SeoPlanningEditorialEvidenceType,
+  type SeoPlanningEditorialEvidenceV1,
+} from "@/lib/cms/seo-planning/editorial-evidence";
+export {
   buildSeoPlanningFingerprint,
   normalizePlanningRestorePath,
   normalizePlanningTopicKey,
@@ -184,3 +199,17 @@ export {
   type SeoPlanningHandoffResult,
   type SeoPlanningHandoffSuccess,
 } from "@/lib/cms/seo-planning/handoff";
+export {
+  SEO_AI_ARTICLE_APPLY_NOT_IN_PREVIEW_RC_MESSAGE,
+  SEO_AI_ARTICLE_GENERATION_SPEC,
+  SEO_AI_ARTICLE_REFRESH_BLOCKED_MESSAGE,
+  SEO_AI_ARTICLE_STALE_PLANNING_MESSAGE,
+  SEO_AI_ARTICLE_UNSUPPORTED_MESSAGE,
+  buildArticleGenerationInput,
+  evaluateNewBlogArticleEligibility,
+  generateNewBlogArticlePreview,
+  parsePrivateArticlePreview,
+  type GenerateArticlePreviewResult,
+  type GeneratedArticle,
+  type PrivateArticlePreview,
+} from "@/lib/cms/seo-planning/article-generation";

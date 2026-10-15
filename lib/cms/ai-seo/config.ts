@@ -31,6 +31,15 @@ export const GEMINI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS = 1500;
 export const OPENAI_IMAGE_PROMPT_TIMEOUT_MS = 30_000;
 export const OPENAI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS = 1500;
 export const CHATGPT_IMAGE_PROMPT_MAX_CHARS = 4_000;
+/** Phase A1 OpenAI blog article generation (not writing-prompt / SEO / research / image). */
+export const OPENAI_BLOG_ARTICLE_TIMEOUT_MS = 45_000;
+export const OPENAI_BLOG_ARTICLE_MAX_OUTPUT_TOKENS = 4500;
+export const GENERATED_ARTICLE_TITLE_MAX_CHARS = 160;
+export const GENERATED_ARTICLE_EXCERPT_MAX_CHARS = 400;
+export const GENERATED_ARTICLE_HTML_MAX_CHARS = 48_000;
+export const ARTICLE_GENERATION_INPUT_MAX_CHARS = 12_000;
+/** Closed-by-default local activation gate — never enable via page render alone. */
+export const SEO_AI_ARTICLE_GENERATION_ENV = "SEO_AI_ARTICLE_GENERATION_ENABLED";
 
 export type OpenAiSeoConfig = {
   configured: boolean;
@@ -69,6 +78,9 @@ export type OpenAiBlogPromptConfig = OpenAiSeoConfig;
 
 /** Same transport shape as OpenAiSeoConfig; model comes only from OPENAI_IMAGE_PROMPT_MODEL. */
 export type OpenAiImagePromptConfig = OpenAiSeoConfig;
+
+/** Same transport shape as OpenAiSeoConfig; model comes only from OPENAI_BLOG_ARTICLE_MODEL. */
+export type OpenAiBlogArticleConfig = OpenAiSeoConfig;
 
 export function isOpenAiSeoConfigured() {
   return Boolean(process.env.OPENAI_API_KEY?.trim());
@@ -210,4 +222,31 @@ export function getOpenAiImagePromptConfig(): OpenAiImagePromptConfig {
     timeoutMs: OPENAI_IMAGE_PROMPT_TIMEOUT_MS,
     maxOutputTokens: OPENAI_IMAGE_PROMPT_MAX_OUTPUT_TOKENS,
   };
+}
+
+/**
+ * OpenAI Blog Article requires key + explicit OPENAI_BLOG_ARTICLE_MODEL.
+ * Never falls back to SEO, research, writing-prompt, or image-prompt models.
+ */
+export function isOpenAiBlogArticleConfigured() {
+  return Boolean(process.env.OPENAI_API_KEY?.trim() && process.env.OPENAI_BLOG_ARTICLE_MODEL?.trim());
+}
+
+export function getOpenAiBlogArticleConfig(): OpenAiBlogArticleConfig {
+  const apiKey = process.env.OPENAI_API_KEY?.trim() || "";
+  const model = process.env.OPENAI_BLOG_ARTICLE_MODEL?.trim() || "";
+  const configured = Boolean(apiKey && model);
+  return {
+    configured,
+    apiKey,
+    model,
+    endpoint: OPENAI_RESPONSES_ENDPOINT,
+    timeoutMs: OPENAI_BLOG_ARTICLE_TIMEOUT_MS,
+    maxOutputTokens: OPENAI_BLOG_ARTICLE_MAX_OUTPUT_TOKENS,
+  };
+}
+
+/** Feature closed unless SEO_AI_ARTICLE_GENERATION_ENABLED=1 (local/dev only). */
+export function isSeoAiArticleGenerationEnabled() {
+  return process.env[SEO_AI_ARTICLE_GENERATION_ENV]?.trim() === "1";
 }

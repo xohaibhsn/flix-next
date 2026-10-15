@@ -39,6 +39,7 @@ import {
 } from "@/lib/cms/seo-planning/image-brief";
 import { SeoPlanningLifecycleControls } from "@/components/sidhu/SeoPlanningLifecycleControls";
 import { SeoPlanningContentHandoff } from "@/components/sidhu/SeoPlanningContentHandoff";
+import { SeoPlanningArticleGeneration } from "@/components/sidhu/SeoPlanningArticleGeneration";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -100,6 +101,8 @@ export function SeoPlanningDetail({
   openaiBlogPromptConfigured = false,
   geminiImagePromptConfigured = false,
   openaiImagePromptConfigured = false,
+  aiArticleGenerationEnabled = false,
+  openaiBlogArticleConfigured = false,
   initialWritingPromptState = {
     gemini: { status: "none", cache: null },
     openai: { status: "none", cache: null },
@@ -118,6 +121,9 @@ export function SeoPlanningDetail({
   openaiBlogPromptConfigured?: boolean;
   geminiImagePromptConfigured?: boolean;
   openaiImagePromptConfigured?: boolean;
+  /** Closed-by-default A1 preview gate — boolean only; never pass secrets. */
+  aiArticleGenerationEnabled?: boolean;
+  openaiBlogArticleConfigured?: boolean;
   initialWritingPromptState?: WritingPromptUiState;
   initialImagePromptState?: ImagePromptUiState;
 }) {
@@ -330,6 +336,16 @@ export function SeoPlanningDetail({
         brief={writingBrief}
         dirty={dirty}
         dirtyMessage={SEO_PLANNING_WRITING_PROMPT_DIRTY_MESSAGE}
+      />
+
+      <SeoPlanningArticleGeneration
+        draft={draft}
+        writingBrief={writingBrief}
+        featureEnabled={aiArticleGenerationEnabled}
+        providerConfigured={openaiBlogArticleConfigured}
+        dirty={dirty}
+        mutationPending={pending || suggestionBusy}
+        archived={archived}
       />
 
       <SeoPlanningWritingPrompt
