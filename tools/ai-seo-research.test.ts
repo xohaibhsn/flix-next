@@ -11,6 +11,7 @@ import {
 } from "../lib/cms/ai-seo/config";
 import {
   buildOpenAiUkOpportunityResearchRequestBody,
+  extractResponsesOutputText,
   extractWebSearchSources,
   requestOpenAiUkOpportunityResearch,
 } from "../lib/cms/ai-seo/provider";
@@ -459,4 +460,304 @@ test("draft/explain provider builders remain free of web_search tools", () => {
   const structuredEnd = provider.indexOf("async function requestOpenAiStructuredJson");
   const structured = provider.slice(structuredStart, structuredEnd);
   assert.doesNotMatch(structured, /web_search|tool_choice|tools:/);
+});
+
+// --- P0 Responses extraction hardening (extractor-direct + Research e2e) ---
+
+test("extractor-direct: top-level output_text wins alone without output[] concat", () => {
+  const text = extractResponsesOutputText({
+    output_text: '{"from":"top"}',
+    output: [
+      {
+        type: "message",
+        content: [{ type: "output_text", text: '{"from":"message"}' }],
+      },
+    ],
+  });
+  assert.equal(text, '{"from":"top"}');
+});
+
+test("extractor-direct: contiguous output_text fragments join without newline", () => {
+  // Previous join("\\n") inserted a newline inside the JSON string and broke parse.
+  const text = extractResponsesOutputText({
+    output: [
+      {
+        type: "message",
+        role: "assistant",
+        content: [
+          { type: "output_text", text: '{"topic":"Smart' },
+          { type: "output_text", text: ' TV"}' },
+        ],
+      },
+    ],
+  });
+  assert.equal(text, '{"topic":"Smart TV"}');
+  assert.deepEqual(JSON.parse(text), { topic: "Smart TV" });
+});
+
+test("extractor-direct: ignores web_search_call and bare-text tool contamination", () => {
+  const json = JSON.stringify({ ok: true });
+  const text = extractResponsesOutputText({
+    output: [
+      {
+        type: "web_search_call",
+        text: "IGNORE_TOOL_TEXT",
+        content: [{ type: "output_text", text: '{"poison":true}' }],
+      },
+      {
+        type: "tool_result",
+        content: [{ text: "also-ignore-untyped" }],
+      },
+      {
+        type: "message",
+        content: [{ type: "output_text", text: json }],
+      },
+    ],
+  });
+  assert.equal(text, json);
+});
+
+test("extractor-direct: fails closed on multiple independent assistant messages", () => {
+  const text = extractResponsesOutputText({
+    output: [
+      {
+        type: "message",
+        content: [{ type: "output_text", text: '{"a":1}' }],
+      },
+      {
+        type: "message",
+        content: [{ type: "output_text", text: '{"b":2}' }],
+      },
+    ],
+  });
+  assert.equal(text, "");
+});
+
+test("extractor-direct: rejects prose/fenced contamination as non-JSON-ready text", () => {
+  assert.equal(
+    extractResponsesOutputText({
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: 'Here you go: {"a":1}' }],
+        },
+      ],
+    }),
+    'Here you go: {"a":1}',
+  );
+  assert.throws(() => JSON.parse('Here you go: {"a":1}'));
+  assert.equal(
+    extractResponsesOutputText({
+      output: [
+        {
+          type: "message",
+          content: [{ type: "output_text", text: "```json\n{\"a\":1}\n```" }],
+        },
+      ],
+    }),
+    "```json\n{\"a\":1}\n```",
+  );
+  assert.throws(() => JSON.parse("```json\n{\"a\":1}\n```"));
+});
+
+test("research e2e: web_search_call + split assistant JSON fragments succeed once (no retry)", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  const opportunityJson = goodOpportunityPayload();
+  const raw = JSON.stringify(opportunityJson);
+  const mid = Math.floor(raw.length / 2);
+  let calls = 0;
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () => {
+      calls += 1;
+      return mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "web_search_call",
+            action: {
+              type: "search",
+              sources: [{ type: "url", url: "https://example.com/a", title: "A" }],
+            },
+            text: "TOOL_TEXT_MUST_NOT_CONTAMINATE",
+          },
+          {
+            type: "message",
+            role: "assistant",
+            content: [
+              { type: "output_text", text: raw.slice(0, mid) },
+              { type: "output_text", text: raw.slice(mid) },
+            ],
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.research.opportunities.length, 2);
+  assert.equal(result.research.sources.length, 1);
+});
+
+test("research e2e: ambiguous multi-message JSON fails closed without retry", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  let calls = 0;
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () => {
+      calls += 1;
+      return mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify(goodOpportunityPayload()) }],
+          },
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify({ opportunities: [] }) }],
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.code, "invalid_response");
+    assert.equal(result.diagnostic, "OUTPUT_TEXT_MISSING");
+  }
+});
+
+test("research e2e: two JSON documents in one message → OUTPUT_JSON_INVALID", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: `${JSON.stringify(goodOpportunityPayload())}\n${JSON.stringify({ opportunities: [] })}`,
+              },
+            ],
+          },
+        ],
+      }),
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.diagnostic, "OUTPUT_JSON_INVALID");
+});
+
+test("research e2e: HTTP invalid JSON body → RESPONSE_JSON_INVALID (no retry)", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  let calls = 0;
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () => {
+      calls += 1;
+      return new Response("{not-json", {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.diagnostic, "RESPONSE_JSON_INVALID");
+});
+
+test("research e2e: top-level output_text alone succeeds (no output[] concat)", async () => {
+  // Research full mocked path — top-level output_text priority + semantic validation.
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse({
+        status: "completed",
+        output_text: JSON.stringify(goodOpportunityPayload()),
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: JSON.stringify({ opportunities: [] }) }],
+          },
+        ],
+      }),
+  });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.research.opportunities.length, 2);
+});
+
+test("research e2e: prose-wrapped or markdown-fenced JSON → OUTPUT_JSON_INVALID (no salvage)", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  const raw = JSON.stringify(goodOpportunityPayload());
+
+  const prose = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: `Here is the result:\n${raw}` }],
+          },
+        ],
+      }),
+  });
+  assert.equal(prose.ok, false);
+  if (!prose.ok) assert.equal(prose.diagnostic, "OUTPUT_JSON_INVALID");
+
+  const fenced = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () =>
+      mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: "```json\n" + raw + "\n```" }],
+          },
+        ],
+      }),
+  });
+  assert.equal(fenced.ok, false);
+  if (!fenced.ok) assert.equal(fenced.diagnostic, "OUTPUT_JSON_INVALID");
+});
+
+test("research e2e: truncated JSON → OUTPUT_JSON_INVALID (no retry)", async () => {
+  resetAiSeoResearchRateLimitForTests();
+  const inventory = sampleInventory();
+  const raw = JSON.stringify(goodOpportunityPayload());
+  let calls = 0;
+  const result = await requestOpenAiUkOpportunityResearch(inventory, {
+    config: testConfig(),
+    fetchImpl: async () => {
+      calls += 1;
+      return mockJsonResponse({
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [{ type: "output_text", text: raw.slice(0, 40) }],
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.diagnostic, "OUTPUT_JSON_INVALID");
 });

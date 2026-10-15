@@ -243,7 +243,8 @@ test("timeout fails calmly", async () => {
   }
 });
 
-test("extractResponsesOutputText walks multiple output items", () => {
+test("extractResponsesOutputText: shared-provider single assistant message (legacy)", () => {
+  // Shared-provider regression: Explain/Draft/Article still accept one message item.
   const text = extractResponsesOutputText({
     output: [
       { type: "reasoning", content: [] },
@@ -252,6 +253,25 @@ test("extractResponsesOutputText walks multiple output items", () => {
   });
   assert.equal(text, '{"summary":"a"}');
   assert.equal(extractResponsesOutputText({ output_text: "direct" }), "direct");
+});
+
+test("extractResponsesOutputText: shared-provider ignores non-message text contamination", () => {
+  const text = extractResponsesOutputText({
+    output: [
+      { type: "reasoning", content: [{ type: "output_text", text: "thinking-leak" }] },
+      {
+        type: "message",
+        content: [
+          { type: "output_text", text: '{"summary":"ok","confidence":"high","actions":["a"],"caveats":[]}' },
+        ],
+      },
+      { type: "other", text: "noise", content: [{ text: "also-noise" }] },
+    ],
+  });
+  assert.equal(
+    text,
+    '{"summary":"ok","confidence":"high","actions":["a"],"caveats":[]}',
+  );
 });
 
 test("rate limit is enforced after burst ceiling", () => {

@@ -12,6 +12,7 @@ import {
   type OpenAiSeoConfig,
 } from "../lib/cms/ai-seo/config";
 import {
+  extractResponsesOutputText,
   inspectOpenAiResearchResponsesPayload,
   requestOpenAiUkOpportunityResearch,
 } from "../lib/cms/ai-seo/provider";
@@ -438,4 +439,40 @@ test("19. resource bounds unchanged", () => {
   assert.doesNotMatch(provider, /retry|for \(.*attempts/);
   assert.match(provider, /tool_choice: "required"/);
   assert.match(provider, /web_search/);
+});
+
+test("P0 extraction: split fragments inside JSON string reconstruct without newline", () => {
+  // Extractor-direct — protects Research/GSC path that shares extractResponsesOutputText.
+  const text = extractResponsesOutputText({
+    status: "completed",
+    output: [
+      {
+        type: "message",
+        content: [
+          { type: "output_text", text: '{"topic":"Smart' },
+          { type: "output_text", text: ' TV","n":1}' },
+        ],
+      },
+    ],
+  });
+  assert.equal(text, '{"topic":"Smart TV","n":1}');
+  assert.deepEqual(JSON.parse(text), { topic: "Smart TV", n: 1 });
+});
+
+test("P0 extraction: failed status remains outside closed research diagnostic contract", () => {
+  // Follow-up: Research inspect does not map status=failed (no RESPONSE_FAILED enum).
+  // Do not broaden diagnostics in this task — assert current closed-contract behavior.
+  const inspected = inspectOpenAiResearchResponsesPayload({
+    status: "failed",
+    output: [{ type: "message", content: [{ type: "output_text", text: '{"opportunities":[]}' }] }],
+  });
+  assert.equal(inspected.ok, true);
+  assert.deepEqual([...SEO_RESEARCH_INVALID_DIAGNOSTICS], [
+    "RESPONSE_JSON_INVALID",
+    "OUTPUT_TEXT_MISSING",
+    "OUTPUT_JSON_INVALID",
+    "SEMANTIC_PAYLOAD_INVALID",
+    "RESPONSE_INCOMPLETE",
+    "RESPONSE_REFUSAL",
+  ]);
 });

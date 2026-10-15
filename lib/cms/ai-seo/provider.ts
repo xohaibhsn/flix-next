@@ -103,7 +103,17 @@ export function buildSeoDraftUserPayload(input: SeoDraftInput) {
   };
 }
 
-/** Walk Responses API output items and collect text payloads. */
+/**
+ * Extract a single structured-output text body from a Responses API payload.
+ *
+ * Selection policy (fail closed):
+ * 1. Prefer nonempty top-level `output_text` alone — never concatenate with `output[]`.
+ * 2. Otherwise consider only `type:"message"` items whose `role` is absent or `"assistant"`.
+ * 3. Within a message, collect only `type:"output_text"` string parts (ignore tools / bare `.text`).
+ * 4. Reconstruct one message by joining contiguous parts with no invented separators and without
+ *    trimming fragment boundaries before the join.
+ * 5. Accept exactly one such message; zero or multiple assistant messages → empty string.
+ */
 export function extractResponsesOutputText(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as Record<string, unknown>;
@@ -112,25 +122,33 @@ export function extractResponsesOutputText(payload: unknown): string {
     return root.output_text.trim();
   }
 
-  const chunks: string[] = [];
   const output = Array.isArray(root.output) ? root.output : [];
+  const messageTexts: string[] = [];
+
   for (const item of output) {
     if (!item || typeof item !== "object") continue;
     const row = item as Record<string, unknown>;
+    if (row.type !== "message") continue;
+    if (typeof row.role === "string" && row.role.toLowerCase() !== "assistant") continue;
+
     const content = Array.isArray(row.content) ? row.content : [];
+    const fragments: string[] = [];
     for (const part of content) {
       if (!part || typeof part !== "object") continue;
       const block = part as Record<string, unknown>;
-      if (typeof block.text === "string" && block.text.trim()) {
-        chunks.push(block.text.trim());
-        continue;
-      }
-      if (block.type === "output_text" && typeof block.text === "string" && block.text.trim()) {
-        chunks.push(block.text.trim());
-      }
+      if (block.type !== "output_text") continue;
+      if (typeof block.text !== "string" || block.text.length === 0) continue;
+      // Preserve fragment bytes — do not trim before join (avoids corrupting JSON strings).
+      fragments.push(block.text);
     }
+
+    if (fragments.length === 0) continue;
+    messageTexts.push(fragments.join(""));
   }
-  return chunks.join("\n").trim();
+
+  // Ambiguous ownership across multiple assistant messages — refuse to guess.
+  if (messageTexts.length !== 1) return "";
+  return messageTexts[0]!.trim();
 }
 
 const RESEARCH_UNUSABLE_MESSAGE = "AI returned an unusable response. Please try again.";
