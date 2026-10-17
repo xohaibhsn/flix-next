@@ -60,7 +60,8 @@ export type GenerateChatgptImagePromptFailure = {
     | "payment_required"
     | "permission_denied"
     | "unavailable"
-    | "invalid_response";
+    | "invalid_response"
+    | "cms_write_freeze";
 };
 
 export type GenerateChatgptImagePromptResult =

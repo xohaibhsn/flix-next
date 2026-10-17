@@ -40,10 +40,22 @@ import {
 } from "@/lib/cms/subscription-seo-microcopy";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
 import { withSlash } from "@/lib/cms/redirects";
+import {
+  MYSQL_SIGNED_INT_MAX,
+  nextContentRevision,
+  parseStoredContentRevision,
+} from "@/lib/cms/page-revision";
+import { isCompatiblePagesContentRevisionColumn } from "@/lib/cms/content-revision-column";
+import {
+  DEFAULT_CMS_SCHEMA_ENSURE_LOCK,
+  DEFAULT_CMS_SCHEMA_ENSURE_LOCK_TIMEOUT_SEC,
+  runWithCmsSchemaAdvisoryLock,
+} from "@/lib/cms/schema-advisory-lock";
 import { getDbPool } from "@/lib/db/pool";
 import { CMS_SCHEMA_STATEMENTS, CURRENT_CMS_SCHEMA_VERSION } from "@/lib/db/schema";
 import {
   CMS_SCHEMA_VERSION_KEY,
+  decideSchemaEnsureAction,
   isMissingRelationError,
   parseStoredSchemaVersion,
   runSchemaVersionGate,
@@ -116,7 +128,41 @@ const REQUIRED_COLUMNS: Array<{ table: string; column: string; definition: strin
   { table: "admin_users", column: "last_login_at", definition: "last_login_at DATETIME NULL" },
   { table: "admin_users", column: "created_by", definition: "created_by VARCHAR(80) NULL" },
   { table: "seo_planning_drafts", column: "archived_at", definition: "archived_at DATETIME NULL" },
+  { table: "pages", column: "content_revision", definition: "content_revision INT NOT NULL DEFAULT 1" },
 ];
+
+function isDuplicateColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String(error.code) : "";
+  const errno = "errno" in error ? Number(error.errno) : 0;
+  return code === "ER_DUP_FIELDNAME" || errno === 1060;
+}
+
+type ContentRevisionColumnRow = RowDataPacket & {
+  TABLE_SCHEMA: string;
+  TABLE_NAME: string;
+  COLUMN_NAME: string;
+  DATA_TYPE: string;
+  COLUMN_TYPE: string;
+  IS_NULLABLE: string;
+  COLUMN_DEFAULT: unknown;
+};
+
+async function assertPagesContentRevisionColumnCompatible(): Promise<void> {
+  const pool = getDbPool();
+  const [schemaRows] = await pool.query<Array<RowDataPacket & { db: string | null }>>("SELECT DATABASE() AS db");
+  const expectedSchema = schemaRows[0]?.db ? String(schemaRows[0].db) : null;
+  const [rows] = await pool.query<ContentRevisionColumnRow[]>(
+    `SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'pages' AND COLUMN_NAME = 'content_revision'
+     LIMIT 1`,
+  );
+  const check = isCompatiblePagesContentRevisionColumn(rows[0], expectedSchema);
+  if (!check.ok) {
+    throw new Error(check.reason);
+  }
+}
 
 async function ensureMissingColumns() {
   const pool = getDbPool();
@@ -133,8 +179,27 @@ async function ensureMissingColumns() {
   for (const item of REQUIRED_COLUMNS) {
     const columns = existing.get(item.table);
     if (!columns || columns.size === 0) continue;
-    if (columns.has(item.column)) continue;
-    await pool.query(`ALTER TABLE \`${item.table}\` ADD COLUMN ${item.definition}`);
+    if (columns.has(item.column)) {
+      if (item.table === "pages" && item.column === "content_revision") {
+        await assertPagesContentRevisionColumnCompatible();
+      }
+      continue;
+    }
+    try {
+      await pool.query(`ALTER TABLE \`${item.table}\` ADD COLUMN ${item.definition}`);
+    } catch (error) {
+      if (!isDuplicateColumnError(error)) throw error;
+      // Concurrent ADD may race; only accept when postconditions match Phase 1 contract.
+      if (item.table === "pages" && item.column === "content_revision") {
+        await assertPagesContentRevisionColumnCompatible();
+        continue;
+      }
+      // Other legacy REQUIRED_COLUMNS: presence after ER_DUP_FIELDNAME is historically accepted.
+      continue;
+    }
+    if (item.table === "pages" && item.column === "content_revision") {
+      await assertPagesContentRevisionColumnCompatible();
+    }
   }
 }
 
@@ -145,6 +210,23 @@ export async function ensureCmsSchema() {
     await pool.query(statement);
   }
   await ensureMissingColumns();
+}
+
+/**
+ * Serialize multi-process schema ensure via session GET_LOCK.
+ * DDL is not transactionally rollback-safe; content_revision is verified after ADD/DUP.
+ */
+async function ensureCmsSchemaSerialized(): Promise<void> {
+  await runWithCmsSchemaAdvisoryLock({
+    lockName: DEFAULT_CMS_SCHEMA_ENSURE_LOCK,
+    timeoutSec: DEFAULT_CMS_SCHEMA_ENSURE_LOCK_TIMEOUT_SEC,
+    getConnection: async () => getDbPool().getConnection(),
+    readIsFastPath: async () => {
+      const lookup = await readCmsSchemaVersionLookup();
+      return decideSchemaEnsureAction(lookup).action === "fast-path";
+    },
+    ensureSchema: ensureCmsSchema,
+  });
 }
 
 type SchemaVersionRow = RowDataPacket & { setting_value: unknown };
@@ -179,7 +261,7 @@ async function writeCmsSchemaVersion(version: number = CURRENT_CMS_SCHEMA_VERSIO
 export async function ensureCmsSchemaCurrent(): Promise<SchemaEnsureOutcome> {
   return runSchemaVersionGate({
     readLookup: readCmsSchemaVersionLookup,
-    ensureSchema: ensureCmsSchema,
+    ensureSchema: ensureCmsSchemaSerialized,
     writeVersion: writeCmsSchemaVersion,
   });
 }
@@ -498,16 +580,104 @@ export async function seedManagedRedirectsIfNeeded() {
   );
 }
 
+type PageSectionRow = RowDataPacket & {
+  id: string;
+  section_type: string;
+  label: string;
+  sort_order: number;
+  visible: number;
+  section_data: unknown;
+};
+
+/** Map authoritative page_sections rows into CmsSection shape used for stale-write fingerprints. */
+function mapSectionRowsToCmsSections(rows: PageSectionRow[]): CmsSection[] {
+  return rows.map((section) => ({
+    id: String(section.id),
+    type: section.section_type as SectionType,
+    label: String(section.label),
+    order: Number(section.sort_order) || 0,
+    visible: Boolean(section.visible),
+    data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
+  }));
+}
+
+function sectionsFingerprint(sections: CmsSection[]): string {
+  const normalized = [...sections]
+    .map((section) => ({
+      id: section.id,
+      type: section.type,
+      label: section.label,
+      order: section.order,
+      visible: section.visible,
+      data: section.data,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  return JSON.stringify(normalized);
+}
+
+/** @internal Real-MySQL integration tests only — exercises maintenance writer lock/fingerprint path. */
+export async function __persistPageSectionDiffForTests(
+  pageId: string,
+  before: CmsSection[],
+  after: CmsSection[],
+) {
+  return persistPageSectionDiff(pageId, before, after);
+}
+
+/** @internal Real-MySQL integration tests only. */
+export async function __migrateSubscriptionPageSlugRowForTests() {
+  return migrateSubscriptionPageSlugRow();
+}
+
 async function persistPageSectionDiff(
   pageId: string,
   before: CmsSection[],
   after: CmsSection[],
 ) {
+  const afterIds = new Set(after.map((section) => section.id));
+  const beforeMap = new Map(before.map((section) => [section.id, section]));
+  let willMutate = false;
+  for (const section of before) {
+    if (!afterIds.has(section.id)) {
+      willMutate = true;
+      break;
+    }
+  }
+  if (!willMutate) {
+    for (const section of after) {
+      const previous = beforeMap.get(section.id);
+      if (!previous || JSON.stringify(previous) !== JSON.stringify(section)) {
+        willMutate = true;
+        break;
+      }
+    }
+  }
+  if (!willMutate) return;
+
   const conn = await getDbPool().getConnection();
   await conn.beginTransaction();
   try {
-    const afterIds = new Set(after.map((section) => section.id));
-    const beforeMap = new Map(before.map((section) => [section.id, section]));
+    // Lock pages row first (same order as savePage) before mutating page_sections.
+    const [locked] = await conn.query<Array<RowDataPacket & { id: string }>>(
+      "SELECT id FROM pages WHERE id = ? FOR UPDATE",
+      [pageId],
+    );
+    if (!locked[0]) {
+      throw new Error(`Page not found for section diff: ${pageId}`);
+    }
+    // Reject stale snapshots: re-read authoritative sections under the page lock.
+    // Fingerprint uses the same row→CmsSection mapping as maintenance callers' live "before".
+    const [liveRows] = await conn.query<PageSectionRow[]>(
+      `SELECT id, section_type, label, sort_order, visible, section_data
+       FROM page_sections
+       WHERE page_id = ?
+       ORDER BY sort_order ASC`,
+      [pageId],
+    );
+    const liveSections = mapSectionRowsToCmsSections(liveRows);
+    if (sectionsFingerprint(liveSections) !== sectionsFingerprint(before)) {
+      throw new Error("Page sections changed during maintenance write; retry required.");
+    }
     for (const section of before) {
       if (!afterIds.has(section.id)) {
         await conn.execute("DELETE FROM page_sections WHERE id = ? AND page_id = ?", [section.id, pageId]);
@@ -536,6 +706,13 @@ async function persistPageSectionDiff(
           JSON.stringify(section.data),
         ],
       );
+    }
+    const [bumpResult] = await conn.execute(
+      "UPDATE pages SET content_revision = content_revision + 1 WHERE id = ? AND content_revision < ?",
+      [pageId, MYSQL_SIGNED_INT_MAX],
+    );
+    if (Number((bumpResult as { affectedRows?: number }).affectedRows ?? 0) !== 1) {
+      throw new Error("Page content_revision overflow during maintenance write.");
     }
     await conn.commit();
   } catch (error) {
@@ -626,44 +803,30 @@ export async function seedSeoLongformIfNeeded() {
         >("SELECT id, name, slug, status, cms_enabled FROM pages WHERE id = ? LIMIT 1", [id]);
         const row = pages[0];
         if (!row) continue;
-        const [sectionRows] = await pool.query<
-          Array<
-            RowDataPacket & {
-              id: string;
-              section_type: string;
-              label: string;
-              sort_order: number;
-              visible: number;
-              section_data: unknown;
-            }
-          >
-        >(
+        const [sectionRows] = await pool.query<PageSectionRow[]>(
           `SELECT id, section_type, label, sort_order, visible, section_data
            FROM page_sections
            WHERE page_id = ?
            ORDER BY sort_order ASC`,
           [row.id],
         );
+        // Authoritative DB snapshot for stale-write detection — must NOT be sanitized.
+        // sanitizePage() fills defaults / reindexes order and would false-conflict vs locked re-read.
+        const liveSections = mapSectionRowsToCmsSections(sectionRows);
         const page: CmsPage = {
           id: row.id,
           name: row.name,
           slug: row.slug,
           status: row.status === "draft" ? "draft" : "published",
           cmsEnabled: Boolean(row.cms_enabled),
-          sections: sectionRows.map((section) => ({
-            id: String(section.id),
-            type: section.section_type as SectionType,
-            label: String(section.label),
-            order: Number(section.sort_order) || 0,
-            visible: Boolean(section.visible),
-            data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
-          })),
+          contentRevision: 1,
+          sections: liveSections,
         };
         const safe = sanitizePage(page);
         const longform = applySeoLongformToPage(safe);
         const cleaned = applyPublicCopyCleanupToPage(longform.page);
         if (!longform.changed && !cleaned.changed) continue;
-        await persistPageSectionDiff(row.id, safe.sections, cleaned.page.sections);
+        await persistPageSectionDiff(row.id, liveSections, cleaned.page.sections);
       }
       await cleanupDemoFaqCopy();
       await cleanupDemoPlanFeatures();
@@ -731,12 +894,60 @@ async function loadRedirectBySourcePath(sourcePath: string) {
   return rows[0] ? mapRedirectSourceRow(rows[0]) : null;
 }
 
+/**
+ * One-shot subscription page slug rewrite with page-row lock + revision bump.
+ * Holds the lock only for the slug/revision mutation — not redirect/section work.
+ */
+async function migrateSubscriptionPageSlugRow(): Promise<"updated" | "noop"> {
+  const conn = await getDbPool().getConnection();
+  await conn.beginTransaction();
+  try {
+    const [lockedRows] = await conn.query<
+      Array<RowDataPacket & { id: string; slug: string; content_revision: unknown }>
+    >("SELECT id, slug, content_revision FROM pages WHERE id = ? FOR UPDATE", [SUBSCRIPTION_PAGE_ID]);
+    const locked = lockedRows[0];
+    if (!locked) {
+      await conn.commit();
+      return "noop";
+    }
+    const currentSlug = String(locked.slug);
+    const eligible =
+      currentSlug === SUBSCRIPTION_SLUG_LEGACY || currentSlug === "/iptv-subscriptions-uk";
+    if (!eligible) {
+      await conn.commit();
+      return "noop";
+    }
+    const currentRevision = parseStoredContentRevision(locked.content_revision ?? 1);
+    const nextRevision = nextContentRevision(currentRevision);
+    const [result] = await conn.execute(
+      `UPDATE pages
+       SET slug = ?, content_revision = ?
+       WHERE id = ? AND content_revision = ? AND (slug = ? OR slug = ?)`,
+      [
+        SUBSCRIPTION_SLUG,
+        nextRevision,
+        SUBSCRIPTION_PAGE_ID,
+        currentRevision,
+        SUBSCRIPTION_SLUG_LEGACY,
+        "/iptv-subscriptions-uk",
+      ],
+    );
+    if (Number((result as { affectedRows?: number }).affectedRows ?? 0) !== 1) {
+      throw new Error("Subscription slug migration lost the page row race.");
+    }
+    await conn.commit();
+    return "updated";
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
+}
+
 async function runSubscriptionSlugMigrationBody(): Promise<void | "deferred"> {
   const pool = getDbPool();
-  await pool.execute(
-    `UPDATE pages SET slug = ? WHERE id = ? AND (slug = ? OR slug = ?)`,
-    [SUBSCRIPTION_SLUG, SUBSCRIPTION_PAGE_ID, SUBSCRIPTION_SLUG_LEGACY, "/iptv-subscriptions-uk"],
-  );
+  await migrateSubscriptionPageSlugRow();
 
   const [redirectRows] = await pool.query<RedirectSourceRow[]>(
     "SELECT id, source_path, destination_path, status_code, is_active, created_at, updated_at FROM redirects",
@@ -760,14 +971,55 @@ async function runSubscriptionSlugMigrationBody(): Promise<void | "deferred"> {
     }
   }
 
-  const [sectionRows] = await pool.query<Array<RowDataPacket & { id: string; section_data: unknown }>>(
-    "SELECT id, section_data FROM page_sections",
-  );
+  // Candidate page ids from a pre-scan only; authoritative remap recomputes under each page lock.
+  const [sectionRows] = await pool.query<
+    Array<RowDataPacket & { id: string; page_id: string; section_data: unknown }>
+  >("SELECT id, page_id, section_data FROM page_sections");
+  const candidatePageIds = new Set<string>();
   for (const row of sectionRows) {
     const data = parseJsonColumn(row.section_data, {} as CmsSection["data"]);
     const next = remapStructuredHrefs(data);
     if (JSON.stringify(next) === JSON.stringify(data)) continue;
-    await pool.execute("UPDATE page_sections SET section_data = ? WHERE id = ?", [JSON.stringify(next), row.id]);
+    candidatePageIds.add(String(row.page_id));
+  }
+  const pageIds = [...candidatePageIds].sort();
+  if (pageIds.length) {
+    const conn = await pool.getConnection();
+    await conn.beginTransaction();
+    try {
+      for (const pageId of pageIds) {
+        await conn.query("SELECT id FROM pages WHERE id = ? FOR UPDATE", [pageId]);
+        const [liveRows] = await conn.query<
+          Array<RowDataPacket & { id: string; section_data: unknown }>
+        >("SELECT id, section_data FROM page_sections WHERE page_id = ? ORDER BY id ASC", [pageId]);
+        let mutated = false;
+        for (const row of liveRows) {
+          const data = parseJsonColumn(row.section_data, {} as CmsSection["data"]);
+          const next = remapStructuredHrefs(data);
+          if (JSON.stringify(next) === JSON.stringify(data)) continue;
+          await conn.execute("UPDATE page_sections SET section_data = ? WHERE id = ? AND page_id = ?", [
+            JSON.stringify(next),
+            String(row.id),
+            pageId,
+          ]);
+          mutated = true;
+        }
+        if (!mutated) continue;
+        const [bumpResult] = await conn.execute(
+          "UPDATE pages SET content_revision = content_revision + 1 WHERE id = ? AND content_revision < ?",
+          [pageId, MYSQL_SIGNED_INT_MAX],
+        );
+        if (Number((bumpResult as { affectedRows?: number }).affectedRows ?? 0) !== 1) {
+          throw new Error("Page content_revision overflow during slug remap.");
+        }
+      }
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
   }
 
   const [settingRows] = await pool.query<SettingValueRow[]>(
@@ -855,18 +1107,7 @@ export async function migrateSubscriptionSeoMicrocopyIfNeeded() {
         );
       }
 
-      const [sectionRows] = await pool.query<
-        Array<
-          RowDataPacket & {
-            id: string;
-            section_type: string;
-            label: string;
-            sort_order: number;
-            visible: number;
-            section_data: unknown;
-          }
-        >
-      >(
+      const [sectionRows] = await pool.query<PageSectionRow[]>(
         `SELECT id, section_type, label, sort_order, visible, section_data
          FROM page_sections
          WHERE page_id = ?
@@ -874,14 +1115,8 @@ export async function migrateSubscriptionSeoMicrocopyIfNeeded() {
         [SUBSCRIPTION_PAGE_ID],
       );
       if (sectionRows.length) {
-        const before: CmsSection[] = sectionRows.map((section) => ({
-          id: String(section.id),
-          type: section.section_type as SectionType,
-          label: String(section.label),
-          order: Number(section.sort_order) || 0,
-          visible: Boolean(section.visible),
-          data: parseJsonColumn(section.section_data, {} as CmsSection["data"]),
-        }));
+        // Same authoritative-before contract as longform: raw mapped rows, not sanitizePage().
+        const before = mapSectionRowsToCmsSections(sectionRows);
         const money = applySubscriptionMoneyBackExactToSections(before);
         if (money.changed) {
           await persistPageSectionDiff(SUBSCRIPTION_PAGE_ID, before, money.sections);

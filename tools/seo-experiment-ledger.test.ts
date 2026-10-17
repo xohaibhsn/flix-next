@@ -100,8 +100,8 @@ function blog(id: string, slug: string, title: string): BlogPost {
 // --- Schema ---
 
 test("schema version bumped to 5 for Experiment Ledger tables", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
-  assert.match(read("lib/db/schema.ts"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*5/);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
+  assert.match(read("lib/db/schema.ts"), /CURRENT_CMS_SCHEMA_VERSION\s*=\s*6/);
   assert.match(read("lib/db/schema.ts"), /seo_research_runs/);
   assert.match(read("lib/db/schema.ts"), /seo_opportunity_decisions/);
 });

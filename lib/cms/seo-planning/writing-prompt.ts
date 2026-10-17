@@ -59,7 +59,8 @@ export type GenerateChatgptWritingPromptFailure = {
     | "payment_required"
     | "permission_denied"
     | "unavailable"
-    | "invalid_response";
+    | "invalid_response"
+    | "cms_write_freeze";
 };
 
 export type GenerateChatgptWritingPromptResult =

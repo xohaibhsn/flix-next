@@ -517,6 +517,7 @@ export function defaultPages(): CmsPage[] {
       slug: "/",
       status: "published",
       cmsEnabled: true,
+      contentRevision: 1,
       sections: createHomeSections(),
     },
     {
@@ -525,6 +526,7 @@ export function defaultPages(): CmsPage[] {
       slug: "/iptv-subscription-uk/",
       status: "published",
       cmsEnabled: true,
+      contentRevision: 1,
       sections: createSubscriptionSections(),
     },
     {
@@ -533,6 +535,7 @@ export function defaultPages(): CmsPage[] {
       slug: "/contact/",
       status: "published",
       cmsEnabled: true,
+      contentRevision: 1,
       sections: createContactSections(),
     },
     ...createCompanyCmsPages(),

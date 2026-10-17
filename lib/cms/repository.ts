@@ -4,7 +4,7 @@ import { LocalJsonRepository } from "@/lib/cms/json-repository";
 import { JsonCatalogRepository } from "@/lib/cms/json-catalog";
 import { MysqlCatalogRepository } from "@/lib/cms/mysql-catalog";
 import { MysqlCmsRepository, MysqlWithBuildFallback } from "@/lib/cms/mysql-repository";
-import { isDatabaseConfigured } from "@/lib/db/config";
+import { isDatabaseConfigured, isProductionRuntime } from "@/lib/db/config";
 
 export type { CmsRepository } from "@/lib/cms/json-repository";
 export { LocalJsonRepository } from "@/lib/cms/json-repository";
@@ -26,7 +26,8 @@ const jsonCatalog = new JsonCatalogRepository();
 const useMysql = isDatabaseConfigured();
 
 if (process.env.NEXT_PHASE !== "phase-production-build") {
-  console.info(`[cms] persistence adapter: ${useMysql ? "mysql" : "json"}`);
+  const adapter = useMysql ? "mysql" : isProductionRuntime() ? "json-read-only-failclosed-writes" : "json";
+  console.info(`[cms] persistence adapter: ${adapter}`);
 }
 
 function createMysqlCms(): Cms {
@@ -35,4 +36,6 @@ function createMysqlCms(): Cms {
   return mergeCms(new MysqlWithBuildFallback(mysqlPages, jsonCms), mysqlCatalog);
 }
 
+// Production runtime without MySQL still constructs the JSON adapter for reads, but
+// LocalJsonRepository / json-store refuse mutations (fail closed). Local/dev keeps JSON writes.
 export const cms: Cms = useMysql ? createMysqlCms() : mergeCms(jsonCms, jsonCatalog);

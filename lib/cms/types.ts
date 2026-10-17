@@ -308,6 +308,8 @@ export type CmsPage = {
   slug: string;
   status: PageStatus;
   cmsEnabled: boolean;
+  /** Optimistic concurrency token; increments on every successful page content mutation. */
+  contentRevision: number;
   sections: CmsSection[];
 };
 

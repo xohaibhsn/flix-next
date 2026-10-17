@@ -63,9 +63,10 @@ export function HomeBuilder({
       setPage(result.page);
       setSaved(result.page);
       setMessage({ tone: "ok", text: hint });
-    } else {
-      setMessage({ tone: "error", text: result.error });
+      return;
     }
+    // Conflict / errors: keep local page state so unsaved edits remain for review. No auto-retry.
+    setMessage({ tone: "error", text: result.error });
   }
 
   return (

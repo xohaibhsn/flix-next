@@ -204,6 +204,7 @@ test("canonical to redirect source is CANONICAL_TO_REDIRECT", () => {
         slug: "/iptv-subscription-uk/",
         status: "published",
         cmsEnabled: true,
+        contentRevision: 1,
         sections: [],
       },
     ],

@@ -29,7 +29,8 @@ export type ResearchUkOpportunitiesFailure = {
     | "timeout"
     | "unavailable"
     | "invalid_response"
-    | "empty";
+    | "empty"
+    | "cms_write_freeze";
   /** Safe admin diagnostic stage — never raw provider content. */
   diagnostic?: SeoResearchInvalidDiagnostic;
   /** Bounded semantic rejection rule — only with SEMANTIC_PAYLOAD_INVALID. */

@@ -52,6 +52,7 @@ function dirtyPage(): CmsPage {
     slug: "/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-home-why",
@@ -246,23 +247,39 @@ test("non-build ENOENT still creates fallback file", async () => {
   });
 });
 
-test("explicit savePage and saveSettings still persist during build phase", async () => {
+test("explicit savePage and saveSettings are rejected during production build", async () => {
   await withTempCwd(async () => {
     const repo = new LocalJsonRepository();
-    await withPhase(BUILD_PHASE, async () => {
-      const savedPage = await repo.savePage(dirtyPage());
-      assert.equal(savedPage.id, "page-home");
-      const pagesDisk = JSON.parse(await readFile(dataFile("pages.json"), "utf8")) as { pages: CmsPage[] };
-      assert.ok(pagesDisk.pages.some((page) => page.id === "page-home"));
-
-      const settings = { ...defaultSettings(), tagline: "Explicit save tagline" };
-      const savedSettings = await repo.saveSettings(settings);
-      assert.equal(savedSettings.tagline, "Explicit save tagline");
-      const settingsDisk = JSON.parse(await readFile(dataFile("site-settings.json"), "utf8")) as {
-        tagline: string;
-      };
-      assert.equal(settingsDisk.tagline, "Explicit save tagline");
-    });
+    const env = process.env as Record<string, string | undefined>;
+    const previousNodeEnv = env.NODE_ENV;
+    env.NODE_ENV = "production";
+    try {
+      await withPhase(BUILD_PHASE, async () => {
+        await assert.rejects(() => repo.savePage(dirtyPage()), (error: unknown) => {
+          assert.ok(error instanceof Error);
+          assert.match(error.message, /unavailable/i);
+          return true;
+        });
+        await assert.rejects(
+          () => repo.saveSettings({ ...defaultSettings(), tagline: "Explicit save tagline" }),
+          (error: unknown) => {
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /unavailable/i);
+            return true;
+          },
+        );
+        await assert.rejects(
+          () => writeJsonFile("should-not-exist-build.json", { nope: true }),
+          (error: unknown) => {
+            assert.ok(error instanceof Error);
+            assert.match(error.message, /unavailable/i);
+            return true;
+          },
+        );
+      });
+    } finally {
+      env.NODE_ENV = previousNodeEnv;
+    }
   });
 });
 
@@ -308,9 +325,9 @@ test("build-phase does not create any unexpected files under data/", async () =>
       await catalog.listFaqs();
       await catalog.listPosts();
       await catalog.listRedirects();
-      await writeJsonFile("explicit.json", { ok: true });
+      await assert.rejects(() => writeJsonFile("explicit.json", { ok: true }), /unavailable/i);
     });
     const names = await readdir(path.join(root, "data"));
-    assert.deepEqual(names.sort(), ["explicit.json", "pages.json"].sort());
+    assert.deepEqual(names.sort(), ["pages.json"]);
   });
 });

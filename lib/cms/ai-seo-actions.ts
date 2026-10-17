@@ -2,6 +2,22 @@
 
 import { headers } from "next/headers";
 import { requireAdminActor } from "@/lib/auth/guards";
+import {
+  assertCmsWritesAllowed,
+  CMS_WRITE_FREEZE_CODE,
+  cmsWriteFreezeBlockedResult,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-freeze";
+
+function rejectIfCmsWriteFrozen(): { ok: false; error: string; code: typeof CMS_WRITE_FREEZE_CODE } | null {
+  try {
+    assertCmsWritesAllowed();
+    return null;
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) return cmsWriteFreezeBlockedResult();
+    throw error;
+  }
+}
 import type { Permission } from "@/lib/auth/permissions";
 import {
   getSeoAiProviderAvailability,
@@ -62,6 +78,8 @@ export async function explainSeoHealthFindingAction(
   if (!actor.ok) {
     return { ok: false, code: "unauthorized", error: actor.error, ...flags };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, code: CMS_WRITE_FREEZE_CODE, error: frozen.error, ...flags };
 
   const parsedRequest = parseSeoAiProviderRequest(rawInput);
   if (!parsedRequest.ok) {
@@ -117,6 +135,8 @@ export async function draftSeoTitleMetaAction(rawInput: unknown): Promise<DraftS
   if (!actor.ok) {
     return { ok: false, code: "unauthorized", error: actor.error, ...flags };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, code: CMS_WRITE_FREEZE_CODE, error: frozen.error, ...flags };
 
   const providerConfigured = provider === "gemini" ? isGeminiSeoConfigured() : isOpenAiSeoConfigured();
   if (!providerConfigured) {
@@ -158,6 +178,10 @@ export async function researchUkContentOpportunitiesAction(): Promise<ResearchUk
   const actor = await requireAdminActor("seo");
   if (!actor.ok) {
     return { ok: false, code: "unauthorized", error: actor.error, configured: isOpenAiSeoConfigured() };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return { ok: false, code: CMS_WRITE_FREEZE_CODE, error: frozen.error, configured: isOpenAiSeoConfigured() };
   }
 
   if (!isOpenAiSeoConfigured()) {

@@ -268,7 +268,7 @@ function memoryCatalog(initial: SeoPlanningDraft, initialPosts: BlogPost[] = [])
 }
 
 test("SCHEMA: CMS schema remains v5", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
 });
 
 test("CONFIG: OpenAI Blog Article requires key + OPENAI_BLOG_ARTICLE_MODEL; no SEO/prompt fallback", () => {
@@ -995,8 +995,8 @@ test("SOURCE GUARDS: enabling the feature flag does not surface an Apply code pa
 
 test("SOURCE GUARDS: CMS schema version baseline unchanged from this RC's expectation", () => {
   const schema = read("lib/db/schema.ts");
-  assert.match(schema, /CURRENT_CMS_SCHEMA_VERSION = 5/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.match(schema, /CURRENT_CMS_SCHEMA_VERSION = 6/);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
 });
 
 test("SOURCE GUARDS: no seo-autonomy or seo-planning-lineage paths exist in this RC", () => {

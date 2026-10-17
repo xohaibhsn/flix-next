@@ -23,6 +23,13 @@ import { applyPublicCopyCleanupToSettings } from "@/lib/cms/settings-cleanup";
 import { withSlash } from "@/lib/cms/redirects";
 import { duplicateSlugError, mysqlDuplicateError } from "@/lib/cms/slug-change";
 import { runMysqlWithBuildFallback } from "@/lib/cms/mysql-build-fallback";
+import {
+  nextContentRevision,
+  parseExpectedContentRevision,
+  parseStoredContentRevision,
+  PageConflictError,
+} from "@/lib/cms/page-revision";
+import { ClientError } from "@/lib/security/errors";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
 
 type PageRow = RowDataPacket & {
@@ -31,6 +38,7 @@ type PageRow = RowDataPacket & {
   slug: string;
   status: string;
   cms_enabled: number;
+  content_revision?: unknown;
 };
 
 type SectionRow = RowDataPacket & {
@@ -86,6 +94,7 @@ function mapPage(page: PageRow, sections: SectionRow[]): CmsPage {
     slug: page.slug,
     status: page.status === "draft" ? "draft" : "published",
     cmsEnabled: Boolean(page.cms_enabled),
+    contentRevision: parseStoredContentRevision(page.content_revision ?? 1),
     sections: sections
       .filter((section) => section.page_id === page.id)
       .sort((a, b) => Number(a.sort_order) - Number(b.sort_order))
@@ -143,7 +152,7 @@ export class MysqlCmsRepository {
     await this.ensureReady();
     const pool = getDbPool();
     const [pages] = await pool.query<PageRow[]>(
-      "SELECT id, name, slug, status, cms_enabled FROM pages ORDER BY name ASC",
+      "SELECT id, name, slug, status, cms_enabled, content_revision FROM pages ORDER BY name ASC",
     );
     if (pages.length === 0) return [];
     const [sections] = await pool.query<SectionRow[]>(
@@ -165,7 +174,7 @@ export class MysqlCmsRepository {
     const want = withSlash(slug);
     const slugs = want === "/" ? ["/"] : [want, want.replace(/\/$/, "")];
     const [pages] = await pool.query<PageRow[]>(
-      `SELECT id, name, slug, status, cms_enabled FROM pages WHERE slug IN (${slugs.map(() => "?").join(", ")}) LIMIT 1`,
+      `SELECT id, name, slug, status, cms_enabled, content_revision FROM pages WHERE slug IN (${slugs.map(() => "?").join(", ")}) LIMIT 1`,
       slugs,
     );
     const page = pages[0];
@@ -182,19 +191,45 @@ export class MysqlCmsRepository {
 
   async savePage(page: CmsPage) {
     await this.ensureReady();
+    const expectedRevision = parseExpectedContentRevision(page.contentRevision);
+    if (expectedRevision == null) {
+      throw new PageConflictError();
+    }
     const safe = sanitizePage(page);
+    let savedRevision = expectedRevision;
     try {
       await withTransaction(async (conn) => {
-        await conn.execute(
-          `INSERT INTO pages (id, name, slug, status, cms_enabled)
-           VALUES (?, ?, ?, ?, ?)
-           ON DUPLICATE KEY UPDATE
-             name = VALUES(name),
-             slug = VALUES(slug),
-             status = VALUES(status),
-             cms_enabled = VALUES(cms_enabled)`,
-          [safe.id, safe.name, safe.slug, safe.status, safe.cmsEnabled ? 1 : 0],
+        const [lockedRows] = await conn.query<PageRow[]>(
+          "SELECT id, content_revision FROM pages WHERE id = ? FOR UPDATE",
+          [safe.id],
         );
+        const locked = lockedRows[0];
+        if (!locked) {
+          throw new ClientError("Page not found.");
+        }
+        const currentRevision = parseStoredContentRevision(locked.content_revision);
+        if (currentRevision !== expectedRevision) {
+          throw new PageConflictError();
+        }
+        const nextRevision = nextContentRevision(currentRevision);
+        const [casResult] = await conn.execute(
+          `UPDATE pages
+           SET name = ?, slug = ?, status = ?, cms_enabled = ?, content_revision = ?
+           WHERE id = ? AND content_revision = ?`,
+          [
+            safe.name,
+            safe.slug,
+            safe.status,
+            safe.cmsEnabled ? 1 : 0,
+            nextRevision,
+            safe.id,
+            expectedRevision,
+          ],
+        );
+        const affected = Number((casResult as { affectedRows?: number }).affectedRows ?? 0);
+        if (affected !== 1) {
+          throw new PageConflictError();
+        }
         await conn.execute("DELETE FROM page_sections WHERE page_id = ?", [safe.id]);
         for (const section of safe.sections) {
           await conn.execute(
@@ -212,12 +247,14 @@ export class MysqlCmsRepository {
             ],
           );
         }
+        savedRevision = nextRevision;
       });
     } catch (error) {
+      if (error instanceof PageConflictError || error instanceof ClientError) throw error;
       if (mysqlDuplicateError(error)) throw duplicateSlugError();
       throw error;
     }
-    return safe;
+    return { ...safe, contentRevision: savedRevision };
   }
 
   async getSettings() {
@@ -311,7 +348,8 @@ export class MysqlWithBuildFallback implements CmsOps {
     private readonly json: CmsOps,
   ) {}
 
-  private async run<T>(mysqlOp: () => Promise<T>, jsonOp: () => Promise<T>): Promise<T> {
+  /** Reads may use JSON only during Next production builds. Mutations never fall back. */
+  private async runRead<T>(mysqlOp: () => Promise<T>, jsonOp: () => Promise<T>): Promise<T> {
     try {
       return await runMysqlWithBuildFallback(mysqlOp, jsonOp, () => {
         console.warn("MySQL CMS unavailable during production build; using JSON snapshot.");
@@ -321,37 +359,45 @@ export class MysqlWithBuildFallback implements CmsOps {
     }
   }
 
+  private async runMutation<T>(mysqlOp: () => Promise<T>): Promise<T> {
+    try {
+      return await mysqlOp();
+    } catch (error) {
+      throw error instanceof Error ? error : cmsDbError(error);
+    }
+  }
+
   listPages() {
-    return this.run(() => this.mysql.listPages(), () => this.json.listPages());
+    return this.runRead(() => this.mysql.listPages(), () => this.json.listPages());
   }
   getPageById(id: string) {
-    return this.run(() => this.mysql.getPageById(id), () => this.json.getPageById(id));
+    return this.runRead(() => this.mysql.getPageById(id), () => this.json.getPageById(id));
   }
   getPageBySlug(slug: string) {
-    return this.run(() => this.mysql.getPageBySlug(slug), () => this.json.getPageBySlug(slug));
+    return this.runRead(() => this.mysql.getPageBySlug(slug), () => this.json.getPageBySlug(slug));
   }
   savePage(page: CmsPage) {
-    return this.run(() => this.mysql.savePage(page), () => this.json.savePage(page));
+    return this.runMutation(() => this.mysql.savePage(page));
   }
   getSettings() {
-    return this.run(() => this.mysql.getSettings(), () => this.json.getSettings());
+    return this.runRead(() => this.mysql.getSettings(), () => this.json.getSettings());
   }
   saveSettings(settings: SiteSettings) {
-    return this.run(() => this.mysql.saveSettings(settings), () => this.json.saveSettings(settings));
+    return this.runMutation(() => this.mysql.saveSettings(settings));
   }
   listMedia() {
-    return this.run(() => this.mysql.listMedia(), () => this.json.listMedia());
+    return this.runRead(() => this.mysql.listMedia(), () => this.json.listMedia());
   }
   getMediaById(id: string) {
-    return this.run(() => this.mysql.getMediaById(id), () => this.json.getMediaById(id));
+    return this.runRead(() => this.mysql.getMediaById(id), () => this.json.getMediaById(id));
   }
   addMedia(asset: MediaAsset) {
-    return this.run(() => this.mysql.addMedia(asset), () => this.json.addMedia(asset));
+    return this.runMutation(() => this.mysql.addMedia(asset));
   }
   updateMediaAlt(id: string, alt: string) {
-    return this.run(() => this.mysql.updateMediaAlt(id, alt), () => this.json.updateMediaAlt(id, alt));
+    return this.runMutation(() => this.mysql.updateMediaAlt(id, alt));
   }
   removeMedia(id: string) {
-    return this.run(() => this.mysql.removeMedia(id), () => this.json.removeMedia(id));
+    return this.runMutation(() => this.mysql.removeMedia(id));
   }
 }

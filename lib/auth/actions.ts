@@ -22,7 +22,23 @@ import {
 } from "@/lib/auth/admin-users";
 import { requireAdminActor } from "@/lib/auth/guards";
 import { clearAdminSession, createAdminSession, getAdminSession } from "@/lib/auth/session";
+import {
+  assertCmsWritesAllowed,
+  CMS_WRITE_FREEZE_MESSAGE,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-freeze";
 import { isDatabaseConfigured } from "@/lib/db/config";
+
+/** Shared CMS write-freeze gate for admin user-management mutations. Login/session reads stay open. */
+function rejectIfCmsWriteFrozen(): FormState | null {
+  try {
+    assertCmsWritesAllowed();
+    return null;
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) return { error: CMS_WRITE_FREEZE_MESSAGE };
+    throw error;
+  }
+}
 
 export type LoginState = {
   error?: string;
@@ -90,6 +106,8 @@ export async function logoutAction() {
 export async function changeOwnPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireAdminActor();
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   const currentPassword = String(formData.get("currentPassword") ?? "");
   const nextPassword = String(formData.get("newPassword") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
@@ -123,6 +141,8 @@ export async function listUsersAction() {
 export async function createUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
   const username = String(formData.get("username") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
@@ -157,6 +177,8 @@ export async function createUserAction(_prev: FormState, formData: FormData): Pr
 export async function updateUserAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
   const id = String(formData.get("id") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
@@ -177,6 +199,8 @@ export async function updateUserAction(_prev: FormState, formData: FormData): Pr
 export async function setUserActiveAction(id: string, active: boolean): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (actor.user.id === id && !active) return { error: "You cannot disable your own account." };
   try {
     await updateAdminUser(id, { active });
@@ -189,6 +213,8 @@ export async function setUserActiveAction(id: string, active: boolean): Promise<
 export async function deleteUserAction(id: string): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (actor.user.role !== "super_admin") return { error: "Only Super Admin can delete users." };
   try {
     await deleteAdminUser(id, actor.user.id);
@@ -201,6 +227,8 @@ export async function deleteUserAction(id: string): Promise<FormState> {
 export async function resetUserPasswordAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const actor = await requireAdminActor("users_security");
   if (!actor.ok) return { error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isDatabaseConfigured()) return { error: "User management requires MySQL." };
   const id = String(formData.get("id") ?? "").trim();
   const password = String(formData.get("password") ?? "");

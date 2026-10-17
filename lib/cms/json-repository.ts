@@ -11,13 +11,36 @@ import {
   migrateSubscriptionPageRecord,
   remapPageStructuredHrefs,
 } from "@/lib/cms/subscription-url-migrate";
-import { readJsonFile, writeJsonFile } from "@/lib/cms/json-store";
+import { readFile } from "fs/promises";
+import {
+  assertCmsJsonWritesAllowed,
+  dataFile,
+  readJsonFile,
+  withJsonFileLock,
+  writeJsonFile,
+  writeJsonFileInLock,
+} from "@/lib/cms/json-store";
 import { sanitizePage, sanitizeSettings } from "@/lib/cms/validation";
-import { isProductionBuildPhase } from "@/lib/db/config";
+import {
+  defaultContentRevision,
+  nextContentRevision,
+  parseExpectedContentRevision,
+  PageConflictError,
+} from "@/lib/cms/page-revision";
+import { ClientError } from "@/lib/security/errors";
+import { cmsJsonWritesAllowed } from "@/lib/db/config";
 
 const PAGES_FILE = "pages.json";
 const SETTINGS_FILE = "site-settings.json";
 const MEDIA_FILE = "media.json";
+
+/** Test-only barrier inside the pages.json lock (after read, before optional write). */
+let pagesFileBarrierForTests: (() => Promise<void>) | null = null;
+
+/** @internal */
+export function __setPagesFileBarrierForTests(barrier: (() => Promise<void>) | null) {
+  pagesFileBarrierForTests = barrier;
+}
 
 export interface CmsRepository {
   listPages(): Promise<CmsPage[]>;
@@ -33,37 +56,70 @@ export interface CmsRepository {
   removeMedia(id: string): Promise<void>;
 }
 
+async function readPagesSnapshotUnlocked(): Promise<CmsPage[]> {
+  try {
+    const raw = await readFile(dataFile(PAGES_FILE), "utf8");
+    const file = JSON.parse(raw) as PagesFile;
+    return Array.isArray(file.pages) ? file.pages : defaultPages();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return defaultPages();
+    throw error;
+  }
+}
+
+function transformPagesSnapshot(raw: CmsPage[]): { pages: CmsPage[]; shouldPersist: boolean } {
+  const defaults = defaultPages();
+  let migratedChanged = false;
+  const pages = raw.map((page) => {
+    const migrated = migrateSubscriptionPageRecord(page);
+    const hrefs = remapPageStructuredHrefs(migrated.page);
+    if (migrated.changed || hrefs.changed) migratedChanged = true;
+    const next = hrefs.page;
+    if (
+      (next.id === SUBSCRIPTION_PAGE_ID ||
+        next.slug === SUBSCRIPTION_SLUG ||
+        next.slug === SUBSCRIPTION_SLUG_LEGACY ||
+        companyPageBySlug(next.slug) ||
+        companyPageById(next.id)) &&
+      (!next.sections || next.sections.length === 0)
+    ) {
+      const fallback =
+        defaults.find((item) => item.id === next.id) ?? defaults.find((item) => item.slug === next.slug);
+      if (fallback) {
+        return {
+          ...next,
+          cmsEnabled: true,
+          contentRevision: defaultContentRevision(next.contentRevision),
+          sections: fallback.sections,
+        };
+      }
+    }
+    return {
+      ...next,
+      contentRevision: defaultContentRevision(next.contentRevision),
+    };
+  });
+  const merged = mergeMissingCompanyPages(pages);
+  const longform = applySeoLongformToPages(merged.pages.map((page) => sanitizePage(page)));
+  const cleaned = applyPublicCopyCleanupToPages(longform.pages);
+  const shouldPersist = migratedChanged || merged.changed || longform.changed || cleaned.changed;
+  return { pages: cleaned.pages, shouldPersist };
+}
+
 export class LocalJsonRepository implements CmsRepository {
   async listPages() {
-    const file = await readJsonFile<PagesFile>(PAGES_FILE, { pages: defaultPages() });
-    const raw = Array.isArray(file.pages) ? file.pages : defaultPages();
-    const defaults = defaultPages();
-    let migratedChanged = false;
-    const pages = raw.map((page) => {
-      const migrated = migrateSubscriptionPageRecord(page);
-      const hrefs = remapPageStructuredHrefs(migrated.page);
-      if (migrated.changed || hrefs.changed) migratedChanged = true;
-      const next = hrefs.page;
-      if (
-        (next.id === SUBSCRIPTION_PAGE_ID ||
-          next.slug === SUBSCRIPTION_SLUG ||
-          next.slug === SUBSCRIPTION_SLUG_LEGACY ||
-          companyPageBySlug(next.slug) ||
-          companyPageById(next.id)) &&
-        (!next.sections || next.sections.length === 0)
-      ) {
-        const fallback = defaults.find((item) => item.id === next.id) ?? defaults.find((item) => item.slug === next.slug);
-        if (fallback) return { ...next, cmsEnabled: true, sections: fallback.sections };
+    // Entire read → transform → optional write shares the same process-local pages lock as savePage.
+    return withJsonFileLock(PAGES_FILE, async () => {
+      const raw = await readPagesSnapshotUnlocked();
+      const { pages, shouldPersist } = transformPagesSnapshot(raw);
+      if (pagesFileBarrierForTests) {
+        await pagesFileBarrierForTests();
       }
-      return next;
+      if (shouldPersist && cmsJsonWritesAllowed()) {
+        await writeJsonFileInLock(PAGES_FILE, { pages } satisfies PagesFile);
+      }
+      return pages;
     });
-    const merged = mergeMissingCompanyPages(pages);
-    const longform = applySeoLongformToPages(merged.pages.map((page) => sanitizePage(page)));
-    const cleaned = applyPublicCopyCleanupToPages(longform.pages);
-    if ((migratedChanged || longform.changed || cleaned.changed) && !isProductionBuildPhase()) {
-      await writeJsonFile(PAGES_FILE, { pages: cleaned.pages } satisfies PagesFile);
-    }
-    return cleaned.pages;
   }
 
   async getPageById(id: string) {
@@ -77,23 +133,48 @@ export class LocalJsonRepository implements CmsRepository {
   }
 
   async savePage(page: CmsPage) {
-    const safe = sanitizePage(page);
-    const pages = await this.listPages();
-    if (pages.some((item) => item.id !== safe.id && withSlash(item.slug) === withSlash(safe.slug))) {
-      throw duplicateSlugError();
+    // Local/dev only. Same-process lock serializes vs listPages migrations.
+    // Not cross-process / multi-worker safe. Production/build refuse JSON writes.
+    assertCmsJsonWritesAllowed();
+    const expectedRevision = parseExpectedContentRevision(page.contentRevision);
+    if (expectedRevision == null) {
+      throw new PageConflictError();
     }
-    const next = pages.some((item) => item.id === safe.id)
-      ? pages.map((item) => (item.id === safe.id ? safe : item))
-      : [...pages, safe];
-    await writeJsonFile(PAGES_FILE, { pages: next } satisfies PagesFile);
-    return safe;
+    const safe = sanitizePage(page);
+
+    return withJsonFileLock(PAGES_FILE, async () => {
+      const rawPages = await readPagesSnapshotUnlocked();
+      const pages = rawPages.map((item) =>
+        sanitizePage({
+          ...item,
+          contentRevision: defaultContentRevision(item.contentRevision),
+        }),
+      );
+      if (pages.some((item) => item.id !== safe.id && withSlash(item.slug) === withSlash(safe.slug))) {
+        throw duplicateSlugError();
+      }
+      const existing = pages.find((item) => item.id === safe.id);
+      if (!existing) {
+        throw new ClientError("Page not found.");
+      }
+      if (existing.contentRevision !== expectedRevision) {
+        throw new PageConflictError();
+      }
+      if (pagesFileBarrierForTests) {
+        await pagesFileBarrierForTests();
+      }
+      const saved = { ...safe, contentRevision: nextContentRevision(expectedRevision) };
+      const next = pages.map((item) => (item.id === safe.id ? saved : item));
+      await writeJsonFileInLock(PAGES_FILE, { pages: next } satisfies PagesFile);
+      return saved;
+    });
   }
 
   async getSettings() {
     const settings = await readJsonFile<SiteSettings>(SETTINGS_FILE, defaultSettings());
     const safe = sanitizeSettings(settings);
     const cleaned = applyPublicCopyCleanupToSettings(safe);
-    if (cleaned.changed && !isProductionBuildPhase()) {
+    if (cleaned.changed && cmsJsonWritesAllowed()) {
       await writeJsonFile(SETTINGS_FILE, cleaned.settings);
     }
     return cleaned.settings;

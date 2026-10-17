@@ -63,6 +63,7 @@ test("page rich-content HTML containing asset.secureUrl is detected", () => {
     slug: "/about-us/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-1",
@@ -101,6 +102,7 @@ test("transformed Cloudinary URL for the same publicId is detected", () => {
     slug: "/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-html",
@@ -180,6 +182,7 @@ test("unrelated Cloudinary asset is not falsely matched", () => {
     slug: "/about-us/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-1",

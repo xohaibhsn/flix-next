@@ -38,6 +38,7 @@ import { sanitizeHtml } from "@/lib/cms/html";
 import { sanitizeJsonLdField } from "@/lib/cms/json-ld-input";
 import { sanitizeCustomHeadCode } from "@/lib/cms/head-code";
 import { sanitizeHttpUrl } from "@/lib/cms/contact";
+import { defaultContentRevision } from "@/lib/cms/page-revision";
 import {
   isReservedRedirectSource,
   isSelfRedirect,
@@ -142,7 +143,8 @@ export function sanitizeMediaRef(value: unknown): MediaRef | null {
   return { id, publicId, secureUrl };
 }
 
-export function sanitizePage(input: CmsPage): CmsPage {
+/** Accepts legacy/partial page objects; always emits a concrete contentRevision. */
+export function sanitizePage(input: Omit<CmsPage, "contentRevision"> & { contentRevision?: unknown }): CmsPage {
   const sections = Array.isArray(input.sections) ? input.sections : [];
   const normalized = sections
     .filter((section): section is CmsSection => {
@@ -170,6 +172,9 @@ export function sanitizePage(input: CmsPage): CmsPage {
     slug,
     status: input.status === "draft" ? "draft" : "published",
     cmsEnabled: Boolean(input.cmsEnabled),
+    // Trusted seed/read default only. Save CAS must call parseExpectedContentRevision separately
+    // and reject missing/invalid expected revisions — never equate them to the DB current revision.
+    contentRevision: defaultContentRevision(input.contentRevision),
     sections: normalized,
   };
 }

@@ -32,6 +32,7 @@ test("DEFAULT_CODE_DEFINED_LINKS header-logo targets /welcome/ and is not REDIRE
       slug: "/",
       status: "published",
       cmsEnabled: true,
+      contentRevision: 1,
       sections: [],
     },
   ];

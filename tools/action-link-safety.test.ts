@@ -32,6 +32,7 @@ function sanitizeHero(data: Partial<HeroData>): HeroData {
     slug: "/hero-test/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-hero",
@@ -53,6 +54,7 @@ function sanitizeCta(buttonHref: string): CtaData {
     slug: "/cta-test/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-cta",
@@ -75,6 +77,7 @@ function sanitizeInlinePricing(buttonHref: string): PricingData {
     slug: "/pricing-test/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-pricing",
@@ -102,6 +105,7 @@ function sanitizeRich(buttonHref: string): RichContentData {
     slug: "/rich-test/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-rich",

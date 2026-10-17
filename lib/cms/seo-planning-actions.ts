@@ -53,6 +53,22 @@ import {
   parseSeoPlanningWorkspaceInput,
 } from "@/lib/cms/seo-planning/workspace";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
+import {
+  assertCmsWritesAllowed,
+  CMS_WRITE_FREEZE_CODE,
+  cmsWriteFreezeBlockedResult,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-freeze";
+
+function rejectIfCmsWriteFrozen(): { ok: false; error: string; code: typeof CMS_WRITE_FREEZE_CODE } | null {
+  try {
+    assertCmsWritesAllowed();
+    return null;
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) return cmsWriteFreezeBlockedResult();
+    throw error;
+  }
+}
 
 function clientIp(headerStore: Headers) {
   const forwarded = headerStore.get("x-forwarded-for");
@@ -108,6 +124,8 @@ export async function proceedSeoOpportunityToPlanningDraftAction(
   if (!actor.ok) {
     return { ok: false, error: actor.error };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const input =
     rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
@@ -146,6 +164,8 @@ export async function saveSeoPlanningWorkspaceAction(
   if (!actor.ok) {
     return { ok: false, error: actor.error };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const parsed = parseSeoPlanningWorkspaceInput(rawInput);
   if (!parsed.ok) return parsed;
@@ -184,6 +204,8 @@ export async function updateSeoPlanningSuggestionAction(
   if (!actor.ok) {
     return { ok: false, error: actor.error };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const parsed = parseSeoPlanningSuggestionInput(rawInput);
   if (!parsed.ok) return parsed;
@@ -242,6 +264,16 @@ export async function generateChatgptWritingPromptWithGeminiAction(
       openaiBlogPromptConfigured,
     };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return {
+      ok: false,
+      code: CMS_WRITE_FREEZE_CODE,
+      error: frozen.error,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
+  }
 
   const input =
     rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
@@ -295,6 +327,16 @@ export async function generateChatgptWritingPromptWithOpenAiAction(
       ok: false,
       code: "unauthorized",
       error: actor.error,
+      geminiBlogPromptConfigured,
+      openaiBlogPromptConfigured,
+    };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return {
+      ok: false,
+      code: CMS_WRITE_FREEZE_CODE,
+      error: frozen.error,
       geminiBlogPromptConfigured,
       openaiBlogPromptConfigured,
     };
@@ -361,6 +403,16 @@ export async function generateChatgptImagePromptWithGeminiAction(
       openaiImagePromptConfigured,
     };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return {
+      ok: false,
+      code: CMS_WRITE_FREEZE_CODE,
+      error: frozen.error,
+      geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
+    };
+  }
 
   const input =
     rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
@@ -414,6 +466,16 @@ export async function generateChatgptImagePromptWithOpenAiAction(
       ok: false,
       code: "unauthorized",
       error: actor.error,
+      geminiImagePromptConfigured,
+      openaiImagePromptConfigured,
+    };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return {
+      ok: false,
+      code: CMS_WRITE_FREEZE_CODE,
+      error: frozen.error,
       geminiImagePromptConfigured,
       openaiImagePromptConfigured,
     };
@@ -472,6 +534,8 @@ export async function archiveSeoPlanningDraftAction(
 ): Promise<SeoPlanningLifecycleActionResult> {
   const actor = await requireAdminActor("seo");
   if (!actor.ok) return { ok: false, error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const parsed = parseSeoPlanningLifecycleId(rawInput);
   if (!parsed.ok) return parsed;
@@ -492,6 +556,8 @@ export async function restoreSeoPlanningDraftAction(
 ): Promise<SeoPlanningLifecycleActionResult> {
   const actor = await requireAdminActor("seo");
   if (!actor.ok) return { ok: false, error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const parsed = parseSeoPlanningLifecycleId(rawInput);
   if (!parsed.ok) return parsed;
@@ -512,6 +578,8 @@ export async function deleteSeoPlanningDraftPermanentlyAction(
 ): Promise<SeoPlanningPermanentDeleteActionResult> {
   const actor = await requireAdminActor("seo");
   if (!actor.ok) return { ok: false, error: actor.error };
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const parsed = parseSeoPlanningPermanentDeleteInput(rawInput);
   if (!parsed.ok) return parsed;
@@ -577,6 +645,18 @@ export async function generateNewBlogArticlePreviewAction(
       openaiBlogArticleConfigured,
     };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return {
+      ok: false,
+      code: CMS_WRITE_FREEZE_CODE,
+      error: frozen.error,
+      blogSaved: false,
+      providerRequests: 0,
+      featureEnabled,
+      openaiBlogArticleConfigured,
+    };
+  }
 
   const input =
     rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
@@ -620,6 +700,8 @@ export async function handoffSeoPlanningToBlogAction(
       code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
     };
   }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, error: frozen.error, code: CMS_WRITE_FREEZE_CODE };
   if (!adminHasPermission(actor.user, "blog")) {
     return {
       ok: false,

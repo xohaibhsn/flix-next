@@ -8,6 +8,7 @@ import {
   reopenSeoHealthFindingInState,
 } from "@/lib/cms/seo-health-memory";
 import { getSeoHealthState, saveSeoHealthState } from "@/lib/cms/seo-health-state";
+import { assertCmsWritesAllowed, isCmsWriteFreezeError } from "@/lib/cms/write-freeze";
 import { publicErrorMessage } from "@/lib/security/errors";
 
 function isNextRedirect(error: unknown) {
@@ -28,6 +29,14 @@ export async function acceptSeoHealthFindingAction(formData: FormData): Promise<
   const unauthorized = await requireAdminAction("seo");
   if (unauthorized) {
     throw new Error(unauthorized.error);
+  }
+  try {
+    assertCmsWritesAllowed();
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      throw new Error(error.message);
+    }
+    throw error;
   }
   const fingerprint = fingerprintFromForm(formData);
   if (!isValidSeoHealthFingerprint(fingerprint)) {
@@ -51,6 +60,14 @@ export async function reopenSeoHealthFindingAction(formData: FormData): Promise<
   const unauthorized = await requireAdminAction("seo");
   if (unauthorized) {
     throw new Error(unauthorized.error);
+  }
+  try {
+    assertCmsWritesAllowed();
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      throw new Error(error.message);
+    }
+    throw error;
   }
   const fingerprint = fingerprintFromForm(formData);
   if (!isValidSeoHealthFingerprint(fingerprint)) {

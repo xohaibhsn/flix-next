@@ -30,7 +30,8 @@ export type DraftSeoTitleMetaFailure = {
     | "rate_limited"
     | "timeout"
     | "unavailable"
-    | "invalid_response";
+    | "invalid_response"
+    | "cms_write_freeze";
 };
 
 export type DraftSeoTitleMetaResult = DraftSeoTitleMetaSuccess | DraftSeoTitleMetaFailure;

@@ -365,7 +365,7 @@ async function fkInfo() {
 
 test("preflight: disposable MySQL identity and isolation", async () => {
   assertDisposableTarget();
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
   const meta = await q<RowDataPacket[]>(
     `SELECT DATABASE() AS db, @@port AS port, @@bind_address AS bind_addr, VERSION() AS version`,
   );

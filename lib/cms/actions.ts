@@ -50,10 +50,32 @@ import {
 } from "@/lib/cms/seo-prepublish-qa";
 import type { PrePublishQaResult } from "@/lib/cms/seo-prepublish-qa-types";
 import { sanitizePost } from "@/lib/cms/validation";
+import {
+  isPageConflictError,
+  PAGE_CONFLICT_CODE,
+  PAGE_CONFLICT_MESSAGE,
+} from "@/lib/cms/page-revision";
+import {
+  assertCmsWritesAllowed,
+  cmsWriteFreezeBlockedResult,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-freeze";
 import { ClientError, publicErrorMessage } from "@/lib/security/errors";
 
 function fail(error: unknown, fallback: string) {
+  if (isCmsWriteFreezeError(error)) return cmsWriteFreezeBlockedResult();
   return { ok: false as const, error: publicErrorMessage(error, fallback) };
+}
+
+/** New-worker freeze gate. Does not protect already-running v5 workers. */
+function rejectIfCmsWriteFrozen() {
+  try {
+    assertCmsWritesAllowed();
+    return null;
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) return cmsWriteFreezeBlockedResult();
+    throw error;
+  }
 }
 
 async function attachSeoAdvisory(
@@ -69,6 +91,8 @@ async function attachSeoAdvisory(
 export async function savePageAction(page: CmsPage) {
   const unauthorized = await requireAdminAction("pages");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const current = await cms.getPageById(page.id);
     if (!current) throw new ClientError("Page not found.");
@@ -93,6 +117,13 @@ export async function savePageAction(page: CmsPage) {
     revalidateSidhuCms();
     return { ok: true as const, page: saved };
   } catch (error) {
+    if (isPageConflictError(error)) {
+      return {
+        ok: false as const,
+        code: PAGE_CONFLICT_CODE,
+        error: PAGE_CONFLICT_MESSAGE,
+      };
+    }
     return fail(error, "Could not save page.");
   }
 }
@@ -100,6 +131,8 @@ export async function savePageAction(page: CmsPage) {
 export async function saveSettingsAction(settings: SiteSettings) {
   const unauthorized = await requireAdminAction("site_settings");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const current = await cms.getSettings();
     const customHeadCode =
@@ -124,6 +157,8 @@ export async function saveSettingsAction(settings: SiteSettings) {
 export async function saveSeoSettingsAction(settings: SiteSettings) {
   const unauthorized = await requireAdminAction("seo");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const site = normalizeJsonLdInput(settings.siteCustomJsonLd);
     if (!site.ok) return { ok: false as const, error: `Site-wide schema: ${site.error}` };
@@ -142,6 +177,8 @@ export async function saveSeoSettingsAction(settings: SiteSettings) {
 export async function savePageSeoAction(key: string, seo: PageSeo) {
   const unauthorized = await requireAdminAction("seo");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isPageSeoKey(key)) return { ok: false as const, error: "Unknown page." };
   try {
     const jsonLd = normalizeJsonLdInput(seo.customJsonLd);
@@ -174,6 +211,8 @@ export async function savePageSeoAction(key: string, seo: PageSeo) {
 export async function savePlanAction(plan: PricingPlan) {
   const unauthorized = await requireAdminAction("pricing");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const saved = await cms.savePlan(plan);
     revalidatePublicPlansData();
@@ -187,6 +226,8 @@ export async function savePlanAction(plan: PricingPlan) {
 export async function deletePlanAction(id: string) {
   const unauthorized = await requireAdminAction("pricing");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     await cms.deletePlan(id);
     revalidatePublicPlansData();
@@ -200,6 +241,8 @@ export async function deletePlanAction(id: string) {
 export async function saveFaqAction(item: FaqItem) {
   const unauthorized = await requireAdminAction("faqs");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const saved = await cms.saveFaq(item);
     revalidatePublicFaqsData();
@@ -213,6 +256,8 @@ export async function saveFaqAction(item: FaqItem) {
 export async function deleteFaqAction(id: string) {
   const unauthorized = await requireAdminAction("faqs");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     await cms.deleteFaq(id);
     revalidatePublicFaqsData();
@@ -226,6 +271,8 @@ export async function deleteFaqAction(id: string) {
 export async function saveCategoryAction(category: BlogCategory) {
   const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const saved = await cms.saveCategory(category);
     revalidateSidhuCms();
@@ -252,6 +299,8 @@ export async function saveCategoryAction(category: BlogCategory) {
 export async function deleteCategoryAction(id: string) {
   const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     await cms.deleteCategory(id);
     revalidateSidhuCms();
@@ -280,6 +329,8 @@ export async function savePostAction(
 ): Promise<SavePostActionResult> {
   const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
 
   const input: SavePostActionInput =
     postOrInput && typeof postOrInput === "object" && "post" in postOrInput
@@ -341,6 +392,8 @@ export async function savePostAction(
 export async function deletePostAction(id: string) {
   const unauthorized = await requireAdminAction("blog");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     await cms.deletePost(id);
     revalidateSidhuCms();
@@ -354,6 +407,8 @@ export async function deletePostAction(id: string) {
 export async function saveRedirectAction(rule: RedirectRule) {
   const unauthorized = await requireAdminAction("redirects");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     const source = (rule.sourcePath || "").trim();
     const destination = (rule.destinationPath || "").trim();
@@ -387,6 +442,8 @@ export async function saveRedirectAction(rule: RedirectRule) {
 export async function deleteRedirectAction(id: string) {
   const unauthorized = await requireAdminAction("redirects");
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   try {
     await cms.deleteRedirect(id);
     revalidateSidhuCms();
@@ -432,6 +489,8 @@ export async function submitContactAction(input: {
   message: string;
   company: string;
 }) {
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (input.company?.trim()) {
     return { ok: true as const };
   }

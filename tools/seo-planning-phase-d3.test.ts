@@ -452,7 +452,7 @@ test("CACHE: openai independent; gemini sibling preserved; selection prefers new
   });
   assert.equal(selected, "openai");
   assert.equal(readWritingPromptsPayload({}).openai, undefined);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
 });
 
 test("CONCURRENCY: F2 mismatch and write-boundary reject; preserve Gemini sibling", async () => {
@@ -691,7 +691,7 @@ test("UI / ACTION / SAFETY: dual buttons; no BlogPost; schema 3; no web_search",
   assert.doesNotMatch(openaiProvider, /web_search|tool_choice/);
   assert.doesNotMatch(service, /\b(?:savePost|createPost|publish)\b/);
   assert.doesNotMatch(service, /web_search/);
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
 });
 
 test("JSON adapter OpenAI merge preserves Gemini under write lock", async () => {

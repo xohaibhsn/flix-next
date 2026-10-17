@@ -241,6 +241,7 @@ export function createCompanyCmsPages(): CmsPage[] {
     slug: page.slug,
     status: "published" as const,
     cmsEnabled: true,
+    contentRevision: 1,
     sections: createCompanyPageSections(page),
   }));
 }

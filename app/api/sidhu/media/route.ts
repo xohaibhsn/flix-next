@@ -18,11 +18,29 @@ import {
 import { publicErrorMessage, logServerError } from "@/lib/security/errors";
 import { assertSafeImageUpload, isAllowedCloudinaryImage } from "@/lib/security/image-upload";
 import { isSameOriginMutation } from "@/lib/security/origin";
+import {
+  assertCmsWritesAllowed,
+  CMS_WRITE_FREEZE_CODE,
+  CMS_WRITE_FREEZE_MESSAGE,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-freeze";
 
 export const runtime = "nodejs";
 
 function jsonError(message: string, status = 400, extra?: Record<string, unknown>) {
   return NextResponse.json({ ok: false, error: message, ...extra }, { status });
+}
+
+function rejectIfCmsWriteFrozen() {
+  try {
+    assertCmsWritesAllowed();
+    return null;
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      return jsonError(CMS_WRITE_FREEZE_MESSAGE, 503, { code: CMS_WRITE_FREEZE_CODE });
+    }
+    throw error;
+  }
 }
 
 function revalidateMedia() {
@@ -63,6 +81,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
   }
@@ -129,6 +149,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
   }
@@ -178,6 +200,8 @@ export async function DELETE(request: Request) {
 export async function PATCH(request: Request) {
   const unauthorized = await requireAdminApi(MEDIA_API_PERMISSIONS);
   if (unauthorized) return unauthorized;
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return frozen;
   if (!isSameOriginMutation(request)) {
     return jsonError("Invalid request origin.", 403);
   }

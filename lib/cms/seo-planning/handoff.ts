@@ -51,7 +51,8 @@ export type SeoPlanningHandoffErrorCode =
   | "blog_permission_required"
   | "handoff_conflict"
   | "access_denied"
-  | "unauthorized";
+  | "unauthorized"
+  | "cms_write_freeze";
 
 export type SeoPlanningHandoffSuccess = {
   ok: true;

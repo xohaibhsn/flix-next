@@ -48,6 +48,7 @@ function samplePage(sections: CmsSection[]): CmsPage {
     slug: "/iptv-subscription-uk/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections,
   };
 }
@@ -210,6 +211,7 @@ test("unrelated content untouched", () => {
     slug: "/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [
       {
         id: "sec-home",

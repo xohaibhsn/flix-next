@@ -93,7 +93,8 @@ export type ArticleGenerationErrorCode =
   | "unavailable"
   | "invalid_response"
   | "feature_disabled"
-  | "apply_not_available";
+  | "apply_not_available"
+  | "cms_write_freeze";
 
 export type GenerateArticlePreviewSuccess = {
   ok: true;

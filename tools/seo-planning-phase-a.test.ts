@@ -133,7 +133,7 @@ function memoryCatalog(seed: {
 }
 
 test("schema version is 3 and seo_planning_drafts table exists", () => {
-  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 5);
+  assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
   const joined = CMS_SCHEMA_STATEMENTS.join("\n");
   assert.match(joined, /CREATE TABLE IF NOT EXISTS seo_planning_drafts/);
   assert.match(joined, /UNIQUE KEY seo_planning_drafts_fingerprint_unique/);
@@ -585,6 +585,7 @@ test("RESTORE CURRENT_CMS rejected", () => {
         slug: BUFFERING,
         status: "published",
         cmsEnabled: true,
+        contentRevision: 1,
         sections: [],
       } as CmsPage,
     ],
@@ -610,6 +611,7 @@ test("RESTORE rejects non-registry welcome-like path", () => {
         slug: "/",
         status: "published",
         cmsEnabled: true,
+        contentRevision: 1,
         sections: [],
       } as CmsPage,
     ],
@@ -899,6 +901,7 @@ test("RESTORE CURRENT_CMS for registry path owned by published page is rejected"
         slug: BUFFERING,
         status: "published",
         cmsEnabled: true,
+        contentRevision: 1,
         sections: [],
       } as CmsPage,
     ],

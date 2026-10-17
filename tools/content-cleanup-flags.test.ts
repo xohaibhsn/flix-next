@@ -154,6 +154,7 @@ test("custom rich content is not replaced by SEO longform", () => {
     slug: "/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [custom],
   };
   const result = applySeoLongformToPage(page);

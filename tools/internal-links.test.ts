@@ -72,6 +72,7 @@ function samplePage(overrides: Partial<CmsPage> = {}): CmsPage {
     slug: "/refund-policy/",
     status: "published",
     cmsEnabled: true,
+    contentRevision: 1,
     sections: [],
     ...overrides,
   };

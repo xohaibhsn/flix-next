@@ -86,6 +86,7 @@ test("company page merge uses page ID so a slug change cannot duplicate the row"
       slug: "/about-company/",
       status: "published" as const,
       cmsEnabled: true,
+      contentRevision: 1,
       sections: [{ id: "about-html", type: "rich-text" as const, label: "Body", order: 0, visible: true, data: { html: "" } }],
     },
   ] as CmsPage[];
