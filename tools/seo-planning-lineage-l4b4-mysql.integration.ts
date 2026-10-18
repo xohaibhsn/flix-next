@@ -11,9 +11,9 @@ import { test } from "node:test";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   attemptEstablishPlanningDecisionLink,
-  createTrustedPlanningDecisionSelectionForTests,
   resolvePlanningDecisionLineage,
 } from "../lib/cms/seo-planning-lineage";
+import { createTrustedPlanningDecisionSelectionForTests } from "./seo-planning-lineage-test-harness";
 import {
   createMysqlPlanningLineageStore,
   isMysqlForeignKeyParentDeleteBlocked,

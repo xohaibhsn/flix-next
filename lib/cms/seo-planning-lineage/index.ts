@@ -71,12 +71,12 @@ export {
 } from "@/lib/cms/seo-planning-lineage/validate";
 
 export {
-  createTrustedPlanningDecisionSelectionForTests,
   isTrustedPlanningDecisionSelection,
   tryMintTrustedPlanningDecisionSelection,
   trustedSelectionMatchesLocators,
   type TrustedPlanningDecisionSelection,
 } from "@/lib/cms/seo-planning-lineage/selection";
+// Test-only selection minting helpers stay off this barrel (deep-import only).
 
 export {
   attemptEstablishPlanningDecisionLink,

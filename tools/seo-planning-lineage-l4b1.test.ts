@@ -15,7 +15,6 @@ import type {
 } from "../lib/cms/seo-experiment-ledger/types";
 import {
   attemptEstablishPlanningDecisionLink,
-  createTrustedPlanningDecisionSelectionForTests,
   decisionSnapshotIncomplete,
   isTrustedPlanningDecisionSelection,
   L4B_LIVE_SCHEMA_VERSION_MUST_REMAIN,
@@ -30,7 +29,9 @@ import {
   validatePlanningDecisionLineageCandidate,
   type PlanningLineageStore,
   type SeoPlanningDecisionLinkRow,
+  type TrustedPlanningDecisionSelection,
 } from "../lib/cms/seo-planning-lineage";
+import { createTrustedPlanningDecisionSelectionForTests } from "./seo-planning-lineage-test-harness";
 import type { SeoPlanningDraft } from "../lib/cms/types";
 
 const root = path.join(__dirname, "..");
@@ -468,7 +469,7 @@ test("14. forged client IDs / plain objects cannot establish authority", async (
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store: memoryStore(state),
-    trustedSelection: forged as ReturnType<typeof createTrustedPlanningDecisionSelectionForTests>,
+    trustedSelection: forged as TrustedPlanningDecisionSelection,
   });
   assert.equal(result.ok, false);
   if (result.ok) return;

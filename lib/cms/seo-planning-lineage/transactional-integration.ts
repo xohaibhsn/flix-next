@@ -73,12 +73,45 @@ import { withTransaction } from "@/lib/db/pool";
 
 export const L4B6_TRANSACTIONAL_INTEGRATION_VERSION = "l4b6-v1" as const;
 
-/** Closed by default — production must never pass this activation object. */
+/**
+ * Process-local L4B-6 test activations. Membership — not object shape — authorizes
+ * transactional Proceed+link / protected delete. Plain
+ * `{ mode: "test-harness", allowDurableLineageWrites: true, ... }` forgeries never pass.
+ */
+const authorizedL4b6HarnessActivations = new WeakSet<object>();
+
+/**
+ * Opaque test-harness activation capability.
+ * Constructible lookalikes are rejected at runtime unless WeakSet-registered via
+ * {@link issueL4B6TestHarnessActivation}.
+ */
 export type L4B6TestHarnessActivation = {
-  mode: "test-harness";
-  allowDurableLineageWrites: true;
-  allowProtectedDelete: true;
+  readonly _l4b6TestHarnessActivation: true;
 };
+
+/**
+ * Restrict issuer to the tools test-harness module (not CMS actions / app routes).
+ */
+function assertCalledFromLineageTestHarness(apiName: string): void {
+  const stack = new Error().stack ?? "";
+  if (!/seo-planning-lineage-test-harness\.(ts|js|cjs|mjs)/i.test(stack)) {
+    throw new Error(
+      `${apiName} is restricted to tools/seo-planning-lineage-test-harness and is not a production API.`,
+    );
+  }
+}
+
+/**
+ * Issue a process-local L4B-6 test activation (WeakSet-registered).
+ * Not re-exported from the production lineage barrel.
+ * Callable successfully only via tools/seo-planning-lineage-test-harness.
+ */
+export function issueL4B6TestHarnessActivation(): L4B6TestHarnessActivation {
+  assertCalledFromLineageTestHarness("issueL4B6TestHarnessActivation");
+  const activation: L4B6TestHarnessActivation = { _l4b6TestHarnessActivation: true };
+  authorizedL4b6HarnessActivations.add(activation);
+  return activation;
+}
 
 export type TransactionalProceedLinkageStatus =
   | "LINKED"
@@ -125,19 +158,13 @@ function trimField(value: unknown, max: number): string {
 
 function assertTestHarnessActivation(
   activation: unknown,
-  flag: "allowDurableLineageWrites" | "allowProtectedDelete",
+  _flag: "allowDurableLineageWrites" | "allowProtectedDelete",
 ): asserts activation is L4B6TestHarnessActivation {
+  void _flag;
   if (!activation || typeof activation !== "object" || Array.isArray(activation)) {
     throw new Error("L4B-6 activation denied.");
   }
-  const row = activation as Record<string, unknown>;
-  if (row.mode !== "test-harness") {
-    throw new Error("L4B-6 activation denied.");
-  }
-  if (row[flag] !== true) {
-    throw new Error("L4B-6 activation denied.");
-  }
-  if (row.allowDurableLineageWrites !== true || row.allowProtectedDelete !== true) {
+  if (!authorizedL4b6HarnessActivations.has(activation)) {
     throw new Error("L4B-6 activation denied.");
   }
 }

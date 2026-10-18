@@ -10,11 +10,11 @@ import { test } from "node:test";
 import type { RowDataPacket } from "mysql2/promise";
 import {
   attemptEstablishPlanningDecisionLink,
-  createTrustedPlanningDecisionSelectionForTests,
   evaluatePlanningPermanentDeletePolicy,
   resolvePlanningDecisionLineage,
   SEO_PLANNING_LINKED_DELETE_BLOCKED_MESSAGE,
 } from "../lib/cms/seo-planning-lineage";
+import { createTrustedPlanningDecisionSelectionForTests } from "./seo-planning-lineage-test-harness";
 import {
   createMysqlPlanningLineageStore,
   isMysqlForeignKeyParentDeleteBlocked,

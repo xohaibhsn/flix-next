@@ -24,8 +24,11 @@ import {
   archiveSeoPlanningDraftOnConnectionForTests,
   executeTransactionalProtectedPermanentDelete,
   executeTransactionalTrustedProceedAndLink,
-  type L4B6TestHarnessActivation,
 } from "../lib/cms/seo-planning-lineage/transactional-integration";
+import {
+  createL4B6TestHarnessActivationForTests,
+  createTrustedPlanningDecisionSelectionForTests,
+} from "./seo-planning-lineage-test-harness";
 import { createMysqlPlanningLineageStore } from "../lib/cms/seo-planning-lineage/mysql-store";
 import { CMS_SCHEMA_STATEMENTS } from "../lib/db/schema";
 import { getDbPool, withTransaction } from "../lib/db/pool";
@@ -48,11 +51,7 @@ const {
 
 type SqlParam = string | number | boolean | null | Date;
 
-const HARNESS: L4B6TestHarnessActivation = {
-  mode: "test-harness",
-  allowDurableLineageWrites: true,
-  allowProtectedDelete: true,
-};
+const HARNESS = createL4B6TestHarnessActivationForTests();
 
 function assertDisposableTarget() {
   if (String(process.env.L4B6_MYSQL_INTEGRATION || "") !== "1") {
@@ -504,7 +503,7 @@ test("10–12. archived blocked; forged/cross-account blocked; no false LINKED",
   assert.equal(cross.ok, false);
 
   const forged = await executeTransactionalTrustedProceedAndLink({
-    activation: { mode: "test-harness", allowDurableLineageWrites: true, allowProtectedDelete: true },
+    activation: { mode: "test-harness", allowDurableLineageWrites: true, allowProtectedDelete: true } as never,
     actor: { authorized: false, adminId: "admin_shared" },
     ledgerRunId: "seorun_x1",
     opportunityIndex: 0,
@@ -679,8 +678,7 @@ test("19–21. concurrent link/delete integrity; Ledger history intact", async (
   );
 
   const store = createMysqlPlanningLineageStore();
-  const { attemptEstablishPlanningDecisionLink, createTrustedPlanningDecisionSelectionForTests } =
-    await import("../lib/cms/seo-planning-lineage");
+  const { attemptEstablishPlanningDecisionLink } = await import("../lib/cms/seo-planning-lineage");
 
   const results = await Promise.allSettled([
     attemptEstablishPlanningDecisionLink({
@@ -741,7 +739,7 @@ test("22–26. activation boundary, no live imports, A2-4B HOLD", async () => {
   assert.doesNotMatch(index, /createMysqlPlanningLineageStore/);
 
   const badActivation = await executeTransactionalTrustedProceedAndLink({
-    activation: { mode: "production" } as unknown as L4B6TestHarnessActivation,
+    activation: { mode: "production" } as never,
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "x",
     opportunityIndex: 0,
