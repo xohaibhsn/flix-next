@@ -48,3 +48,12 @@ export {
   toLedgerMysqlDateTime,
   type SeoLedgerListCursor,
 } from "@/lib/cms/seo-experiment-ledger/read-cursor";
+
+/** L4A pure target-Blog navigation helpers (no Planning provenance). */
+export {
+  collectUniqueLedgerTargetPostIds,
+  isSafeLedgerTargetPostId,
+  resolveLedgerTargetBlogLink,
+  resolveLedgerTargetBlogLinks,
+  type LedgerTargetBlogLinkState,
+} from "@/lib/cms/seo-experiment-ledger/target-blog-links";
