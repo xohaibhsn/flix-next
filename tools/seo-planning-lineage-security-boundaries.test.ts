@@ -1,10 +1,10 @@
 /**
- * L4A/L4B hardening — negative security boundaries for test-only capabilities.
+ * L4A/L4B hardening — negative security boundaries for production/test trust separation.
  * Provider-free. No production DB. No schema ensure.
  */
 
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
@@ -15,15 +15,12 @@ import {
   type PlanningLineageStore,
   type TrustedPlanningDecisionSelection,
 } from "../lib/cms/seo-planning-lineage";
-import {
-  issueLineageSelectionTestGate,
-  mintTrustedPlanningDecisionSelectionWithTestGate,
-} from "../lib/cms/seo-planning-lineage/selection";
+import * as selectionModule from "../lib/cms/seo-planning-lineage/selection";
 import {
   executeTransactionalProtectedPermanentDelete,
   executeTransactionalTrustedProceedAndLink,
-  issueL4B6TestHarnessActivation,
 } from "../lib/cms/seo-planning-lineage/transactional-integration";
+import * as transactionalModule from "../lib/cms/seo-planning-lineage/transactional-integration";
 import type {
   SeoOpportunityDecisionRow,
   SeoResearchRunRow,
@@ -35,8 +32,9 @@ import {
 } from "../lib/cms/seo-planning-lineage/schema-ddl";
 import { CURRENT_CMS_SCHEMA_VERSION } from "../lib/db/schema";
 import {
-  createL4B6TestHarnessActivationForTests,
   createTrustedPlanningDecisionSelectionForTests,
+  executeTransactionalProtectedPermanentDeleteForTests,
+  executeTransactionalTrustedProceedAndLinkForTests,
 } from "./seo-planning-lineage-test-harness";
 
 const root = path.join(__dirname, "..");
@@ -202,11 +200,13 @@ test("1. plain client-shaped selection is rejected (zero writes)", async () => {
 });
 
 test("2. deserialized selection cannot regain trusted authority", async () => {
-  const real = createTrustedPlanningDecisionSelectionForTests({
+  const real = await createTrustedPlanningDecisionSelectionForTests({
     planningDraftId: "seoplan_sec",
     decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     researchRunId: "seorun_sec",
     actorAdminId: "admin_1",
+    topic: "Security boundary topic for UK IPTV",
+    workingTitle: "Security Boundary Working Title",
   });
   assert.equal(isTrustedPlanningDecisionSelection(real), true);
   const revived = JSON.parse(JSON.stringify(real)) as TrustedPlanningDecisionSelection;
@@ -224,86 +224,116 @@ test("2. deserialized selection cannot regain trusted authority", async () => {
   assert.equal(state.insertCalls, 0);
 });
 
-test("3. forged selection test-gate shape cannot mint; deep-import issuer denied", () => {
-  const forgedGate = { _lineageSelectionTestGate: true as const };
-  // Direct call outside tools harness is denied (caller restriction) before WeakSet.
-  assert.throws(
-    () =>
-      mintTrustedPlanningDecisionSelectionWithTestGate(forgedGate, {
-        planningDraftId: "seoplan_sec",
-        decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-        researchRunId: "seorun_sec",
-        actorAdminId: "admin_1",
-      }),
-    /restricted to tools\/seo-planning-lineage-test-harness/i,
-  );
-  assert.throws(() => issueLineageSelectionTestGate(), /restricted to tools\/seo-planning-lineage-test-harness/i);
-  assert.throws(() => issueL4B6TestHarnessActivation(), /restricted to tools\/seo-planning-lineage-test-harness/i);
+test("3. production modules export no registrar/issuer; shared trust-registries removed", () => {
+  assert.equal(existsSync(path.join(root, "lib/cms/seo-planning-lineage/internal/trust-registries.ts")), false);
+
+  const selectionExports = Object.keys(selectionModule);
+  for (const name of [
+    "issueLineageSelectionTestGate",
+    "mintTrustedPlanningDecisionSelectionWithTestGate",
+    "createTrustedPlanningDecisionSelectionForTests",
+    "addTrustedPlanningDecisionSelection",
+    "registerTrustedSelection",
+  ]) {
+    assert.ok(!selectionExports.includes(name), `selection must not export ${name}`);
+    assert.equal(typeof (selectionModule as Record<string, unknown>)[name], "undefined");
+  }
+
+  const txExports = Object.keys(transactionalModule);
+  for (const name of [
+    "issueL4B6TestHarnessActivation",
+    "createL4B6TestHarnessActivationForTests",
+    "addL4B6HarnessActivation",
+    "runTransactionalTrustedProceedAndLink",
+  ]) {
+    assert.ok(!txExports.includes(name), `transactional-integration must not export ${name}`);
+  }
+
+  const selectionSrc = read("lib/cms/seo-planning-lineage/selection.ts");
+  assert.doesNotMatch(selectionSrc, /new Error\(\)\.stack/);
+  assert.doesNotMatch(selectionSrc, /export function addTrusted|export function registerTrusted/);
+  assert.match(selectionSrc, /const mintedSelections = new WeakSet/);
+  assert.match(selectionSrc, /mintedSelections\.add\(selection\)/);
+
+  const harnessSrc = read("tools/seo-planning-lineage-test-harness.ts");
+  assert.match(harnessSrc, /prepareTrustedResearchProceedSelection/);
+  assert.match(harnessSrc, /tryMintTrustedPlanningDecisionSelection/);
+  assert.doesNotMatch(harnessSrc, /addTrustedPlanningDecisionSelection|trust-registries/);
+  assert.doesNotMatch(harnessSrc, /new Error\(\)\.stack|NODE_ENV/);
 });
 
-test("4. arbitrary {mode:test-harness,...} activation is rejected (no DB path)", async () => {
+test("4. production transaction/delete entrypoints deny forged activation inputs", async () => {
   const forged = {
     mode: "test-harness",
     allowDurableLineageWrites: true,
     allowProtectedDelete: true,
   };
-  const emptyCatalog = {
-    async listPosts() {
-      return [];
-    },
-    async listPages() {
-      return [];
-    },
-    async listCategories() {
-      return [];
-    },
-    async listActiveRedirects() {
-      return [];
-    },
-    async getSeoPlanningDraftByFingerprint() {
-      return null;
-    },
-    async saveSeoPlanningDraft() {
-      throw new Error("must not save");
-    },
-  };
-  const proceed = await executeTransactionalTrustedProceedAndLink({
-    activation: forged as never,
-    actor: { authorized: true, adminId: "admin_1" },
-    ledgerRunId: "seorun_sec",
-    opportunityIndex: 0,
-    editorialSupplemental: { searchIntent: "INFORMATIONAL" },
-    ledgerReader: {
-      async getSeoResearchRunDetail() {
-        return { ok: false, errorCode: "not_found", errorMessage: "missing" };
-      },
-    },
-    catalog: emptyCatalog,
-  });
+  const proceed = await executeTransactionalTrustedProceedAndLink(forged);
   assert.equal(proceed.ok, false);
   if (!proceed.ok) assert.equal(proceed.errorCode, "ACTIVATION_DENIED");
 
-  const del = await executeTransactionalProtectedPermanentDelete({
-    activation: forged as never,
-    actor: { authorized: true, adminId: "admin_1" },
-    planningDraftId: "seoplan_sec",
-    confirmation: "x",
-  });
+  const del = await executeTransactionalProtectedPermanentDelete(forged);
   assert.equal(del.ok, false);
   if (!del.ok) assert.equal(del.errorCode, "ACTIVATION_DENIED");
 });
 
-test("5. production barrel does not expose test-only minting or harness issue", () => {
+test("5. production import graph cannot reach harness or ungated execution", () => {
   const index = read("lib/cms/seo-planning-lineage/index.ts");
+  assert.doesNotMatch(index, /from\s+["'][^"']*seo-planning-lineage-test-harness/);
+  assert.doesNotMatch(index, /from\s+["'][^"']*transactional-execution/);
+  assert.doesNotMatch(index, /from\s+["'][^"']*trust-registries/);
   assert.doesNotMatch(index, /createTrustedPlanningDecisionSelectionForTests/);
-  assert.doesNotMatch(index, /\bissueLineageSelectionTestGate\b/);
-  assert.doesNotMatch(index, /\bmintTrustedPlanningDecisionSelectionWithTestGate\b/);
-  assert.doesNotMatch(index, /\bissueL4B6TestHarnessActivation\b/);
-  assert.doesNotMatch(index, /transactional-integration/);
-  assert.doesNotMatch(index, /seo-planning-lineage-test-harness/);
-  // Barrel must keep exporting the real same-request mint path only.
   assert.match(index, /tryMintTrustedPlanningDecisionSelection/);
   assert.match(index, /isTrustedPlanningDecisionSelection/);
+
+  // Closed facade must not load ungated runners (no direct/transitive production edge).
+  const facadeSrc = read("lib/cms/seo-planning-lineage/transactional-integration.ts");
+  assert.doesNotMatch(facadeSrc, /from\s+["'][^"']*transactional-execution/);
+  assert.doesNotMatch(facadeSrc, /\brunTransactionalTrustedProceedAndLink\b|\brunTransactionalProtectedPermanentDelete\b/);
+  assert.match(facadeSrc, /ACTIVATION_DENIED/);
+
+  // Match import/require edges only — not prose comments.
+  const forbiddenImport =
+    /(?:from\s+["'][^"']*(?:seo-planning-lineage-test-harness|transactional-execution|trust-registries)[^"']*["']|require\(\s*["'][^"']*(?:seo-planning-lineage-test-harness|transactional-execution|trust-registries)[^"']*["']\s*\)|import\(\s*["'][^"']*(?:seo-planning-lineage-test-harness|transactional-execution|trust-registries)[^"']*["']\s*\))/;
+
+  function scanTree(relDir: string, filter: (name: string) => boolean) {
+    const abs = path.join(root, relDir);
+    if (!existsSync(abs)) return;
+    const entries = readdirSync(abs, { withFileTypes: true });
+    for (const entry of entries) {
+      const rel = path.join(relDir, entry.name).replace(/\\/g, "/");
+      if (entry.isDirectory()) {
+        if (entry.name === "node_modules" || entry.name === ".next") continue;
+        scanTree(rel, filter);
+        continue;
+      }
+      if (!filter(entry.name)) continue;
+      if (rel.endsWith("transactional-execution.ts")) continue;
+      if (rel.includes("seo-planning-lineage-test-harness")) continue;
+      if (rel.endsWith(".test.ts") || rel.endsWith(".integration.ts")) continue;
+      const src = read(rel);
+      assert.doesNotMatch(
+        src,
+        forbiddenImport,
+        `${rel} must not import ungated test execution/harness`,
+      );
+    }
+  }
+
+  scanTree("app", (n) => n.endsWith(".ts") || n.endsWith(".tsx"));
+  scanTree("lib", (n) => n.endsWith(".ts") || n.endsWith(".tsx"));
+  scanTree("components", (n) => n.endsWith(".ts") || n.endsWith(".tsx"));
+  for (const top of ["proxy.ts", "middleware.ts", "instrumentation.ts"]) {
+    if (!existsSync(path.join(root, top))) continue;
+    assert.doesNotMatch(
+      read(top),
+      forbiddenImport,
+      `${top} must not import ungated test execution/harness`,
+    );
+  }
+
+  // Demonstrated: no current production import edge to execution/harness.
+  // Not claimed: JS cannot stop a future developer from adding such an import on purpose.
 });
 
 test("6. real authorized same-request preparation still mints trusted selection", async () => {
@@ -355,13 +385,15 @@ test("6. real authorized same-request preparation still mints trusted selection"
   assert.equal(state.links.length, 1);
 });
 
-test("7. duplicate same-pair link remains idempotent", async () => {
+test("7. duplicate same-pair link remains idempotent via genuine prepare/mint fixtures", async () => {
   const state = seeded();
-  const trusted = createTrustedPlanningDecisionSelectionForTests({
+  const trusted = await createTrustedPlanningDecisionSelectionForTests({
     planningDraftId: "seoplan_sec",
     decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     researchRunId: "seorun_sec",
     actorAdminId: "admin_1",
+    topic: "Security boundary topic for UK IPTV",
+    workingTitle: "Security Boundary Working Title",
   });
   const store = memoryStore(state);
   const first = await attemptEstablishPlanningDecisionLink({
@@ -377,11 +409,13 @@ test("7. duplicate same-pair link remains idempotent", async () => {
     decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_sec",
       decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
       researchRunId: "seorun_sec",
       actorAdminId: "admin_1",
+      topic: "Security boundary topic for UK IPTV",
+      workingTitle: "Security Boundary Working Title",
     }),
   });
   assert.equal(second.ok, true);
@@ -389,22 +423,40 @@ test("7. duplicate same-pair link remains idempotent", async () => {
   assert.equal(state.links.length, 1);
 });
 
-test("8. tools harness can mint/activate; structural lookalikes remain unequal", () => {
-  const selection = createTrustedPlanningDecisionSelectionForTests({
+test("8. harness uses prepare/mint; production facade stays closed while test wrappers reach execution", async () => {
+  const selection = await createTrustedPlanningDecisionSelectionForTests({
     planningDraftId: "seoplan_sec",
     decisionId: "seodec_aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
     researchRunId: "seorun_sec",
     actorAdminId: "admin_1",
+    topic: "Security boundary topic for UK IPTV",
+    workingTitle: "Security Boundary Working Title",
   });
   assert.equal(isTrustedPlanningDecisionSelection(selection), true);
 
-  const harness = createL4B6TestHarnessActivationForTests();
-  assert.equal(typeof harness, "object");
-  assert.notDeepEqual(harness, {
-    mode: "test-harness",
-    allowDurableLineageWrites: true,
-    allowProtectedDelete: true,
+  const productionProceed = await executeTransactionalTrustedProceedAndLink({
+    actor: { authorized: true, adminId: "admin_1" },
   });
+  assert.equal(productionProceed.ok, false);
+  if (!productionProceed.ok) assert.equal(productionProceed.errorCode, "ACTIVATION_DENIED");
+
+  // Test wrapper is a distinct import graph entry (tools → transactional-execution).
+  // Without disposable MySQL it still fails closed on missing schema/actor paths,
+  // but must not be ACTIVATION_DENIED from the production facade.
+  const harnessDelete = await executeTransactionalProtectedPermanentDeleteForTests({
+    actor: { authorized: true, adminId: "admin_1" },
+    planningDraftId: "seoplan_missing_for_boundary",
+    confirmation: "DELETE",
+    withTransactionFn: async () => {
+      throw Object.assign(new Error("no db"), {
+        l4b6Code: "WRITE_ERROR",
+        l4b6Message: "no disposable db in unit test",
+      });
+    },
+  });
+  assert.equal(harnessDelete.ok, false);
+  if (!harnessDelete.ok) assert.notEqual(harnessDelete.errorCode, "ACTIVATION_DENIED");
+  void executeTransactionalTrustedProceedAndLinkForTests;
 });
 
 test("9. unlinked Planning remains UNLINKED without fabricated history", async () => {
@@ -422,9 +474,4 @@ test("10. production write / schema gates remain OFF", () => {
   assert.equal(RESEARCH_PROCEED_DURABLE_LINK_AUTHORIZED, false);
   assert.equal(L4B_PLANNING_LINEAGE_DDL_REGISTERED_WITH_ENSURE, false);
   assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
-  assert.doesNotMatch(read("lib/cms/seo-planning-actions.ts"), /issueL4B6TestHarnessActivation/);
-  assert.doesNotMatch(
-    read("lib/cms/seo-planning-actions.ts"),
-    /createTrustedPlanningDecisionSelectionForTests|mintTrustedPlanningDecisionSelectionWithTestGate/,
-  );
 });

@@ -213,7 +213,7 @@ test("11–16. FK blocks linked delete; Ledger intact; unlinked delete works; co
     decisionId: "seodec_d1",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_d1",
       decisionId: "seodec_d1",
       researchRunId: "seorun_d1",
@@ -312,7 +312,7 @@ test("11–16. FK blocks linked delete; Ledger intact; unlinked delete works; co
       decisionId: "seodec_race",
       actorAdminId: "admin_shared",
       store: storeA,
-      trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+      trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
         planningDraftId: "seoplan_race",
         decisionId: "seodec_race",
         researchRunId: "seorun_race",

@@ -21,13 +21,14 @@ import {
   L4B_PLANNING_LINEAGE_DDL_REGISTERED_WITH_ENSURE,
 } from "../lib/cms/seo-planning-lineage/schema-ddl";
 import {
-  archiveSeoPlanningDraftOnConnectionForTests,
-  executeTransactionalProtectedPermanentDelete,
-  executeTransactionalTrustedProceedAndLink,
+  executeTransactionalProtectedPermanentDelete as executeTransactionalProtectedPermanentDeleteProduction,
+  executeTransactionalTrustedProceedAndLink as executeTransactionalTrustedProceedAndLinkProduction,
 } from "../lib/cms/seo-planning-lineage/transactional-integration";
+import { archiveSeoPlanningDraftOnConnectionForTests } from "../lib/cms/seo-planning-lineage/transactional-execution";
 import {
-  createL4B6TestHarnessActivationForTests,
   createTrustedPlanningDecisionSelectionForTests,
+  executeTransactionalProtectedPermanentDeleteForTests,
+  executeTransactionalTrustedProceedAndLinkForTests,
 } from "./seo-planning-lineage-test-harness";
 import { createMysqlPlanningLineageStore } from "../lib/cms/seo-planning-lineage/mysql-store";
 import { CMS_SCHEMA_STATEMENTS } from "../lib/db/schema";
@@ -50,8 +51,6 @@ const {
 };
 
 type SqlParam = string | number | boolean | null | Date;
-
-const HARNESS = createL4B6TestHarnessActivationForTests();
 
 function assertDisposableTarget() {
   if (String(process.env.L4B6_MYSQL_INTEGRATION || "") !== "1") {
@@ -258,8 +257,7 @@ test("1–3. valid selection creates Planning + committed LINKED lineage", async
   const run = runRow("seorun_a1");
   const decision = decisionRow({ id: "seodec_a1", runId: "seorun_a1", topic, title });
 
-  const result = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const result = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_a1",
     opportunityIndex: 0,
@@ -298,8 +296,7 @@ test("4. forced link failure rolls back Planning creation", async () => {
   const run = runRow("seorun_r1");
   const decision = decisionRow({ id: "seodec_r1", runId: "seorun_r1", topic, title });
 
-  const result = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const result = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_r1",
     opportunityIndex: 0,
@@ -329,8 +326,7 @@ test("5. forced Planning-after-insert failure creates no link", async () => {
   const run = runRow("seorun_r2");
   const decision = decisionRow({ id: "seodec_r2", runId: "seorun_r2", topic, title });
 
-  const result = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const result = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_r2",
     opportunityIndex: 0,
@@ -358,7 +354,6 @@ test("6. same-pair retry is idempotent", async () => {
   const run = runRow("seorun_i1");
   const decision = decisionRow({ id: "seodec_i1", runId: "seorun_i1", topic, title });
   const args = {
-    activation: HARNESS,
     actor: { authorized: true, adminId: "admin_shared" as const },
     ledgerRunId: "seorun_i1",
     opportunityIndex: 0 as const,
@@ -368,9 +363,9 @@ test("6. same-pair retry is idempotent", async () => {
     createIdFn: () => "seoplan_i1",
     createLinkIdFn: () => "seoplink_i1",
   };
-  const first = await executeTransactionalTrustedProceedAndLink(args);
+  const first = await executeTransactionalTrustedProceedAndLinkForTests(args);
   assert.equal(first.ok, true);
-  const second = await executeTransactionalTrustedProceedAndLink({
+  const second = await executeTransactionalTrustedProceedAndLinkForTests({
     ...args,
     createIdFn: () => "seoplan_i1_other",
     createLinkIdFn: () => "seoplink_i1_other",
@@ -404,8 +399,7 @@ test("7. different-decision conflict rejected", async () => {
   });
   const d1 = decisionRow({ id: "seodec_c1", runId: "seorun_c1", topic, title });
   const d2 = decisionRow({ id: "seodec_c2", runId: "seorun_c2", topic, title });
-  const first = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const first = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_c1",
     opportunityIndex: 0,
@@ -417,8 +411,7 @@ test("7. different-decision conflict rejected", async () => {
   });
   assert.equal(first.ok, true);
 
-  const conflict = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const conflict = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_c2",
     opportunityIndex: 0,
@@ -459,8 +452,7 @@ test("8. existing unlinked draft does not silently relink", async () => {
     [fingerprint, topic, title, proposedSlug],
   );
 
-  const opened = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const opened = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_u1",
     opportunityIndex: 0,
@@ -489,8 +481,7 @@ test("10–12. archived blocked; forged/cross-account blocked; no false LINKED",
   const title = "Auth Title";
   await seedLedger({ runId: "seorun_x1", decisionId: "seodec_x1", topic, title });
 
-  const cross = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const cross = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_other" },
     ledgerRunId: "seorun_x1",
     opportunityIndex: 0,
@@ -502,8 +493,7 @@ test("10–12. archived blocked; forged/cross-account blocked; no false LINKED",
   });
   assert.equal(cross.ok, false);
 
-  const forged = await executeTransactionalTrustedProceedAndLink({
-    activation: { mode: "test-harness", allowDurableLineageWrites: true, allowProtectedDelete: true } as never,
+  const forged = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: false, adminId: "admin_shared" },
     ledgerRunId: "seorun_x1",
     opportunityIndex: 0,
@@ -516,6 +506,16 @@ test("10–12. archived blocked; forged/cross-account blocked; no false LINKED",
   assert.equal(forged.ok, false);
   if (!forged.ok) assert.notEqual(forged.linkageStatus, "LINKED");
 
+  // Production facade rejects any caller-provided "activation" object (closed entrypoint).
+  const productionDenied = await executeTransactionalTrustedProceedAndLinkProduction({
+    mode: "test-harness",
+    allowDurableLineageWrites: true,
+    allowProtectedDelete: true,
+    actor: { authorized: true, adminId: "admin_shared" },
+  });
+  assert.equal(productionDenied.ok, false);
+  if (!productionDenied.ok) assert.equal(productionDenied.errorCode, "ACTIVATION_DENIED");
+
   // Archived existing draft
   await exec(
     `INSERT INTO seo_planning_drafts (
@@ -527,8 +527,7 @@ test("10–12. archived blocked; forged/cross-account blocked; no false LINKED",
     )`,
     [topic, title],
   );
-  const archived = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const archived = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_x1",
     opportunityIndex: 0,
@@ -548,8 +547,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
   const topic = "Delete topic";
   const title = "Delete Title Token";
   await seedLedger({ runId: "seorun_d1", decisionId: "seodec_d1", topic, title });
-  const created = await executeTransactionalTrustedProceedAndLink({
-    activation: HARNESS,
+  const created = await executeTransactionalTrustedProceedAndLinkForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "seorun_d1",
     opportunityIndex: 0,
@@ -564,8 +562,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
   assert.equal(created.ok, true);
 
   // Active linked delete rejected
-  const activeDeny = await executeTransactionalProtectedPermanentDelete({
-    activation: HARNESS,
+  const activeDeny = await executeTransactionalProtectedPermanentDeleteForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     planningDraftId: "seoplan_d1",
     confirmation: title,
@@ -577,8 +574,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
   });
 
   // Linked archived delete rejected
-  const linkedDeny = await executeTransactionalProtectedPermanentDelete({
-    activation: HARNESS,
+  const linkedDeny = await executeTransactionalProtectedPermanentDeleteForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     planningDraftId: "seoplan_d1",
     confirmation: title,
@@ -615,8 +611,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
       'unlinked-delete-title', '{}', 'admin_shared', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP()
     )`,
   );
-  const deleted = await executeTransactionalProtectedPermanentDelete({
-    activation: HARNESS,
+  const deleted = await executeTransactionalProtectedPermanentDeleteForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     planningDraftId: "seoplan_ok",
     confirmation: "Unlinked Delete Title",
@@ -639,8 +634,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
       'bad-confirm', '{}', 'admin_shared', UTC_TIMESTAMP(), UTC_TIMESTAMP(), UTC_TIMESTAMP()
     )`,
   );
-  const badConfirm = await executeTransactionalProtectedPermanentDelete({
-    activation: HARNESS,
+  const badConfirm = await executeTransactionalProtectedPermanentDeleteForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     planningDraftId: "seoplan_bad",
     confirmation: "wrong",
@@ -649,8 +643,7 @@ test("13–18. protected delete policy + schema fail-closed", async () => {
 
   // Missing schema fail closed
   await exec(`DROP TABLE ${SEO_PLANNING_DECISION_LINKS_TABLE}`);
-  const missing = await executeTransactionalProtectedPermanentDelete({
-    activation: HARNESS,
+  const missing = await executeTransactionalProtectedPermanentDeleteForTests({
     actor: { authorized: true, adminId: "admin_shared" },
     planningDraftId: "seoplan_d1",
     confirmation: title,
@@ -686,7 +679,7 @@ test("19–21. concurrent link/delete integrity; Ledger history intact", async (
       decisionId: "seodec_race",
       actorAdminId: "admin_shared",
       store,
-      trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+      trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
         planningDraftId: "seoplan_race",
         decisionId: "seodec_race",
         researchRunId: "seorun_race",
@@ -694,8 +687,7 @@ test("19–21. concurrent link/delete integrity; Ledger history intact", async (
       }),
       createLinkId: () => "seoplink_race",
     }),
-    executeTransactionalProtectedPermanentDelete({
-      activation: HARNESS,
+    executeTransactionalProtectedPermanentDeleteForTests({
       actor: { authorized: true, adminId: "admin_shared" },
       planningDraftId: "seoplan_race",
       confirmation: title,
@@ -732,27 +724,29 @@ test("22–26. activation boundary, no live imports, A2-4B HOLD", async () => {
   const actions = readFileSync(path.join(root, "lib/cms/seo-planning-actions.ts"), "utf8");
   assert.doesNotMatch(actions, /executeTransactionalTrustedProceedAndLink/);
   assert.doesNotMatch(actions, /executeTransactionalProtectedPermanentDelete/);
-  assert.doesNotMatch(actions, /transactional-integration/);
+  assert.doesNotMatch(actions, /transactional-integration|transactional-execution/);
+  assert.doesNotMatch(actions, /seo-planning-lineage-test-harness|runTransactionalTrustedProceedAndLink/);
 
   const index = readFileSync(path.join(root, "lib/cms/seo-planning-lineage/index.ts"), "utf8");
-  assert.doesNotMatch(index, /transactional-integration/);
+  assert.doesNotMatch(index, /from\s+["'][^"']*transactional-integration/);
+  assert.doesNotMatch(index, /from\s+["'][^"']*transactional-execution/);
   assert.doesNotMatch(index, /createMysqlPlanningLineageStore/);
 
-  const badActivation = await executeTransactionalTrustedProceedAndLink({
-    activation: { mode: "production" } as never,
+  const badActivation = await executeTransactionalTrustedProceedAndLinkProduction({
+    mode: "production",
     actor: { authorized: true, adminId: "admin_shared" },
     ledgerRunId: "x",
     opportunityIndex: 0,
-    editorialSupplemental: editorial,
-    ledgerReader: {
-      async getSeoResearchRunDetail() {
-        return { ok: false, errorCode: "not_found", errorMessage: "missing" };
-      },
-    },
-    catalog: emptyCatalog(),
   });
   assert.equal(badActivation.ok, false);
   if (!badActivation.ok) assert.equal(badActivation.errorCode, "ACTIVATION_DENIED");
+
+  const deleteDenied = await executeTransactionalProtectedPermanentDeleteProduction({
+    allowProtectedDelete: true,
+    planningDraftId: "seoplan_x",
+  });
+  assert.equal(deleteDenied.ok, false);
+  if (!deleteDenied.ok) assert.equal(deleteDenied.errorCode, "ACTIVATION_DENIED");
 
   const proceedSrc = readFileSync(
     path.join(root, "lib/cms/seo-planning-lineage/proceed-integration.ts"),
@@ -766,6 +760,7 @@ test("22–26. activation boundary, no live imports, A2-4B HOLD", async () => {
   );
   assert.doesNotMatch(txSrc, /requestOpenAi|querySearchAnalytics|ensureCmsSchemaCurrent/);
   assert.match(txSrc, /import ["']server-only["']/);
+  assert.match(txSrc, /ACTIVATION_DENIED/);
 });
 
 test("cleanup: end pool", async () => {

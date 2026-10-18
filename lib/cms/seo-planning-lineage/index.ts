@@ -76,7 +76,8 @@ export {
   trustedSelectionMatchesLocators,
   type TrustedPlanningDecisionSelection,
 } from "@/lib/cms/seo-planning-lineage/selection";
-// Test-only selection minting helpers stay off this barrel (deep-import only).
+// Test-only fixtures stay under tools/ (not re-exported here).
+// The ungated transactional execution module is intentionally omitted from this barrel.
 
 export {
   attemptEstablishPlanningDecisionLink,

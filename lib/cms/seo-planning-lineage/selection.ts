@@ -6,6 +6,8 @@
  * same-request PreparedResearchProceedSelection (L4B-2) plus a Planning draft id.
  *
  * WeakSet registry is process-local and NOT durable across HTTP requests/workers.
+ * Only tryMintTrustedPlanningDecisionSelection may register membership.
+ * There is no exported registrar or test issuer.
  * Never serialize minted objects to the browser.
  */
 
@@ -25,19 +27,8 @@ export type TrustedPlanningDecisionSelection = {
   readonly boundAt: string;
 };
 
-/** Runtime registry of server-minted selections (not serializable across processes). */
+/** Production-only registry — not shared with test fixtures. */
 const mintedSelections = new WeakSet<object>();
-
-/**
- * Process-local test gates. Membership — not object shape — authorizes test minting.
- * Plain `{ _lineageSelectionTestGate: true }` forgeries never pass.
- */
-const authorizedSelectionTestGates = new WeakSet<object>();
-
-/** Opaque test-only gate. Not a production trust authority. */
-export type LineageSelectionTestGate = {
-  readonly _lineageSelectionTestGate: true;
-};
 
 function trimField(value: unknown, max: number): string {
   return sanitizeText(value, max).replace(/\s+/g, " ").trim();
@@ -114,62 +105,6 @@ export function tryMintTrustedPlanningDecisionSelection(args: {
   };
   mintedSelections.add(selection);
   return { ok: true, selection };
-}
-
-/**
- * Restrict issuer/mint helpers to the tools test-harness module.
- * Deep imports from CMS actions/app code fail closed (stack must name the harness file).
- */
-function assertCalledFromLineageTestHarness(apiName: string): void {
-  const stack = new Error().stack ?? "";
-  if (!/seo-planning-lineage-test-harness\.(ts|js|cjs|mjs)/i.test(stack)) {
-    throw new Error(
-      `${apiName} is restricted to tools/seo-planning-lineage-test-harness and is not a production API.`,
-    );
-  }
-}
-
-/**
- * Issue a process-local selection test gate (WeakSet-registered).
- * NOT re-exported from the production lineage barrel (`index.ts`).
- * Callable successfully only via {@link assertCalledFromLineageTestHarness}.
- * Forged plain objects cannot satisfy {@link mintTrustedPlanningDecisionSelectionWithTestGate}.
- */
-export function issueLineageSelectionTestGate(): LineageSelectionTestGate {
-  assertCalledFromLineageTestHarness("issueLineageSelectionTestGate");
-  const gate: LineageSelectionTestGate = { _lineageSelectionTestGate: true };
-  authorizedSelectionTestGates.add(gate);
-  return gate;
-}
-
-/**
- * Mint a trusted selection only when `gate` is a live WeakSet-registered test gate.
- * NOT re-exported from the production lineage barrel (`index.ts`).
- * Callable successfully only via the tools test-harness module.
- */
-export function mintTrustedPlanningDecisionSelectionWithTestGate(
-  gate: LineageSelectionTestGate,
-  args: {
-    planningDraftId: string;
-    decisionId: string;
-    researchRunId: string;
-    actorAdminId: string;
-    boundAt?: string;
-  },
-): TrustedPlanningDecisionSelection {
-  assertCalledFromLineageTestHarness("mintTrustedPlanningDecisionSelectionWithTestGate");
-  if (!authorizedSelectionTestGates.has(gate as object)) {
-    throw new Error("Lineage selection test gate is invalid or forged.");
-  }
-  const selection: TrustedPlanningDecisionSelection = {
-    planningDraftId: trimField(args.planningDraftId, SEO_PLANNING_LINEAGE_CAPS.id),
-    decisionId: trimField(args.decisionId, SEO_PLANNING_LINEAGE_CAPS.id),
-    researchRunId: trimField(args.researchRunId, SEO_PLANNING_LINEAGE_CAPS.id),
-    actorAdminId: trimField(args.actorAdminId, SEO_PLANNING_LINEAGE_CAPS.adminId),
-    boundAt: args.boundAt || new Date().toISOString(),
-  };
-  mintedSelections.add(selection);
-  return selection;
 }
 
 export function trustedSelectionMatchesLocators(

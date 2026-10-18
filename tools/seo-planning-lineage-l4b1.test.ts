@@ -188,15 +188,17 @@ function seeded(extra?: Partial<MemoryState>): MemoryState {
   };
 }
 
-function trusted(state: MemoryState) {
+async function trusted(state: MemoryState) {
   const d = [...state.drafts.values()][0]!;
   const dec = [...state.decisions.values()][0]!;
   const r = [...state.runs.values()][0]!;
-  return createTrustedPlanningDecisionSelectionForTests({
+  return await createTrustedPlanningDecisionSelectionForTests({
     planningDraftId: d.id,
     decisionId: dec.id,
     researchRunId: r.id,
     actorAdminId: "admin_1",
+    topic: dec.topic,
+    workingTitle: dec.workingTitle,
   });
 }
 
@@ -205,7 +207,7 @@ function trusted(state: MemoryState) {
 test("1. schema: unique Planning link enforced by store UNIQUE semantics", async () => {
   const state = seeded();
   const store = memoryStore(state);
-  const selection = trusted(state);
+  const selection = await trusted(state);
   const first = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_l4b1",
     decisionId: "seodec_1",
@@ -228,7 +230,7 @@ test("1. schema: unique Planning link enforced by store UNIQUE semantics", async
     decisionId: "seodec_2",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_2",
       researchRunId: "seorun_1",
@@ -249,7 +251,7 @@ test("2. schema: unique decision association enforced", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   state.drafts.set("seoplan_other", draft({ id: "seoplan_other", fingerprint: "NEW_BLOG:other" }));
   const conflict = await attemptEstablishPlanningDecisionLink({
@@ -257,7 +259,7 @@ test("2. schema: unique decision association enforced", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_other",
       decisionId: "seodec_1",
       researchRunId: "seorun_1",
@@ -278,7 +280,7 @@ test("3. schema: FK integrity — missing draft/decision rejects insert path", a
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_1",
       researchRunId: "seorun_1",
@@ -318,7 +320,7 @@ test("5. existing Ledger history remains intact (no decision mutation)", async (
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store: memoryStore(state),
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   assert.deepEqual(state.decisions.get("seodec_1"), before);
   assert.equal(state.drafts.get("seoplan_l4b1")?.payload.opportunity != null, true);
@@ -349,7 +351,7 @@ test("7. valid authoritative relationship passes with trusted selection", async 
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store: memoryStore(state),
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   assert.equal(result.ok, true);
   if (!result.ok) return;
@@ -360,7 +362,7 @@ test("7. valid authoritative relationship passes with trusted selection", async 
 
 test("8. missing Planning draft rejected", async () => {
   const state = seeded();
-  const selection = trusted(state);
+  const selection = await trusted(state);
   state.drafts.clear();
   const result = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_l4b1",
@@ -376,7 +378,7 @@ test("8. missing Planning draft rejected", async () => {
 
 test("9. archived Planning rejected", async () => {
   const state = seeded();
-  const selection = trusted(state);
+  const selection = await trusted(state);
   state.drafts.set("seoplan_l4b1", draft({ archivedAt: "2026-10-07T00:00:00.000Z" }));
   const result = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_l4b1",
@@ -392,7 +394,7 @@ test("9. archived Planning rejected", async () => {
 
 test("10. missing decision/run rejected", async () => {
   const state = seeded();
-  const selection = trusted(state);
+  const selection = await trusted(state);
   state.decisions.clear();
   const result = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_l4b1",
@@ -493,7 +495,7 @@ test("15. unauthorized / different-owner selection rejected", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_other",
     store: memoryStore(state),
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_1",
       researchRunId: "seorun_1",
@@ -509,7 +511,7 @@ test("15. unauthorized / different-owner selection rejected", async () => {
 test("16. same-pair replay is idempotent", async () => {
   const state = seeded();
   const store = memoryStore(state);
-  const selection = trusted(state);
+  const selection = await trusted(state);
   const first = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_l4b1",
     decisionId: "seodec_1",
@@ -541,7 +543,7 @@ test("17. conflicting second link rejected", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   state.decisions.set(
     "seodec_2",
@@ -558,7 +560,7 @@ test("17. conflicting second link rejected", async () => {
     decisionId: "seodec_2",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_2",
       researchRunId: "seorun_1",
@@ -573,7 +575,7 @@ test("17. conflicting second link rejected", async () => {
 test("18. simulated concurrent conflict does not produce two authoritative links", async () => {
   const state = seeded();
   const store = memoryStore(state);
-  const selection = trusted(state);
+  const selection = await trusted(state);
 
   // Pre-insert competing link between validation and write simulation via race:
   // first writer succeeds; second hits UNIQUE.
@@ -628,7 +630,7 @@ test("18. simulated concurrent conflict does not produce two authoritative links
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store: racingStore,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_1",
       researchRunId: "seorun_1",
@@ -640,7 +642,7 @@ test("18. simulated concurrent conflict does not produce two authoritative links
     decisionId: "seodec_2",
     actorAdminId: "admin_1",
     store: racingStore,
-    trustedSelection: createTrustedPlanningDecisionSelectionForTests({
+    trustedSelection: await createTrustedPlanningDecisionSelectionForTests({
       planningDraftId: "seoplan_l4b1",
       decisionId: "seodec_2",
       researchRunId: "seorun_1",
@@ -662,7 +664,7 @@ test("19. valid linked Planning resolves to expected decision", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   const resolved = await resolvePlanningDecisionLineage({
     planningDraftId: "seoplan_l4b1",
@@ -695,7 +697,7 @@ test("21. missing schema produces sanitized unavailable response", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store: memoryStore(state),
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   assert.equal(write.ok, false);
   if (write.ok) return;
@@ -730,7 +732,7 @@ test("23. no broad scans — bounded read calls on resolve", async () => {
     decisionId: "seodec_1",
     actorAdminId: "admin_1",
     store,
-    trustedSelection: trusted(state),
+    trustedSelection: await trusted(state),
   });
   state.readCalls = 0;
   await resolvePlanningDecisionLineage({

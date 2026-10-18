@@ -188,7 +188,7 @@ async function seedRunDecisionPlanning(args: {
   );
 }
 
-function trusted(args: {
+async function trusted(args: {
   planningDraftId: string;
   decisionId: string;
   researchRunId: string;
@@ -311,7 +311,7 @@ test("4–5. unique Planning and decision constraints", async () => {
     decisionId: "seodec_u1",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_u1",
       decisionId: "seodec_u1",
       researchRunId: "seorun_u1",
@@ -326,7 +326,7 @@ test("4–5. unique Planning and decision constraints", async () => {
     decisionId: "seodec_u2",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_u1",
       decisionId: "seodec_u2",
       researchRunId: "seorun_u2",
@@ -342,7 +342,7 @@ test("4–5. unique Planning and decision constraints", async () => {
     decisionId: "seodec_u1",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_u2",
       decisionId: "seodec_u1",
       researchRunId: "seorun_u1",
@@ -374,7 +374,7 @@ test("6. valid transaction commit creates one link", async () => {
     decisionId: "seodec_c1",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_c1",
       decisionId: "seodec_c1",
       researchRunId: "seorun_c1",
@@ -399,7 +399,7 @@ test("7. same-pair idempotency", async () => {
     decisionId: "seodec_c1",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_c1",
       decisionId: "seodec_c1",
       researchRunId: "seorun_c1",
@@ -451,7 +451,7 @@ test("8. conflicting association rejection", async () => {
     decisionId: "seodec_c2",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_c1",
       decisionId: "seodec_c2",
       researchRunId: "seorun_c2",
@@ -481,7 +481,7 @@ test("9. cross-connection concurrent same-pair → exactly one link", async () =
       decisionId: "seodec_race",
       actorAdminId: "admin_shared",
       store: storeA,
-      trustedSelection: trusted({
+      trustedSelection: await trusted({
         planningDraftId: "seoplan_race",
         decisionId: "seodec_race",
         researchRunId: "seorun_race",
@@ -493,7 +493,7 @@ test("9. cross-connection concurrent same-pair → exactly one link", async () =
       decisionId: "seodec_race",
       actorAdminId: "admin_shared",
       store: storeB,
-      trustedSelection: trusted({
+      trustedSelection: await trusted({
         planningDraftId: "seoplan_race",
         decisionId: "seodec_race",
         researchRunId: "seorun_race",
@@ -563,7 +563,7 @@ test("9b. concurrent conflicting A/X vs A/Y → at most one decision association
       decisionId: "seodec_cx",
       actorAdminId: "admin_shared",
       store: storeA,
-      trustedSelection: trusted({
+      trustedSelection: await trusted({
         planningDraftId: "seoplan_cx",
         decisionId: "seodec_cx",
         researchRunId: "seorun_cx",
@@ -575,7 +575,7 @@ test("9b. concurrent conflicting A/X vs A/Y → at most one decision association
       decisionId: "seodec_cy",
       actorAdminId: "admin_shared",
       store: storeB,
-      trustedSelection: trusted({
+      trustedSelection: await trusted({
         planningDraftId: "seoplan_cx",
         decisionId: "seodec_cy",
         researchRunId: "seorun_cy",
@@ -613,7 +613,7 @@ test("10. transaction rollback on failure leaves no partial link", async () => {
     decisionId: "seodec_rb",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_rb",
       decisionId: "seodec_rb",
       researchRunId: "seorun_rb",
@@ -648,7 +648,7 @@ test("11. missing parent records rejected", async () => {
     decisionId: "seodec_rb",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_missing",
       decisionId: "seodec_rb",
       researchRunId: "seorun_rb",
@@ -675,7 +675,7 @@ test("12. archiving a linked Planning draft remains possible", async () => {
     decisionId: "seodec_ar",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_ar",
       decisionId: "seodec_ar",
       researchRunId: "seorun_ar",
@@ -782,7 +782,7 @@ test("15. incomplete Pipeline snapshot remains non-ready (INCOMPLETE flag on res
     decisionId: "seodec_inc",
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_inc",
       decisionId: "seodec_inc",
       researchRunId: "seorun_inc",
@@ -841,14 +841,16 @@ test("16. trusted selection remains mandatory — no client decision-id write", 
 
 test("17. sanitized errors — no SQL secrets in establish failure path", async () => {
   const store = createMysqlPlanningLineageStore();
+  // Valid decision-id shape that is absent from disposable MySQL (underscores are invalid).
+  const missingDecisionId = "seodec_missingdec";
   const result = await attemptEstablishPlanningDecisionLink({
     planningDraftId: "seoplan_trust",
-    decisionId: "seodec_missing_dec",
+    decisionId: missingDecisionId,
     actorAdminId: "admin_shared",
     store,
-    trustedSelection: trusted({
+    trustedSelection: await trusted({
       planningDraftId: "seoplan_trust",
-      decisionId: "seodec_missing_dec",
+      decisionId: missingDecisionId,
       researchRunId: "seorun_trust",
     }),
   });
