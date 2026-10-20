@@ -61,6 +61,7 @@ import {
   type DisplayedResearchOpportunitySnapshot,
   type ResearchProceedLedgerReader,
 } from "@/lib/cms/seo-planning-lineage/research-proceed-selection";
+import { createFencedPlanningWriteTransactionFn } from "@/lib/cms/seo-planning-lineage/planning-write-fence-auth";
 import { L4B_PLANNING_LINEAGE_DDL_REGISTERED_WITH_ENSURE } from "@/lib/cms/seo-planning-lineage/schema-ddl";
 import {
   isTrustedPlanningDecisionSelection,
@@ -71,6 +72,15 @@ import { mysqlDuplicateError } from "@/lib/cms/slug-change";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 import { sanitizeText } from "@/lib/cms/validation";
 import { withTransaction } from "@/lib/db/pool";
+
+/**
+ * Optional local fence-bridge injection for disposable MySQL / tools harness.
+ * Production facade (transactional-integration) never supplies this.
+ * When set, Planning DML runs under session-marker authorization on one connection.
+ */
+export type PlanningWriteFenceExecutionOptions = {
+  token: string;
+};
 
 export const L4B6_TRANSACTIONAL_EXECUTION_VERSION = "l4b6-v1" as const;
 
@@ -153,6 +163,11 @@ export async function runTransactionalTrustedProceedAndLink(args: {
   createIdFn?: (prefix?: string) => string;
   createLinkIdFn?: () => string;
   withTransactionFn?: typeof withTransaction;
+  /**
+   * When set (tools/disposable only), use fenced session-auth transaction helper.
+   * Ignored when withTransactionFn is also provided (caller owns TX boundary).
+   */
+  planningWriteFence?: PlanningWriteFenceExecutionOptions;
   /** Test hook: throw after Planning insert, before link — must roll back draft. */
   failAfterPlanningInsert?: boolean;
   /** Test hook: throw inside link insert path. */
@@ -261,7 +276,14 @@ export async function runTransactionalTrustedProceedAndLink(args: {
   }
 
   const now = args.now || new Date().toISOString();
-  const tx = args.withTransactionFn ?? withTransaction;
+  const tx =
+    args.withTransactionFn ??
+    (args.planningWriteFence
+      ? createFencedPlanningWriteTransactionFn({
+          token: args.planningWriteFence.token,
+          trustedOperation: "transactional_proceed_link",
+        })
+      : withTransaction);
   const summary = summarizePreparedResearchProceedSelection(preparation);
 
   try {
@@ -494,6 +516,7 @@ export async function runTransactionalProtectedPermanentDelete(args: {
   planningDraftId: unknown;
   confirmation: unknown;
   withTransactionFn?: typeof withTransaction;
+  planningWriteFence?: PlanningWriteFenceExecutionOptions;
   lineageProtectionActive?: boolean;
 }): Promise<TransactionalProtectedDeleteResult> {
   const adminId = trimField(args.actor?.adminId, SEO_PLANNING_LINEAGE_CAPS.adminId);
@@ -519,7 +542,14 @@ export async function runTransactionalProtectedPermanentDelete(args: {
   }
 
   const protectionActive = args.lineageProtectionActive !== false;
-  const tx = args.withTransactionFn ?? withTransaction;
+  const tx =
+    args.withTransactionFn ??
+    (args.planningWriteFence
+      ? createFencedPlanningWriteTransactionFn({
+          token: args.planningWriteFence.token,
+          trustedOperation: "transactional_protected_delete",
+        })
+      : withTransaction);
 
   try {
     return await tx(async (conn: PoolConnection) => {

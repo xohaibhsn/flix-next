@@ -25,6 +25,7 @@ import {
   type ProceedOpportunityInput,
 } from "@/lib/cms/seo-planning/sanitize";
 import { slugify } from "@/lib/cms/slug";
+import { classifyPlanningFenceError } from "@/lib/cms/seo-planning-lineage/planning-write-fence-errors";
 import { mysqlDuplicateError } from "@/lib/cms/slug-change";
 import type { BlogPost, CmsPage, BlogCategory, RedirectRule, SeoPlanningDraft } from "@/lib/cms/types";
 
@@ -37,6 +38,8 @@ export type ProceedSeoPlanningSuccess = {
 export type ProceedSeoPlanningFailure = {
   ok: false;
   error: string;
+  /** Stable fence / control code when applicable — never SQL internals. */
+  code?: string;
 };
 
 export type ProceedSeoPlanningResult = ProceedSeoPlanningSuccess | ProceedSeoPlanningFailure;
@@ -327,6 +330,10 @@ export async function proceedSeoOpportunityToPlanningDraft(args: {
         }
         return { ok: true, id: raced.id, created: false };
       }
+    }
+    const fenced = classifyPlanningFenceError(error);
+    if (fenced) {
+      return { ok: false, error: fenced.message, code: fenced.code };
     }
     return {
       ok: false,

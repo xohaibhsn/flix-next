@@ -999,16 +999,35 @@ test("SOURCE GUARDS: CMS schema version baseline unchanged from this RC's expect
   assert.equal(CURRENT_CMS_SCHEMA_VERSION, 6);
 });
 
-test("SOURCE GUARDS: no seo-autonomy or seo-planning-lineage paths exist in this RC", () => {
+test("SOURCE GUARDS: A1 Preview stays free of autonomy/Apply/ungated transactional writers", () => {
+  // seo-autonomy and flat lineage entry files must stay absent.
   assert.equal(fileExists("lib/cms/seo-autonomy"), false);
   assert.equal(fileExists("lib/cms/seo-planning/seo-planning-lineage.ts"), false);
   assert.equal(fileExists("lib/cms/seo-planning-lineage.ts"), false);
-  for (const src of [
-    read("lib/cms/seo-planning-actions.ts"),
-    read("lib/cms/seo-planning/article-generation.ts"),
-    read("components/sidhu/SeoPlanningArticleGeneration.tsx"),
-  ]) {
-    assert.doesNotMatch(src, /seo-autonomy|seo-planning-lineage/);
+
+  const actions = read("lib/cms/seo-planning-actions.ts");
+  const articleMod = read("lib/cms/seo-planning/article-generation.ts");
+  const ui = read("components/sidhu/SeoPlanningArticleGeneration.tsx");
+
+  // Approved writers-OFF dispatch only (GitHub main already wires this).
+  assert.match(
+    actions,
+    /from ["']@\/lib\/cms\/seo-planning-lineage\/live-wiring-dispatch["']/,
+  );
+  assert.doesNotMatch(actions, /seo-autonomy/);
+  assert.doesNotMatch(actions, /transactional-execution/);
+  assert.doesNotMatch(actions, /planning-write-fence-auth/);
+  assert.doesNotMatch(actions, /planning-write-fence-ddl/);
+  assert.doesNotMatch(actions, /applyGeneratedArticleToNewBlogDraftAction/);
+  assert.doesNotMatch(actions, /applyGeneratedArticleToPrivateBlogDraft/);
+
+  // Article generation + UI remain isolated from lineage activation / Apply.
+  for (const src of [articleMod, ui]) {
+    assert.doesNotMatch(src, /seo-autonomy/);
+    assert.doesNotMatch(src, /seo-planning-lineage/);
+    assert.doesNotMatch(src, /transactional-execution/);
+    assert.doesNotMatch(src, /applyGeneratedArticleToNewBlogDraftAction/);
+    assert.doesNotMatch(src, /applyGeneratedArticleToPrivateBlogDraft/);
   }
 });
 

@@ -43,6 +43,7 @@ import {
   confirmSeoPlanningPermanentDelete,
   SEO_PLANNING_MISSING_DRAFT_MESSAGE,
 } from "@/lib/cms/seo-planning/lifecycle";
+import { classifyPlanningFenceError } from "@/lib/cms/seo-planning-lineage/planning-write-fence-errors";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 
 export const LIVE_WIRING_PREP_VERSION = "l4b-live-wiring-prep-v1" as const;
@@ -150,7 +151,7 @@ export async function dispatchSidhuProceedToPlanning(args: {
 
 export type SidhuPermanentDeleteDispatchResult =
   | { ok: true }
-  | { ok: false; error: string };
+  | { ok: false; error: string; code?: string };
 
 /**
  * Production permanent-delete dispatch — legacy archive/confirm/catalog delete.
@@ -178,7 +179,11 @@ export async function dispatchSidhuPermanentDelete(args: {
 
   try {
     return await args.deletePermanently(args.planningDraftId);
-  } catch {
+  } catch (error) {
+    const fenced = classifyPlanningFenceError(error);
+    if (fenced) {
+      return { ok: false, error: fenced.message, code: fenced.code };
+    }
     // Includes MySQL FK RESTRICT (ER_ROW_IS_REFERENCED_2 / errno 1451) when a
     // lineage row blocks parent delete — fail closed, sanitized, no unlink.
     return {
