@@ -124,3 +124,28 @@ export {
   type ResearchProceedIntegrationSuccess,
   type ResearchProceedLinkageStatus,
 } from "@/lib/cms/seo-planning-lineage/proceed-integration";
+
+/** Physical readiness + worker-overlap are pure/DI — not transactional writers. */
+export {
+  L4B_PHYSICAL_SCHEMA_READINESS_VERSION,
+  LINEAGE_PHYSICAL_READINESS_STATUSES,
+  LINEAGE_PHYSICAL_SCHEMA_EXPECTATIONS,
+  assessLineagePhysicalSchemaReadiness,
+  lineagePhysicalReadinessInvocationPolicy,
+  type LineagePhysicalReadinessResult,
+  type LineagePhysicalReadinessStatus,
+  type LineagePhysicalSchemaMetadataReader,
+} from "@/lib/cms/seo-planning-lineage/physical-schema-readiness";
+
+export {
+  L4B_WORKER_OVERLAP_ANALYSIS_VERSION,
+  L4B_WORKER_OVERLAP_MATRIX,
+  classifyWorkerOverlap,
+  describeCurrentRolloutStage,
+  type WorkerOverlapCell,
+  type WorkerOverlapVerdict,
+  type WorkerProceedMode,
+} from "@/lib/cms/seo-planning-lineage/worker-overlap-compatibility";
+
+// transactional-integration / live-wiring-dispatch / transactional-execution
+// remain intentionally omitted from this barrel.

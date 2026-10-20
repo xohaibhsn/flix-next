@@ -825,7 +825,8 @@ test("Planning list/detail admin UI has no publish/create/restore actions", () =
   assert.match(detail, /Private planning draft/);
   assert.match(detail, /Not published/);
   for (const src of [list, detail, listPage, detailPage]) {
-    assert.doesNotMatch(src, /\bPublish\b|Create Blog|savePost|Restore now|saveRedirect/);
+    // Ban publish/create-post wording; allow intentional handoff CTA "Create Blog Draft".
+    assert.doesNotMatch(src, /\bPublish\b|Create Blog(?! Draft)|savePost|Restore now|saveRedirect/);
   }
 
   const draft: SeoPlanningDraft = {
@@ -869,7 +870,9 @@ test("Planning list/detail admin UI has no publish/create/restore actions", () =
   );
   assert.match(listHtml, /Demo title/);
   assert.match(detailHtml, /Private planning draft/);
-  assert.doesNotMatch(detailHtml, /\bPublish\b|Create Blog|Restore now/);
+  // "Create Blog Draft" is the intentional Content Handoff CTA (private draft, not publish).
+  assert.match(detailHtml, /Create Blog Draft/);
+  assert.doesNotMatch(detailHtml, /\bPublish\b|Create Blog(?! Draft)|Restore now/);
 });
 
 test("Planning has no public blog/sitemap surface", () => {

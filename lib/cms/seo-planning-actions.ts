@@ -21,10 +21,12 @@ import {
   SEO_PLANNING_HANDOFF_BLOG_PERMISSION_MESSAGE,
   type SeoPlanningHandoffResult,
 } from "@/lib/cms/seo-planning/handoff";
+import type { ProceedSeoPlanningResult } from "@/lib/cms/seo-planning/proceed";
 import {
-  proceedSeoOpportunityToPlanningDraft,
-  type ProceedSeoPlanningResult,
-} from "@/lib/cms/seo-planning/proceed";
+  dispatchSidhuPermanentDelete,
+  dispatchSidhuProceedToPlanning,
+  ignoreClientSuppliedLiveWiringFlags,
+} from "@/lib/cms/seo-planning-lineage/live-wiring-dispatch";
 import {
   applySeoPlanningSuggestionCommand,
   parseSeoPlanningSuggestionInput,
@@ -40,7 +42,6 @@ import {
   type GenerateChatgptWritingPromptResult,
 } from "@/lib/cms/seo-planning/writing-prompt";
 import {
-  confirmSeoPlanningPermanentDelete,
   isSeoPlanningArchivedMutationError,
   isSeoPlanningDraftArchived,
   parseSeoPlanningLifecycleId,
@@ -135,7 +136,10 @@ export async function proceedSeoOpportunityToPlanningDraftAction(
     return { ok: false, error: "Opportunity data is missing." };
   }
 
-  return proceedSeoOpportunityToPlanningDraft({
+  // Client activation/lineage claims are ignored — OFF dispatch stays manual Proceed.
+  ignoreClientSuppliedLiveWiringFlags(input);
+
+  return dispatchSidhuProceedToPlanning({
     rawOpportunity: input.opportunity,
     rawSources: input.sources,
     rawGscMeta: input.gsc,
@@ -581,20 +585,22 @@ export async function deleteSeoPlanningDraftPermanentlyAction(
   const frozen = rejectIfCmsWriteFrozen();
   if (frozen) return frozen;
 
+  ignoreClientSuppliedLiveWiringFlags(rawInput);
+
   const parsed = parseSeoPlanningPermanentDeleteInput(rawInput);
   if (!parsed.ok) return parsed;
 
   const stored = await cms.getSeoPlanningDraftById(parsed.id);
   if (!stored) return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
 
-  const confirmed = confirmSeoPlanningPermanentDelete(stored, parsed.confirmation);
-  if (!confirmed.ok) return confirmed;
-
-  try {
-    return await cms.deleteSeoPlanningDraftPermanently(parsed.id);
-  } catch {
-    return { ok: false, error: "Could not permanently delete the planning draft. Please try again." };
-  }
+  // OFF: legacy permanent-delete via dispatch (no lineage protection activation).
+  // Confirmation is applied inside dispatch to preserve a single policy boundary.
+  return dispatchSidhuPermanentDelete({
+    planningDraftId: parsed.id,
+    confirmation: parsed.confirmation,
+    draft: stored,
+    deletePermanently: (id) => cms.deleteSeoPlanningDraftPermanently(id),
+  });
 }
 
 function articleGenerationCatalog() {
