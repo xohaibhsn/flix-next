@@ -1,5 +1,6 @@
 import type {
   CatalogRepository,
+  MergeSeoPlanningEditorialEvidenceResult,
   MergeSeoPlanningImagePromptResult,
   MergeSeoPlanningWritingPromptResult,
   SeoPlanningPromptAcceptReaders,
@@ -45,6 +46,14 @@ import {
   type WritingPromptCacheEntry,
   type WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import {
+  fingerprintEditorialEvidenceFromPayload,
+  isSeoPlanningEditorialEvidenceRevisionToken,
+  mergeEditorialEvidenceIntoPayload,
+  preserveLockedEditorialEvidenceInPayload,
+  type SeoPlanningEditorialEvidenceV1,
+} from "@/lib/cms/seo-planning/editorial-evidence";
+import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -358,8 +367,11 @@ export class JsonCatalogRepository implements CatalogRepository {
       if (existing) {
         // Final boundary: ordinary save cannot clear Archive or mutate archived drafts.
         assertSeoPlanningDraftMutableForOrdinarySave(existing);
+        // Preserve concurrent editorialEvidenceV1 merges — only the evidence merge API may change it.
+        const payload = preserveLockedEditorialEvidenceInPayload(existing.payload, safe.payload);
         const toWrite = sanitizeSeoPlanningDraft({
           ...safe,
+          payload,
           // Preserve authoritative lifecycle; only Restore may clear archivedAt.
           archivedAt: existing.archivedAt ?? null,
         });
@@ -528,6 +540,53 @@ export class JsonCatalogRepository implements CatalogRepository {
         return { ok: true, draft: nextDraft };
       }),
     );
+  }
+  async mergeSeoPlanningEditorialEvidence(args: {
+    id: string;
+    expectedEvidenceRevision: string;
+    evidence: SeoPlanningEditorialEvidenceV1 | null;
+  }): Promise<MergeSeoPlanningEditorialEvidenceResult> {
+    const id = String(args.id || "").trim();
+    const expected = String(args.expectedEvidenceRevision || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+    // Arbitrary client tokens are not authenticity proofs — format + locked-row SHA-256 match required.
+    if (!isSeoPlanningEditorialEvidenceRevisionToken(expected)) {
+      return { ok: false, reason: "rejected" };
+    }
+
+    // Process-local Planning lock only — no cross-process CAS claim for JSON catalog.
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.#readAllSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === id);
+      if (index < 0) return { ok: false, reason: "not_found" };
+
+      const latest = items[index]!;
+      if (latest.archivedAt) return { ok: false, reason: "archived" };
+      if (!isSeoPlanningActionableRecommendation(latest.recommendation)) {
+        return { ok: false, reason: "immutable" };
+      }
+
+      // Authoritative CAS: recompute SHA-256 of locked-row evidence; reject before mutation.
+      const currentRevision = fingerprintEditorialEvidenceFromPayload(latest.payload);
+      if (currentRevision !== expected) {
+        return { ok: false, reason: "stale" };
+      }
+
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
+      const updatedAt = new Date().toISOString();
+      const nextDraft = sanitizeSeoPlanningDraft({
+        ...latest,
+        payload: nextPayload,
+        updatedAt,
+      });
+      const next = items.map((item, i) => (i === index ? nextDraft : item));
+      await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true, draft: nextDraft };
+    });
   }
   async handoffSeoPlanningToBlog(planningDraftId: string): Promise<SeoPlanningHandoffResult> {
     const id = String(planningDraftId || "").trim();

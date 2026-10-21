@@ -6,6 +6,7 @@ import type {
   WritingPromptCacheEntry,
   WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import type { SeoPlanningEditorialEvidenceV1 } from "@/lib/cms/seo-planning/editorial-evidence";
 import type { SeoPlanningHandoffResult } from "@/lib/cms/seo-planning/handoff";
 import type {
   BlogCategory,
@@ -30,6 +31,14 @@ export type MergeSeoPlanningGeminiWritingPromptResult = MergeSeoPlanningWritingP
 export type MergeSeoPlanningImagePromptResult =
   | { ok: true; draft: SeoPlanningDraft }
   | { ok: false; reason: "not_found" | "rejected" };
+
+/** Result of an atomic Planning editorial-evidence payload merge (CAS on evidence revision). */
+export type MergeSeoPlanningEditorialEvidenceResult =
+  | { ok: true; draft: SeoPlanningDraft }
+  | {
+      ok: false;
+      reason: "not_found" | "archived" | "stale" | "immutable" | "rejected";
+    };
 
 /**
  * Transaction/lock-scoped article readers for final Planning prompt write-boundary validation.
@@ -129,6 +138,19 @@ export interface CatalogRepository {
       readers: SeoPlanningImagePromptAcceptReaders,
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningImagePromptResult>;
+  /**
+   * Atomic editorial-evidence write: re-read latest under write lock/transaction,
+   * compare expectedEvidenceRevision (SHA-256 of canonical evidence) to the
+   * locked-row fingerprint, then merge ONLY payload.editorialEvidenceV1 (or clear).
+   * Does not change recommendation, workflow, Blog links, or other payload siblings.
+   * MySQL: SELECT … FOR UPDATE on the same connection as the UPDATE.
+   * JSON: process-local Planning write lock only (no cross-process CAS).
+   */
+  mergeSeoPlanningEditorialEvidence(args: {
+    id: string;
+    expectedEvidenceRevision: string;
+    evidence: SeoPlanningEditorialEvidenceV1 | null;
+  }): Promise<MergeSeoPlanningEditorialEvidenceResult>;
   /**
    * Content Handoff V1: open REFRESH target or create/reopen NEW_BLOG private draft.
    * MySQL: single transaction (Planning FOR UPDATE → Blog insert → linked_post_id).

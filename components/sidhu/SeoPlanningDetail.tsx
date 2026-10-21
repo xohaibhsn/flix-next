@@ -40,6 +40,8 @@ import {
 import { SeoPlanningLifecycleControls } from "@/components/sidhu/SeoPlanningLifecycleControls";
 import { SeoPlanningContentHandoff } from "@/components/sidhu/SeoPlanningContentHandoff";
 import { SeoPlanningArticleGeneration } from "@/components/sidhu/SeoPlanningArticleGeneration";
+import { SeoPlanningEditorialEvidencePanel } from "@/components/sidhu/SeoPlanningEditorialEvidence";
+import { SeoPlanningEditorialReadinessChecklist } from "@/components/sidhu/SeoPlanningEditorialReadinessChecklist";
 import { Banner, Field, TextArea, TextInput, inputClass } from "@/components/sidhu/fields";
 import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { StickyEditorBar } from "@/components/sidhu/ui/StickyEditorBar";
@@ -132,13 +134,14 @@ export function SeoPlanningDetail({
   const [savedForm, setSavedForm] = useState<FormState>(() => formFromDraft(initialDraft));
   const [message, setMessage] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [suggestionBusy, setSuggestionBusy] = useState(false);
+  const [evidenceBusy, setEvidenceBusy] = useState(false);
   const [writingPromptState, setWritingPromptState] =
     useState<WritingPromptUiState>(initialWritingPromptState);
   const [imagePromptState, setImagePromptState] =
     useState<ImagePromptUiState>(initialImagePromptState);
   const [pending, startTransition] = useTransition();
   const archived = isSeoPlanningDraftArchived(draft);
-  const controlsLocked = pending || suggestionBusy || archived;
+  const controlsLocked = pending || suggestionBusy || evidenceBusy || archived;
 
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(savedForm), [form, savedForm]);
   const writingBrief = useMemo(
@@ -163,7 +166,7 @@ export function SeoPlanningDetail({
   const gscMeta = asRecord(payload.gsc);
 
   function saveWithWorkflow(nextWorkflow: SeoPlanningWorkflowStatus) {
-    if (pending || suggestionBusy) return;
+    if (pending || suggestionBusy || evidenceBusy) return;
     setMessage(null);
     const payloadInput = {
       id: draft.id,
@@ -330,6 +333,22 @@ export function SeoPlanningDetail({
         onBusy={setSuggestionBusy}
         onDraft={adoptSuggestionDraft}
         onMessage={setMessage}
+      />
+
+      <SeoPlanningEditorialEvidencePanel
+        draft={draft}
+        archived={archived}
+        blocked={pending || suggestionBusy || dirty}
+        onBusy={setEvidenceBusy}
+        onDraft={setDraft}
+        onMessage={setMessage}
+      />
+
+      <SeoPlanningEditorialReadinessChecklist
+        draft={draft}
+        writingArticle={writingArticle}
+        aiArticleGenerationEnabled={aiArticleGenerationEnabled}
+        openaiBlogArticleConfigured={openaiBlogArticleConfigured}
       />
 
       <SeoPlanningWritingBrief

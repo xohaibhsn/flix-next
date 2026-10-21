@@ -53,6 +53,14 @@ import {
   applySeoPlanningWorkspaceUpdate,
   parseSeoPlanningWorkspaceInput,
 } from "@/lib/cms/seo-planning/workspace";
+import {
+  fingerprintEditorialEvidenceFromPayload,
+  parseSeoPlanningEditorialEvidenceSaveInput,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_IMMUTABLE_MESSAGE,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_SAVE_FAILED_MESSAGE,
+  SEO_PLANNING_EDITORIAL_EVIDENCE_STALE_MESSAGE,
+} from "@/lib/cms/seo-planning/editorial-evidence";
+import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 import {
   assertCmsWritesAllowed,
@@ -109,6 +117,23 @@ export type ProceedSeoOpportunityActionResult = ProceedSeoPlanningResult;
 export type SaveSeoPlanningWorkspaceResult =
   | { ok: true; draft: SeoPlanningDraft }
   | { ok: false; error: string };
+
+export type SaveSeoPlanningEditorialEvidenceResult =
+  | { ok: true; draft: SeoPlanningDraft; evidenceRevision: string }
+  | {
+      ok: false;
+      error: string;
+      code?:
+        | "unauthorized"
+        | "access_denied"
+        | typeof CMS_WRITE_FREEZE_CODE
+        | "not_found"
+        | "archived"
+        | "stale"
+        | "immutable"
+        | "rejected"
+        | "invalid_input";
+    };
 
 export type UpdateSeoPlanningSuggestionResult =
   | { ok: true; draft: SeoPlanningDraft }
@@ -193,6 +218,96 @@ export async function saveSeoPlanningWorkspaceAction(
       return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
     }
     return { ok: false, error: "Could not save the planning draft. Please try again." };
+  }
+}
+
+/**
+ * Save or clear private Planning editorialEvidenceV1 only.
+ * No OpenAI. No GSC. No BlogPost. No workflow/recommendation mutation.
+ * Stale-save: server compares expectedEvidenceRevision (SHA-256) to locked-row evidence.
+ */
+export async function saveSeoPlanningEditorialEvidenceAction(
+  rawInput: unknown,
+): Promise<SaveSeoPlanningEditorialEvidenceResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: actor.error,
+      code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
+    };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, error: frozen.error, code: CMS_WRITE_FREEZE_CODE };
+
+  const parsed = parseSeoPlanningEditorialEvidenceSaveInput(rawInput);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error, code: "invalid_input" };
+  }
+
+  // Pre-check for clearer errors; authoritative checks run again under catalog lock.
+  const stored = await cms.getSeoPlanningDraftById(parsed.value.id);
+  if (!stored) {
+    return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "not_found" };
+  }
+  if (isSeoPlanningDraftArchived(stored)) {
+    return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE, code: "archived" };
+  }
+  if (!isSeoPlanningActionableRecommendation(stored.recommendation)) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_EDITORIAL_EVIDENCE_IMMUTABLE_MESSAGE,
+      code: "immutable",
+    };
+  }
+
+  try {
+    const merged = await cms.mergeSeoPlanningEditorialEvidence({
+      id: parsed.value.id,
+      expectedEvidenceRevision: parsed.value.expectedEvidenceRevision,
+      evidence: parsed.value.evidence,
+    });
+    if (!merged.ok) {
+      if (merged.reason === "not_found") {
+        return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "not_found" };
+      }
+      if (merged.reason === "archived") {
+        return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE, code: "archived" };
+      }
+      if (merged.reason === "stale") {
+        return {
+          ok: false,
+          error: SEO_PLANNING_EDITORIAL_EVIDENCE_STALE_MESSAGE,
+          code: "stale",
+        };
+      }
+      if (merged.reason === "immutable") {
+        return {
+          ok: false,
+          error: SEO_PLANNING_EDITORIAL_EVIDENCE_IMMUTABLE_MESSAGE,
+          code: "immutable",
+        };
+      }
+      return {
+        ok: false,
+        error: SEO_PLANNING_EDITORIAL_EVIDENCE_SAVE_FAILED_MESSAGE,
+        code: "rejected",
+      };
+    }
+    return {
+      ok: true,
+      draft: merged.draft,
+      evidenceRevision: fingerprintEditorialEvidenceFromPayload(merged.draft.payload),
+    };
+  } catch (error) {
+    if (isSeoPlanningArchivedMutationError(error)) {
+      return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE, code: "archived" };
+    }
+    return {
+      ok: false,
+      error: SEO_PLANNING_EDITORIAL_EVIDENCE_SAVE_FAILED_MESSAGE,
+      code: "rejected",
+    };
   }
 }
 

@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type {
   CatalogRepository,
+  MergeSeoPlanningEditorialEvidenceResult,
   MergeSeoPlanningImagePromptResult,
   MergeSeoPlanningWritingPromptResult,
   SeoPlanningPromptAcceptReaders,
@@ -39,6 +40,14 @@ import {
   type WritingPromptCacheEntry,
   type WritingPromptProvider,
 } from "@/lib/cms/seo-planning/writing-prompt-cache";
+import {
+  fingerprintEditorialEvidenceFromPayload,
+  isSeoPlanningEditorialEvidenceRevisionToken,
+  mergeEditorialEvidenceIntoPayload,
+  preserveLockedEditorialEvidenceInPayload,
+  type SeoPlanningEditorialEvidenceV1,
+} from "@/lib/cms/seo-planning/editorial-evidence";
+import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
   sanitizeCategory,
   sanitizeFaq,
@@ -651,6 +660,8 @@ export class MysqlCatalogRepository implements CatalogRepository {
         const latest = mapPlanningDraft(rows[0]);
         // Final boundary: ordinary save cannot clear Archive or mutate archived drafts.
         assertSeoPlanningDraftMutableForOrdinarySave(latest);
+        // Preserve concurrent editorialEvidenceV1 merges — only the evidence merge API may change it.
+        const payload = preserveLockedEditorialEvidenceInPayload(latest.payload, safe.payload);
         // Do not write archived_at — Restore is the only path that may clear it.
         await conn.execute(
           `UPDATE seo_planning_drafts SET
@@ -670,13 +681,14 @@ export class MysqlCatalogRepository implements CatalogRepository {
             safe.restorePath,
             safe.searchIntent,
             safe.linkedPostId,
-            JSON.stringify(safe.payload || {}),
+            JSON.stringify(payload),
             toMysqlDateTime(safe.updatedAt),
             safe.id,
           ],
         );
         return sanitizeSeoPlanningDraft({
           ...safe,
+          payload,
           archivedAt: latest.archivedAt ?? null,
         });
       }
@@ -873,6 +885,60 @@ export class MysqlCatalogRepository implements CatalogRepository {
           ? { ...(latest.payload as Record<string, unknown>) }
           : {};
       const nextPayload = mergeImagePromptCache(basePayload, args.provider, args.entry);
+      const updatedAt = new Date().toISOString();
+      await conn.execute(
+        "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",
+        [JSON.stringify(nextPayload), toMysqlDateTime(updatedAt), id],
+      );
+
+      return {
+        ok: true,
+        draft: sanitizeSeoPlanningDraft({
+          ...latest,
+          payload: nextPayload,
+          updatedAt,
+        }),
+      };
+    });
+  }
+  async mergeSeoPlanningEditorialEvidence(args: {
+    id: string;
+    expectedEvidenceRevision: string;
+    evidence: SeoPlanningEditorialEvidenceV1 | null;
+  }): Promise<MergeSeoPlanningEditorialEvidenceResult> {
+    await this.ready();
+    const id = String(args.id || "").trim();
+    const expected = String(args.expectedEvidenceRevision || "").trim();
+    if (!id) return { ok: false, reason: "not_found" };
+    // Arbitrary client tokens are not authenticity proofs — format + locked-row SHA-256 match required.
+    if (!isSeoPlanningEditorialEvidenceRevisionToken(expected)) {
+      return { ok: false, reason: "rejected" };
+    }
+
+    return withTransaction(async (conn) => {
+      const [rows] = await conn.query<PlanningRow[]>(
+        "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+        [id],
+      );
+      if (!rows[0]) return { ok: false, reason: "not_found" };
+
+      const latest = mapPlanningDraft(rows[0]);
+      if (latest.archivedAt) return { ok: false, reason: "archived" };
+      if (!isSeoPlanningActionableRecommendation(latest.recommendation)) {
+        return { ok: false, reason: "immutable" };
+      }
+
+      // Authoritative CAS: recompute SHA-256 of locked-row evidence; reject before mutation.
+      const currentRevision = fingerprintEditorialEvidenceFromPayload(latest.payload);
+      if (currentRevision !== expected) {
+        return { ok: false, reason: "stale" };
+      }
+
+      const basePayload =
+        latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
+          ? { ...(latest.payload as Record<string, unknown>) }
+          : {};
+      const nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
       const updatedAt = new Date().toISOString();
       await conn.execute(
         "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",
