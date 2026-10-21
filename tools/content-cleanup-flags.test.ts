@@ -204,9 +204,9 @@ test("content cleanup flags do not collide with site settings or managed redirec
   assert.deepEqual([...CONTENT_CLEANUP_FLAG_KEYS], [CMS_CONTENT_CLEANUP_V1, TEST_TAGLINE_CLEANUP_V1]);
 });
 
-test("Junaid-style redirect records are outside content cleanup flags", () => {
-  const junaid: RedirectRule = {
-    id: "redir-junaid-example",
+test("Unrelated redirect records are outside content cleanup flags", () => {
+  const unrelatedRedirect: RedirectRule = {
+    id: "redir-unrelated-example",
     sourcePath: "/old-landing/",
     destinationPath: "/welcome/",
     statusCode: 301,
@@ -214,8 +214,8 @@ test("Junaid-style redirect records are outside content cleanup flags", () => {
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
   };
-  assert.equal(CONTENT_CLEANUP_FLAG_KEYS.includes(junaid.id as never), false);
-  assert.equal(junaid.sourcePath, "/old-landing/");
-  assert.equal(junaid.destinationPath, "/welcome/");
-  assert.equal(junaid.statusCode, 301);
+  assert.equal(CONTENT_CLEANUP_FLAG_KEYS.includes(unrelatedRedirect.id as never), false);
+  assert.equal(unrelatedRedirect.sourcePath, "/old-landing/");
+  assert.equal(unrelatedRedirect.destinationPath, "/welcome/");
+  assert.equal(unrelatedRedirect.statusCode, 301);
 });

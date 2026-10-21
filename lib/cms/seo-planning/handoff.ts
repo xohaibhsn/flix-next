@@ -11,6 +11,10 @@ import {
   SEO_PLANNING_ARCHIVED_EDIT_MESSAGE,
   SEO_PLANNING_MISSING_DRAFT_MESSAGE,
 } from "@/lib/cms/seo-planning/lifecycle";
+import {
+  isSeoPlanningEditorialEvidenceTestFixture,
+  SEO_PLANNING_TEST_FIXTURE_HANDOFF_MESSAGE,
+} from "@/lib/cms/seo-planning/test-fixture";
 import { isInternalLinkPlanningRecommendation } from "@/lib/cms/seo-planning/workspace";
 import type { BlogPost, SeoPlanningDraft } from "@/lib/cms/types";
 import { sanitizePost, sanitizeText } from "@/lib/cms/validation";
@@ -50,6 +54,7 @@ export type SeoPlanningHandoffErrorCode =
   | "title_required"
   | "blog_permission_required"
   | "handoff_conflict"
+  | "test_fixture"
   | "access_denied"
   | "unauthorized"
   | "cms_write_freeze";
@@ -98,6 +103,13 @@ export function evaluateSeoPlanningHandoffEligibility(
   }
   if (isSeoPlanningDraftArchived(draft)) {
     return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE, code: "planning_archived" };
+  }
+  if (isSeoPlanningEditorialEvidenceTestFixture(draft)) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_HANDOFF_MESSAGE,
+      code: "test_fixture",
+    };
   }
   if (isInternalLinkPlanningRecommendation(draft.recommendation)) {
     return {

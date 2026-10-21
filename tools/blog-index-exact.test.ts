@@ -62,18 +62,18 @@ test("inactive or wrong /blog/ row repairs to previous semantics", () => {
   assert.equal(result.rule.active, true);
 });
 
-test("unrelated Junaid redirects are untouched by exact blog resolve", () => {
-  const junaid = rule({
-    id: "redir-junaid-example",
+test("Unrelated redirects are untouched by exact blog resolve", () => {
+  const unrelatedRedirect = rule({
+    id: "redir-unrelated-example",
     sourcePath: "/old-campaign/",
     destinationPath: "/welcome/",
   });
   const onlyBlog = resolveBlogIndexManagedRedirect(null);
   assert.equal(onlyBlog.rule.sourcePath, BLOG_INDEX_SLUG_LEGACY);
-  assert.notEqual(onlyBlog.rule.id, junaid.id);
-  assert.equal(junaid.sourcePath, "/old-campaign/");
-  assert.equal(junaid.destinationPath, "/welcome/");
-  assert.equal(junaid.statusCode, 301);
+  assert.notEqual(onlyBlog.rule.id, unrelatedRedirect.id);
+  assert.equal(unrelatedRedirect.sourcePath, "/old-campaign/");
+  assert.equal(unrelatedRedirect.destinationPath, "/welcome/");
+  assert.equal(unrelatedRedirect.statusCode, 301);
 });
 
 test("exact resolve matches managed-row outcome of full upsert for /blog/", () => {

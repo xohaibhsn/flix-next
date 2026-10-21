@@ -10,6 +10,11 @@ import {
   SEO_PLANNING_HUMAN_NOTES_CAP,
   isSeoPlanningActionableRecommendation,
 } from "@/lib/cms/seo-planning/constants";
+import {
+  isSeoPlanningEditorialEvidenceTestFixture,
+  SEO_PLANNING_TEST_FIXTURE_TOPIC,
+  SEO_PLANNING_TEST_FIXTURE_WORKING_TITLE,
+} from "@/lib/cms/seo-planning/test-fixture";
 import { sanitizeSeoPlanningDraft } from "@/lib/cms/seo-planning/sanitize";
 import {
   SEO_PLANNING_WORKFLOW_STATUSES,
@@ -181,15 +186,19 @@ export function applySeoPlanningWorkspaceUpdate(
     return { ok: false, error: "This planning draft cannot be edited." };
   }
 
+  const fixture = isSeoPlanningEditorialEvidenceTestFixture(stored);
+  // TEST fixtures stay PLANNING — ignore client workflow spoof before transition checks.
+  const nextWorkflow: SeoPlanningWorkflowStatus = fixture ? "PLANNING" : input.workflowStatus;
+
   if (isInternalLinkPlanningRecommendation(stored.recommendation)) {
-    if (input.workflowStatus !== "PLANNING" || stored.workflowStatus !== "PLANNING") {
+    if (nextWorkflow !== "PLANNING" || stored.workflowStatus !== "PLANNING") {
       return {
         ok: false,
         error: "Internal-link planning stays in Planning. Workflow transitions are not available.",
       };
     }
   } else if (isContentPlanningRecommendation(stored.recommendation)) {
-    if (!isAllowedSeoPlanningWorkflowTransition(stored.workflowStatus, input.workflowStatus)) {
+    if (!isAllowedSeoPlanningWorkflowTransition(stored.workflowStatus, nextWorkflow)) {
       return {
         ok: false,
         error: "That workflow change is not allowed from the current status.",
@@ -218,11 +227,11 @@ export function applySeoPlanningWorkspaceUpdate(
     linkedPostId: stored.linkedPostId,
     createdBy: stored.createdBy,
     createdAt: stored.createdAt,
-    // Editable.
-    topic: input.topic,
-    workingTitle: input.workingTitle,
+    // Editable (TEST fixtures freeze title/topic/workflow identity).
+    topic: fixture ? SEO_PLANNING_TEST_FIXTURE_TOPIC : input.topic,
+    workingTitle: fixture ? SEO_PLANNING_TEST_FIXTURE_WORKING_TITLE : input.workingTitle,
     searchIntent: input.searchIntent,
-    workflowStatus: input.workflowStatus,
+    workflowStatus: nextWorkflow,
     updatedAt,
     payload: mergeWorkspaceHumanNotes(storedPayload, input.humanNotes),
   });

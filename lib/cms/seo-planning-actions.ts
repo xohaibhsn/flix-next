@@ -61,6 +61,14 @@ import {
   SEO_PLANNING_EDITORIAL_EVIDENCE_STALE_MESSAGE,
 } from "@/lib/cms/seo-planning/editorial-evidence";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
+import {
+  createSeoPlanningEditorialEvidenceTestFixture,
+  evaluateSeoPlanningTestFixturePermanentDelete,
+  ignoreClientSuppliedTestFixtureFlags,
+  isSeoPlanningEditorialEvidenceTestFixture,
+  SEO_PLANNING_TEST_FIXTURE_DELETE_FAILED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_DISABLED_MESSAGE,
+} from "@/lib/cms/seo-planning/test-fixture";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 import {
   assertCmsWritesAllowed,
@@ -68,6 +76,7 @@ import {
   cmsWriteFreezeBlockedResult,
   isCmsWriteFreezeError,
 } from "@/lib/cms/write-freeze";
+import { classifyPlanningFenceError } from "@/lib/cms/seo-planning-lineage/planning-write-fence-errors";
 
 function rejectIfCmsWriteFrozen(): { ok: false; error: string; code: typeof CMS_WRITE_FREEZE_CODE } | null {
   try {
@@ -336,6 +345,12 @@ export async function updateSeoPlanningSuggestionAction(
     }
     if (isSeoPlanningDraftArchived(stored)) {
       return { ok: false, error: SEO_PLANNING_ARCHIVED_EDIT_MESSAGE };
+    }
+    if (isSeoPlanningEditorialEvidenceTestFixture(stored)) {
+      return {
+        ok: false,
+        error: "TEST fixtures have no Research suggestions. Editorial evidence capture only.",
+      };
     }
 
     const applied = applySeoPlanningSuggestionCommand(stored, parsed.value);
@@ -844,6 +859,123 @@ export async function handoffSeoPlanningToBlogAction(
       ok: false,
       error: "Could not hand off this planning draft to the Blog editor. Please try again.",
       code: "handoff_conflict",
+    };
+  }
+}
+
+export type CreateSeoPlanningEditorialEvidenceTestFixtureResult =
+  | { ok: true; draft: SeoPlanningDraft; created: true }
+  | {
+      ok: false;
+      error: string;
+      code?: "disabled" | "exists" | "rejected" | "unauthorized" | "access_denied" | typeof CMS_WRITE_FREEZE_CODE;
+    };
+
+/**
+ * Create the single reserved SEO Editorial Evidence TEST fixture Planning draft.
+ * Compile-time OFF in this RC — client flags cannot enable it.
+ * No Research/Proceed/GSC/AI/Blog. No permanent UI create button.
+ */
+export async function createSeoPlanningEditorialEvidenceTestFixtureAction(
+  rawInput?: unknown,
+): Promise<CreateSeoPlanningEditorialEvidenceTestFixtureResult> {
+  ignoreClientSuppliedTestFixtureFlags(rawInput);
+
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: actor.error,
+      code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
+    };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, error: frozen.error, code: CMS_WRITE_FREEZE_CODE };
+
+  // Production path never force-enables — only the compile-time constant.
+  const result = await createSeoPlanningEditorialEvidenceTestFixture({
+    adminId: actor.user.id,
+    catalog: {
+      getSeoPlanningDraftByFingerprint: (fingerprint) =>
+        cms.getSeoPlanningDraftByFingerprint(fingerprint),
+      saveSeoPlanningDraft: (draft) => cms.saveSeoPlanningDraft(draft),
+    },
+  });
+  if (!result.ok) {
+    return {
+      ok: false,
+      error: result.error || SEO_PLANNING_TEST_FIXTURE_DISABLED_MESSAGE,
+      code: result.code ?? "rejected",
+    };
+  }
+  return result;
+}
+
+export type DeleteSeoPlanningEditorialEvidenceTestFixtureResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      code?:
+        | "not_found"
+        | "not_fixture"
+        | "not_archived"
+        | "confirm_mismatch"
+        | "linked"
+        | "rejected"
+        | "unauthorized"
+        | "access_denied"
+        | typeof CMS_WRITE_FREEZE_CODE;
+    };
+
+/**
+ * Permanently delete an already-archived SEO Editorial Evidence TEST fixture only.
+ * Exact ID + reserved fingerprint + marker + confirmation. Fail closed on FK/lineage.
+ * Does not delete genuine Planning drafts (use the standard lifecycle action).
+ */
+export async function deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAction(
+  rawInput: unknown,
+): Promise<DeleteSeoPlanningEditorialEvidenceTestFixtureResult> {
+  ignoreClientSuppliedTestFixtureFlags(rawInput);
+
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return {
+      ok: false,
+      error: actor.error,
+      code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
+    };
+  }
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) return { ok: false, error: frozen.error, code: CMS_WRITE_FREEZE_CODE };
+
+  const parsed = parseSeoPlanningPermanentDeleteInput(rawInput);
+  if (!parsed.ok) return { ok: false, error: parsed.error, code: "confirm_mismatch" };
+
+  const stored = await cms.getSeoPlanningDraftById(parsed.id);
+  const policy = evaluateSeoPlanningTestFixturePermanentDelete({
+    draft: stored,
+    confirmation: parsed.confirmation,
+    // Lineage writers remain OFF — treat unknown as unlinked; FK RESTRICT still fails closed.
+    lineageLinked: false,
+  });
+  if (!policy.ok) return policy;
+
+  try {
+    const deleted = await cms.deleteSeoPlanningDraftPermanently(parsed.id);
+    if (!deleted.ok) {
+      return { ok: false, error: deleted.error, code: "rejected" };
+    }
+    return { ok: true };
+  } catch (error) {
+    const fenced = classifyPlanningFenceError(error);
+    if (fenced) {
+      return { ok: false, error: fenced.message, code: "linked" };
+    }
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_DELETE_FAILED_MESSAGE,
+      code: "rejected",
     };
   }
 }

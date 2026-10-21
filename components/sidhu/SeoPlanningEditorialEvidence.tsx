@@ -214,7 +214,7 @@ export function SeoPlanningEditorialEvidencePanel({
       <div className="space-y-1">
         <h3 className="text-sm font-semibold text-ink">Editorial Evidence Capture</h3>
         <p className="text-xs text-muted">
-          Private planning notes for Junaid. Saved evidence is always{" "}
+          Private editorial notes for SEO Team. Saved evidence is always{" "}
           <span className="font-semibold text-ink">{SEO_PLANNING_EDITORIAL_TRUST}</span>
           {" — "}
           URLs are not verified just because they were saved. No auto-save.

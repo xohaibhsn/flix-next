@@ -53,6 +53,11 @@ import {
   preserveLockedEditorialEvidenceInPayload,
   type SeoPlanningEditorialEvidenceV1,
 } from "@/lib/cms/seo-planning/editorial-evidence";
+import {
+  isSeoPlanningEditorialEvidenceTestFixture,
+  preserveLockedTestFixtureIdentity,
+  preserveTestFixtureMarkerInEvidencePayload,
+} from "@/lib/cms/seo-planning/test-fixture";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
   sanitizeCategory,
@@ -369,12 +374,16 @@ export class JsonCatalogRepository implements CatalogRepository {
         assertSeoPlanningDraftMutableForOrdinarySave(existing);
         // Preserve concurrent editorialEvidenceV1 merges — only the evidence merge API may change it.
         const payload = preserveLockedEditorialEvidenceInPayload(existing.payload, safe.payload);
-        const toWrite = sanitizeSeoPlanningDraft({
+        let toWrite = sanitizeSeoPlanningDraft({
           ...safe,
           payload,
           // Preserve authoritative lifecycle; only Restore may clear archivedAt.
           archivedAt: existing.archivedAt ?? null,
         });
+        // TEST fixture: freeze identity + marker under the same Planning write lock.
+        if (isSeoPlanningEditorialEvidenceTestFixture(existing)) {
+          toWrite = preserveLockedTestFixtureIdentity(existing, toWrite);
+        }
         const next = items.map((item) => (item.id === safe.id ? toWrite : item));
         await saveList(SEO_PLANNING_FILE, next);
         return toWrite;
@@ -576,7 +585,10 @@ export class JsonCatalogRepository implements CatalogRepository {
         latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
           ? { ...(latest.payload as Record<string, unknown>) }
           : {};
-      const nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
+      let nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
+      if (isSeoPlanningEditorialEvidenceTestFixture(latest)) {
+        nextPayload = preserveTestFixtureMarkerInEvidencePayload(latest.payload, nextPayload);
+      }
       const updatedAt = new Date().toISOString();
       const nextDraft = sanitizeSeoPlanningDraft({
         ...latest,

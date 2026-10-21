@@ -47,6 +47,11 @@ import {
   preserveLockedEditorialEvidenceInPayload,
   type SeoPlanningEditorialEvidenceV1,
 } from "@/lib/cms/seo-planning/editorial-evidence";
+import {
+  isSeoPlanningEditorialEvidenceTestFixture,
+  preserveLockedTestFixtureIdentity,
+  preserveTestFixtureMarkerInEvidencePayload,
+} from "@/lib/cms/seo-planning/test-fixture";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
   sanitizeCategory,
@@ -662,6 +667,15 @@ export class MysqlCatalogRepository implements CatalogRepository {
         assertSeoPlanningDraftMutableForOrdinarySave(latest);
         // Preserve concurrent editorialEvidenceV1 merges — only the evidence merge API may change it.
         const payload = preserveLockedEditorialEvidenceInPayload(latest.payload, safe.payload);
+        let toWrite = sanitizeSeoPlanningDraft({
+          ...safe,
+          payload,
+          archivedAt: latest.archivedAt ?? null,
+        });
+        // TEST fixture: freeze identity + marker under FOR UPDATE lock.
+        if (isSeoPlanningEditorialEvidenceTestFixture(latest)) {
+          toWrite = preserveLockedTestFixtureIdentity(latest, toWrite);
+        }
         // Do not write archived_at — Restore is the only path that may clear it.
         await conn.execute(
           `UPDATE seo_planning_drafts SET
@@ -670,27 +684,23 @@ export class MysqlCatalogRepository implements CatalogRepository {
             search_intent = ?, linked_post_id = ?, payload = ?, updated_at = ?
            WHERE id = ?`,
           [
-            safe.recommendation,
-            safe.workflowStatus,
-            safe.fingerprint,
-            safe.topic,
-            safe.workingTitle,
-            safe.proposedSlug,
-            safe.targetPostId,
-            safe.matchedPublicUrl,
-            safe.restorePath,
-            safe.searchIntent,
-            safe.linkedPostId,
-            JSON.stringify(payload),
-            toMysqlDateTime(safe.updatedAt),
-            safe.id,
+            toWrite.recommendation,
+            toWrite.workflowStatus,
+            toWrite.fingerprint,
+            toWrite.topic,
+            toWrite.workingTitle,
+            toWrite.proposedSlug,
+            toWrite.targetPostId,
+            toWrite.matchedPublicUrl,
+            toWrite.restorePath,
+            toWrite.searchIntent,
+            toWrite.linkedPostId,
+            JSON.stringify(toWrite.payload || {}),
+            toMysqlDateTime(toWrite.updatedAt),
+            toWrite.id,
           ],
         );
-        return sanitizeSeoPlanningDraft({
-          ...safe,
-          payload,
-          archivedAt: latest.archivedAt ?? null,
-        });
+        return toWrite;
       }
 
       const archivedAtSql = safe.archivedAt ? toMysqlDateTime(safe.archivedAt) : null;
@@ -938,7 +948,10 @@ export class MysqlCatalogRepository implements CatalogRepository {
         latest.payload && typeof latest.payload === "object" && !Array.isArray(latest.payload)
           ? { ...(latest.payload as Record<string, unknown>) }
           : {};
-      const nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
+      let nextPayload = mergeEditorialEvidenceIntoPayload(basePayload, args.evidence);
+      if (isSeoPlanningEditorialEvidenceTestFixture(latest)) {
+        nextPayload = preserveTestFixtureMarkerInEvidencePayload(latest.payload, nextPayload);
+      }
       const updatedAt = new Date().toISOString();
       await conn.execute(
         "UPDATE seo_planning_drafts SET payload = ?, updated_at = ? WHERE id = ?",

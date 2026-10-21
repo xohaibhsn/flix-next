@@ -1,5 +1,5 @@
 /**
- * Junaid Editorial Evidence Capture UI + safe persistence + readiness checklist.
+ * SEO Editorial Evidence Capture UI + safe persistence + readiness checklist.
  * Local only — no live MySQL, OpenAI, Gemini, GSC, or Hostinger.
  */
 
