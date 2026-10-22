@@ -54,9 +54,20 @@ import {
   type SeoPlanningEditorialEvidenceV1,
 } from "@/lib/cms/seo-planning/editorial-evidence";
 import {
+  buildSeoPlanningEditorialEvidenceTestFixtureDraft,
+  buildSeoPlanningTestFixtureOneshot,
+  evaluateSeoPlanningTestFixturePermanentDelete,
+  evaluateTestFixtureCreationGate,
+  isReservedOrFixtureMarkedSeoPlanningDraft,
   isSeoPlanningEditorialEvidenceTestFixture,
+  isSeoPlanningTestFixtureOneshotConsumed,
   preserveLockedTestFixtureIdentity,
   preserveTestFixtureMarkerInEvidencePayload,
+  SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_FINGERPRINT,
+  SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
 } from "@/lib/cms/seo-planning/test-fixture";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
@@ -96,6 +107,7 @@ const REDIRECTS_FILE = "redirects.json";
 const REDIRECT_SEED_FILE = "redirect-seeds.json";
 const MESSAGES_FILE = "contact-messages.json";
 const SEO_PLANNING_FILE = "seo-planning-drafts.json";
+const SEO_PLANNING_TEST_FIXTURE_ONESHOT_FILE = "seo-planning-test-fixture-oneshot.json";
 
 /**
  * Process-local queue for seo-planning-drafts.json read/check/write.
@@ -430,10 +442,112 @@ export class JsonCatalogRepository implements CatalogRepository {
       const items = await this.#readAllSeoPlanningDrafts();
       const index = items.findIndex((item) => item.id === want);
       if (index < 0) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
-      const gate = assertArchivedForPermanentDelete(items[index]!);
+      const latest = items[index]!;
+      if (isReservedOrFixtureMarkedSeoPlanningDraft(latest)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
+        };
+      }
+      const gate = assertArchivedForPermanentDelete(latest);
       if (!gate.ok) return gate;
       const next = items.filter((_, i) => i !== index);
       await saveList(SEO_PLANNING_FILE, next);
+      return { ok: true as const };
+    });
+  }
+
+  async isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed() {
+    const raw = await readJsonFile<unknown>(SEO_PLANNING_TEST_FIXTURE_ONESHOT_FILE, null);
+    return isSeoPlanningTestFixtureOneshotConsumed(raw);
+  }
+
+  async createSeoPlanningEditorialEvidenceTestFixtureAtomic(args: {
+    adminId: string;
+    now?: string;
+    createIdFn?: (prefix?: string) => string;
+    testOnlyForceEnabled?: boolean;
+  }) {
+    const gate = evaluateTestFixtureCreationGate({
+      testOnlyForceEnabled: args.testOnlyForceEnabled,
+    });
+    if (!gate.ok) {
+      return { ok: false as const, error: gate.error, code: "disabled" as const };
+    }
+    return withSeoPlanningJsonWriteLock(async () => {
+      const latch = await readJsonFile<unknown>(SEO_PLANNING_TEST_FIXTURE_ONESHOT_FILE, null);
+      if (isSeoPlanningTestFixtureOneshotConsumed(latch)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE,
+          code: "oneshot_consumed" as const,
+        };
+      }
+      const items = await this.#readAllSeoPlanningDrafts();
+      if (items.some((item) => item.fingerprint === SEO_PLANNING_TEST_FIXTURE_FINGERPRINT)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
+          code: "exists" as const,
+        };
+      }
+      const draft = buildSeoPlanningEditorialEvidenceTestFixtureDraft({
+        adminId: args.adminId,
+        now: args.now,
+        createIdFn: args.createIdFn,
+      });
+      const safe = sanitizeSeoPlanningDraft(draft);
+      if (!isSeoPlanningEditorialEvidenceTestFixture(safe)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE,
+          code: "rejected" as const,
+        };
+      }
+      const oneshot = buildSeoPlanningTestFixtureOneshot({
+        adminId: args.adminId,
+        planningId: safe.id,
+        now: args.now || safe.createdAt,
+      });
+      // Latch first — fail closed if planning write fails after consume (JSON cannot roll back).
+      await writeJsonFile(SEO_PLANNING_TEST_FIXTURE_ONESHOT_FILE, oneshot);
+      try {
+        await saveList(SEO_PLANNING_FILE, [...items, safe]);
+      } catch (error) {
+        // Planning insert failed after latch — do not clear latch (prevents recreate races).
+        void error;
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE,
+          code: "rejected" as const,
+        };
+      }
+      return { ok: true as const, draft: safe, created: true as const };
+    });
+  }
+
+  async deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic(args: {
+    id: string;
+    confirmation: string;
+  }) {
+    const want = String(args.id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    return withSeoPlanningJsonWriteLock(async () => {
+      const items = await this.#readAllSeoPlanningDrafts();
+      const index = items.findIndex((item) => item.id === want);
+      if (index < 0) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+      const latest = items[index]!;
+      // JSON adapter has no lineage tables — treat as unlinked (not cross-process CAS).
+      const policy = evaluateSeoPlanningTestFixturePermanentDelete({
+        draft: latest,
+        confirmation: args.confirmation,
+        lineageStatus: "unlinked",
+      });
+      if (!policy.ok) return policy;
+      await saveList(
+        SEO_PLANNING_FILE,
+        items.filter((_, i) => i !== index),
+      );
       return { ok: true as const };
     });
   }

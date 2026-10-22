@@ -100,6 +100,41 @@ export interface CatalogRepository {
     { ok: true } | { ok: false; error: string }
   >;
   /**
+   * Atomic TEST-fixture create: durable oneshot latch + reserved fingerprint insert.
+   * MySQL: single transaction (site_settings FOR UPDATE → planning insert → latch consume).
+   * JSON: Planning write lock + oneshot file (process-local only).
+   */
+  createSeoPlanningEditorialEvidenceTestFixtureAtomic(args: {
+    adminId: string;
+    now?: string;
+    createIdFn?: (prefix?: string) => string;
+    testOnlyForceEnabled?: boolean;
+  }): Promise<
+    | { ok: true; draft: SeoPlanningDraft; created: true }
+    | {
+        ok: false;
+        error: string;
+        code?:
+          | "disabled"
+          | "exists"
+          | "oneshot_consumed"
+          | "rejected"
+          | "unauthorized"
+          | "confirm_mismatch"
+          | "access_denied";
+      }
+  >;
+  /** Durable oneshot latch read — true after first successful fixture create. */
+  isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed(): Promise<boolean>;
+  /**
+   * Atomic TEST-fixture permanent delete under row lock with full identity + lineage checks.
+   * Does not weaken generic Planning delete; fixtures are rejected from the generic path.
+   */
+  deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic(args: {
+    id: string;
+    confirmation: string;
+  }): Promise<{ ok: true } | { ok: false; error: string; code?: string }>;
+  /**
    * Atomic prompt-cache write: re-read latest under write lock/transaction,
    * merge ONLY the selected writingPrompts provider sibling.
    * acceptLatest receives transaction/lock-scoped article readers for REFRESH safety.

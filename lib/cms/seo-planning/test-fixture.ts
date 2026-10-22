@@ -58,6 +58,52 @@ export const SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE =
   "Could not create the editorial evidence test fixture. Please try again." as const;
 export const SEO_PLANNING_TEST_FIXTURE_DELETE_FAILED_MESSAGE =
   "Could not permanently delete the editorial evidence test fixture. Please try again." as const;
+export const SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE =
+  "The editorial evidence test-fixture one-shot creation allowance is already consumed. Recreation requires a separately authorized reset." as const;
+export const SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE =
+  "TEST fixtures must be permanently deleted only through the fixture-specific delete action." as const;
+export const SEO_PLANNING_TEST_FIXTURE_SUPER_ADMIN_REQUIRED_MESSAGE =
+  "Only Super Admin may create the editorial evidence test fixture." as const;
+export const SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM_MISMATCH_MESSAGE =
+  "Fixture creation confirmation did not match. Creation was cancelled." as const;
+export const SEO_PLANNING_TEST_FIXTURE_LINEAGE_UNKNOWN_MESSAGE =
+  "Fixture lineage status could not be established. Permanent delete was cancelled." as const;
+
+/** Durable site_settings / JSON flag key — survives workers, restarts, and fixture deletion. */
+export const SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY =
+  "seo_editorial_evidence_fixture_oneshot_v1" as const;
+
+/** Exact confirmation phrase required for temporary Super Admin create control. */
+export const SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM =
+  "CREATE SEO EDITORIAL EVIDENCE TEST FIXTURE" as const;
+
+/**
+ * Future activation order (documented + tested offline — not executed here):
+ * 1) Approved ON release → 2) create one fixture → 3) approved OFF release →
+ * 4) verify OFF without mutating create → 5) evidence acceptance on existing ID →
+ * 6) archive → 7) fixture-specific permanent delete.
+ * Residual ON workers must not recreate after delete because the one-shot latch stays consumed.
+ */
+export const SEO_PLANNING_TEST_FIXTURE_OFF_BEFORE_CLEANUP_ORDER = [
+  "approved_on_release",
+  "create_one_fixture",
+  "approved_off_release",
+  "verify_off_without_mutating_create",
+  "evidence_acceptance_on_existing_id",
+  "archive_exact_id",
+  "fixture_specific_permanent_delete",
+] as const;
+
+export type FixtureLineageStatus = "unlinked" | "linked" | "unknown";
+
+export type SeoPlanningTestFixtureOneshotV1 = {
+  kind: "TEST_FIXTURE_ONESHOT";
+  purpose: typeof SEO_PLANNING_TEST_FIXTURE_PURPOSE;
+  version: 1;
+  consumedAt: string;
+  consumedBy: string;
+  planningId: string;
+};
 
 export type SeoPlanningTestFixtureV1 = {
   kind: typeof SEO_PLANNING_TEST_FIXTURE_KIND;
@@ -136,6 +182,58 @@ export function isSeoPlanningEditorialEvidenceTestFixture(
   if (draft.fingerprint !== SEO_PLANNING_TEST_FIXTURE_FINGERPRINT) return false;
   if (draft.recommendation !== SEO_PLANNING_TEST_FIXTURE_RECOMMENDATION) return false;
   return readSeoPlanningTestFixtureMarker(draft.payload) != null;
+}
+
+/**
+ * Pure server render predicate for the temporary Super Admin create control.
+ * Requires BOTH compile-time creationEnabled AND super_admin. Tests inject ON
+ * without flipping the production constant.
+ */
+export function shouldRenderSeoPlanningTestFixtureCreateControl(args: {
+  creationEnabled: boolean;
+  role: string | null | undefined;
+}): boolean {
+  return args.creationEnabled === true && args.role === "super_admin";
+}
+
+/**
+ * True when payload carries the reserved `testFixtureV1` key with any value,
+ * including corrupted / partial marker objects. Does not scan free-text notes.
+ */
+export function hasRecognizableSeoPlanningTestFixtureMarkerEvidence(
+  payload: unknown,
+): boolean {
+  const root = asRecord(payload);
+  if (!root) return false;
+  if (!Object.prototype.hasOwnProperty.call(root, SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY)) {
+    return false;
+  }
+  const raw = root[SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY];
+  // Key present (including null / non-object) ⇒ reserved fixture namespace.
+  if (raw === undefined) return false;
+  if (readSeoPlanningTestFixtureMarker(payload) != null) return true;
+  const rec = asRecord(raw);
+  if (!rec) return true;
+  if (rec.kind === SEO_PLANNING_TEST_FIXTURE_KIND) return true;
+  if (rec.purpose === SEO_PLANNING_TEST_FIXTURE_PURPOSE) return true;
+  if (rec.version === SEO_PLANNING_TEST_FIXTURE_VERSION) return true;
+  // Any object under the reserved key is fixture-marked territory.
+  return true;
+}
+
+/**
+ * Fail-closed generic-delete fence: reserved fingerprint OR recognizable
+ * fixture marker evidence (valid, partial, or corrupt). Does NOT require both.
+ * Ordinary drafts that only mention "TEST" in notes are not protected.
+ */
+export function isReservedOrFixtureMarkedSeoPlanningDraft(
+  draft: Pick<SeoPlanningDraft, "fingerprint" | "payload"> | null | undefined,
+): boolean {
+  if (!draft) return false;
+  if (String(draft.fingerprint || "").trim() === SEO_PLANNING_TEST_FIXTURE_FINGERPRINT) {
+    return true;
+  }
+  return hasRecognizableSeoPlanningTestFixtureMarkerEvidence(draft.payload);
 }
 
 export function buildSeoPlanningTestFixturePayload(args: {
@@ -265,18 +363,39 @@ export function preserveTestFixtureMarkerInEvidencePayload(
   return out;
 }
 
-export type CreateTestFixtureCatalog = {
-  getSeoPlanningDraftByFingerprint(fingerprint: string): Promise<SeoPlanningDraft | null>;
-  saveSeoPlanningDraft(draft: SeoPlanningDraft): Promise<SeoPlanningDraft>;
-};
-
 export type CreateTestFixtureResult =
   | { ok: true; draft: SeoPlanningDraft; created: true }
-  | { ok: false; error: string; code?: "disabled" | "exists" | "rejected" | "unauthorized" };
+  | {
+      ok: false;
+      error: string;
+      code?:
+        | "disabled"
+        | "exists"
+        | "oneshot_consumed"
+        | "rejected"
+        | "unauthorized"
+        | "confirm_mismatch"
+        | "access_denied";
+    };
 
 /**
- * Pure orchestration for fixture create (gate + uniqueness + insert).
- * Production server action wraps this and never passes testOnlyForceEnabled.
+ * Catalog contract for atomic fixture create (gate + oneshot + UNIQUE insert).
+ * Production MySQL implements this under one transaction; JSON under Planning write lock.
+ */
+export type CreateTestFixtureCatalog = {
+  createSeoPlanningEditorialEvidenceTestFixtureAtomic(args: {
+    adminId: string;
+    now?: string;
+    createIdFn?: (prefix?: string) => string;
+    /** Offline tests only — production actions never pass true. */
+    testOnlyForceEnabled?: boolean;
+  }): Promise<CreateTestFixtureResult>;
+  isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed(): Promise<boolean>;
+};
+
+/**
+ * Orchestration entry — delegates durable oneshot + insert to the catalog adapter.
+ * Production server action never passes testOnlyForceEnabled.
  */
 export async function createSeoPlanningEditorialEvidenceTestFixture(args: {
   adminId: string;
@@ -292,33 +411,12 @@ export async function createSeoPlanningEditorialEvidenceTestFixture(args: {
   if (!gate.ok) {
     return { ok: false, error: gate.error, code: "disabled" };
   }
-
-  const existing = await args.catalog.getSeoPlanningDraftByFingerprint(
-    SEO_PLANNING_TEST_FIXTURE_FINGERPRINT,
-  );
-  if (existing) {
-    return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE, code: "exists" };
-  }
-
-  const draft = buildSeoPlanningEditorialEvidenceTestFixtureDraft({
+  return args.catalog.createSeoPlanningEditorialEvidenceTestFixtureAtomic({
     adminId: args.adminId,
     now: args.now,
     createIdFn: args.createIdFn,
+    testOnlyForceEnabled: args.testOnlyForceEnabled,
   });
-
-  try {
-    const saved = await args.catalog.saveSeoPlanningDraft(draft);
-    if (!isSeoPlanningEditorialEvidenceTestFixture(saved)) {
-      return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE, code: "rejected" };
-    }
-    return { ok: true, draft: saved, created: true };
-  } catch (error) {
-    // Race on UNIQUE fingerprint — treat as exists.
-    if (error instanceof Error && /fingerprint/i.test(error.message)) {
-      return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE, code: "exists" };
-    }
-    return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE, code: "rejected" };
-  }
 }
 
 export type FixturePermanentDeleteResult =
@@ -336,14 +434,70 @@ export type FixturePermanentDeleteResult =
     };
 
 /**
+ * Catalog contract for lock-scoped fixture permanent delete.
+ */
+export type DeleteTestFixtureCatalog = {
+  deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic(args: {
+    id: string;
+    confirmation: string;
+  }): Promise<FixturePermanentDeleteResult>;
+};
+
+export function parseSeoPlanningTestFixtureOneshot(
+  raw: unknown,
+): SeoPlanningTestFixtureOneshotV1 | null {
+  const row = asRecord(raw);
+  if (!row) return null;
+  if (row.kind !== "TEST_FIXTURE_ONESHOT") return null;
+  if (row.purpose !== SEO_PLANNING_TEST_FIXTURE_PURPOSE) return null;
+  if (row.version !== 1) return null;
+  const consumedAt = sanitizeText(row.consumedAt, 40).trim();
+  const consumedBy = sanitizeText(row.consumedBy, SEO_PLANNING_FIELD_CAPS.createdBy).trim();
+  const planningId = sanitizeText(row.planningId, 80).trim();
+  if (!consumedAt || !consumedBy || !planningId) return null;
+  return {
+    kind: "TEST_FIXTURE_ONESHOT",
+    purpose: SEO_PLANNING_TEST_FIXTURE_PURPOSE,
+    version: 1,
+    consumedAt,
+    consumedBy,
+    planningId,
+  };
+}
+
+export function isSeoPlanningTestFixtureOneshotConsumed(raw: unknown): boolean {
+  return parseSeoPlanningTestFixtureOneshot(raw) != null;
+}
+
+export function buildSeoPlanningTestFixtureOneshot(args: {
+  adminId: string;
+  planningId: string;
+  now?: string;
+}): SeoPlanningTestFixtureOneshotV1 {
+  return {
+    kind: "TEST_FIXTURE_ONESHOT",
+    purpose: SEO_PLANNING_TEST_FIXTURE_PURPOSE,
+    version: 1,
+    consumedAt: args.now || new Date().toISOString(),
+    consumedBy: sanitizeText(args.adminId, SEO_PLANNING_FIELD_CAPS.createdBy).trim() || "unknown",
+    planningId: sanitizeText(args.planningId, 80).trim(),
+  };
+}
+
+export function confirmSeoPlanningTestFixtureCreate(confirmation: unknown): boolean {
+  return String(confirmation || "").trim() === SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM;
+}
+
+/**
  * Strict fixture-only permanent-delete policy (fail closed).
+ * Intended for use under the authoritative row lock after re-read.
  * Does not unlink lineage or cascade. Does not delete non-fixtures.
  */
 export function evaluateSeoPlanningTestFixturePermanentDelete(args: {
   draft: SeoPlanningDraft | null;
   confirmation: string;
-  /** Optional authoritative lineage probe — if linked, deny. */
-  lineageLinked?: boolean;
+  /** Authoritative lineage probe — unknown fails closed. */
+  lineageStatus: FixtureLineageStatus;
 }): FixturePermanentDeleteResult {
   if (!args.draft) {
     return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "not_found" };
@@ -352,6 +506,21 @@ export function evaluateSeoPlanningTestFixturePermanentDelete(args: {
     return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_NOT_FIXTURE_MESSAGE, code: "not_fixture" };
   }
   if (args.draft.fingerprint !== SEO_PLANNING_TEST_FIXTURE_FINGERPRINT) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_IDENTITY_MISMATCH_MESSAGE,
+      code: "not_fixture",
+    };
+  }
+  if (args.draft.recommendation !== SEO_PLANNING_TEST_FIXTURE_RECOMMENDATION) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_IDENTITY_MISMATCH_MESSAGE,
+      code: "not_fixture",
+    };
+  }
+  const marker = readSeoPlanningTestFixtureMarker(args.draft.payload);
+  if (!marker || marker.purpose !== SEO_PLANNING_TEST_FIXTURE_PURPOSE) {
     return {
       ok: false,
       error: SEO_PLANNING_TEST_FIXTURE_IDENTITY_MISMATCH_MESSAGE,
@@ -367,8 +536,15 @@ export function evaluateSeoPlanningTestFixturePermanentDelete(args: {
   ) {
     return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_LINKED_MESSAGE, code: "linked" };
   }
-  if (args.lineageLinked === true) {
+  if (args.lineageStatus === "linked") {
     return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_LINKED_MESSAGE, code: "linked" };
+  }
+  if (args.lineageStatus === "unknown") {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_LINEAGE_UNKNOWN_MESSAGE,
+      code: "rejected",
+    };
   }
   if (!isSeoPlanningDraftArchived(args.draft)) {
     return { ok: false, error: SEO_PLANNING_NOT_ARCHIVED_MESSAGE, code: "not_archived" };

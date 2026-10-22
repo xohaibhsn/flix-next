@@ -62,12 +62,16 @@ import {
 } from "@/lib/cms/seo-planning/editorial-evidence";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
+  confirmSeoPlanningTestFixtureCreate,
   createSeoPlanningEditorialEvidenceTestFixture,
-  evaluateSeoPlanningTestFixturePermanentDelete,
   ignoreClientSuppliedTestFixtureFlags,
+  isReservedOrFixtureMarkedSeoPlanningDraft,
   isSeoPlanningEditorialEvidenceTestFixture,
+  SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM_MISMATCH_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_DELETE_FAILED_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_DISABLED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_SUPER_ADMIN_REQUIRED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
 } from "@/lib/cms/seo-planning/test-fixture";
 import type { SeoPlanningDraft } from "@/lib/cms/types";
 import {
@@ -723,6 +727,11 @@ export async function deleteSeoPlanningDraftPermanentlyAction(
   const stored = await cms.getSeoPlanningDraftById(parsed.id);
   if (!stored) return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
 
+  // Reserved / fixture-marked rows (incl. corrupt markers) use fixture-specific delete only.
+  if (isReservedOrFixtureMarkedSeoPlanningDraft(stored)) {
+    return { ok: false, error: SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE };
+  }
+
   // OFF: legacy permanent-delete via dispatch (no lineage protection activation).
   // Confirmation is applied inside dispatch to preserve a single policy boundary.
   return dispatchSidhuPermanentDelete({
@@ -868,13 +877,21 @@ export type CreateSeoPlanningEditorialEvidenceTestFixtureResult =
   | {
       ok: false;
       error: string;
-      code?: "disabled" | "exists" | "rejected" | "unauthorized" | "access_denied" | typeof CMS_WRITE_FREEZE_CODE;
+      code?:
+        | "disabled"
+        | "exists"
+        | "oneshot_consumed"
+        | "rejected"
+        | "unauthorized"
+        | "access_denied"
+        | "confirm_mismatch"
+        | typeof CMS_WRITE_FREEZE_CODE;
     };
 
 /**
- * Create the single reserved SEO Editorial Evidence TEST fixture Planning draft.
- * Compile-time OFF in this RC — client flags cannot enable it.
- * No Research/Proceed/GSC/AI/Blog. No permanent UI create button.
+ * Temporary Super Admin create control for the reserved TEST fixture.
+ * Compile-time OFF — client flags / testOnlyForceEnabled cannot enable production create.
+ * Requires exact confirmation phrase. Durable oneshot latch prevents recreate after delete.
  */
 export async function createSeoPlanningEditorialEvidenceTestFixtureAction(
   rawInput?: unknown,
@@ -889,17 +906,32 @@ export async function createSeoPlanningEditorialEvidenceTestFixtureAction(
       code: actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
     };
   }
+  if (actor.user.role !== "super_admin") {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_SUPER_ADMIN_REQUIRED_MESSAGE,
+      code: "access_denied",
+    };
+  }
   const frozen = rejectIfCmsWriteFrozen();
   if (frozen) return { ok: false, error: frozen.error, code: CMS_WRITE_FREEZE_CODE };
 
-  // Production path never force-enables — only the compile-time constant.
+  const confirmation =
+    rawInput && typeof rawInput === "object" && !Array.isArray(rawInput)
+      ? (rawInput as Record<string, unknown>).confirmation
+      : undefined;
+  if (!confirmSeoPlanningTestFixtureCreate(confirmation)) {
+    return {
+      ok: false,
+      error: SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM_MISMATCH_MESSAGE,
+      code: "confirm_mismatch",
+    };
+  }
+
+  // Production path never force-enables — only the compile-time constant + durable oneshot.
   const result = await createSeoPlanningEditorialEvidenceTestFixture({
     adminId: actor.user.id,
-    catalog: {
-      getSeoPlanningDraftByFingerprint: (fingerprint) =>
-        cms.getSeoPlanningDraftByFingerprint(fingerprint),
-      saveSeoPlanningDraft: (draft) => cms.saveSeoPlanningDraft(draft),
-    },
+    catalog: cms,
   });
   if (!result.ok) {
     return {
@@ -930,7 +962,7 @@ export type DeleteSeoPlanningEditorialEvidenceTestFixtureResult =
 
 /**
  * Permanently delete an already-archived SEO Editorial Evidence TEST fixture only.
- * Exact ID + reserved fingerprint + marker + confirmation. Fail closed on FK/lineage.
+ * Identity + lineage revalidated under MySQL FOR UPDATE (or JSON Planning lock).
  * Does not delete genuine Planning drafts (use the standard lifecycle action).
  */
 export async function deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAction(
@@ -952,19 +984,13 @@ export async function deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAc
   const parsed = parseSeoPlanningPermanentDeleteInput(rawInput);
   if (!parsed.ok) return { ok: false, error: parsed.error, code: "confirm_mismatch" };
 
-  const stored = await cms.getSeoPlanningDraftById(parsed.id);
-  const policy = evaluateSeoPlanningTestFixturePermanentDelete({
-    draft: stored,
-    confirmation: parsed.confirmation,
-    // Lineage writers remain OFF — treat unknown as unlinked; FK RESTRICT still fails closed.
-    lineageLinked: false,
-  });
-  if (!policy.ok) return policy;
-
   try {
-    const deleted = await cms.deleteSeoPlanningDraftPermanently(parsed.id);
+    const deleted = await cms.deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic({
+      id: parsed.id,
+      confirmation: parsed.confirmation,
+    });
     if (!deleted.ok) {
-      return { ok: false, error: deleted.error, code: "rejected" };
+      return deleted as DeleteSeoPlanningEditorialEvidenceTestFixtureResult;
     }
     return { ok: true };
   } catch (error) {

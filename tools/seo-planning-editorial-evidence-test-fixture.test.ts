@@ -20,24 +20,32 @@ import { seoPlanningPermanentDeleteConfirmToken } from "../lib/cms/seo-planning/
 import { sanitizeSeoPlanningDraft } from "../lib/cms/seo-planning/sanitize";
 import {
   SEO_PLANNING_EDITORIAL_EVIDENCE_TEST_FIXTURE_ENABLED,
+  SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM,
   SEO_PLANNING_TEST_FIXTURE_DISABLED_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_FINGERPRINT,
   SEO_PLANNING_TEST_FIXTURE_KIND,
+  SEO_PLANNING_TEST_FIXTURE_LINEAGE_UNKNOWN_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_OFF_BEFORE_CLEANUP_ORDER,
+  SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY,
   SEO_PLANNING_TEST_FIXTURE_PURPOSE,
   SEO_PLANNING_TEST_FIXTURE_RECOMMENDATION,
   SEO_PLANNING_TEST_FIXTURE_TOPIC,
+  SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
   SEO_PLANNING_TEST_FIXTURE_WORKING_TITLE,
   buildSeoPlanningEditorialEvidenceTestFixtureDraft,
+  confirmSeoPlanningTestFixtureCreate,
   createSeoPlanningEditorialEvidenceTestFixture,
   evaluateSeoPlanningTestFixturePermanentDelete,
   evaluateTestFixtureCreationGate,
   ignoreClientSuppliedTestFixtureFlags,
+  isReservedOrFixtureMarkedSeoPlanningDraft,
   isSeoPlanningEditorialEvidenceTestFixture,
   isSeoPlanningEditorialEvidenceTestFixtureCreationEnabled,
   preserveLockedTestFixtureIdentity,
   readSeoPlanningTestFixtureMarker,
+  shouldRenderSeoPlanningTestFixtureCreateControl,
 } from "../lib/cms/seo-planning/test-fixture";
 import { applySeoPlanningWorkspaceUpdate } from "../lib/cms/seo-planning/workspace";
 import type { SeoPlanningDraft } from "../lib/cms/types";
@@ -99,6 +107,52 @@ test("compile-time fixture gate is OFF and client flags cannot enable", () => {
   });
   assert.equal(evaluateTestFixtureCreationGate().ok, false);
   assert.equal(evaluateTestFixtureCreationGate({ testOnlyForceEnabled: true }).ok, true);
+});
+
+test("create-control render predicate — OFF hides for every role; ON needs super_admin", () => {
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: false,
+      role: "super_admin",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: false,
+      role: "admin",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: true,
+      role: "admin",
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: true,
+      role: null,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: true,
+      role: "super_admin",
+    }),
+    true,
+  );
+  // Page wires the real compile-time constant — stays hidden while OFF.
+  assert.equal(
+    shouldRenderSeoPlanningTestFixtureCreateControl({
+      creationEnabled: SEO_PLANNING_EDITORIAL_EVIDENCE_TEST_FIXTURE_ENABLED,
+      role: "super_admin",
+    }),
+    false,
+  );
 });
 
 test("SEO naming: reserved purpose/fingerprint/title; no person-specific fixture strings", () => {
@@ -210,8 +264,33 @@ test("forced create builds honest TEST fixture — no Research/GSC/Blog linkage"
     });
     assert.equal(dup.ok, false);
     if (!dup.ok) {
-      assert.equal(dup.code, "exists");
-      assert.equal(dup.error, SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE);
+      // Durable oneshot is consumed on first success — blocks recreate even before fingerprint check.
+      assert.equal(dup.code, "oneshot_consumed");
+      assert.equal(dup.error, SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE);
+    }
+    assert.equal(await catalog.isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed(), true);
+  });
+});
+
+test("UNIQUE fingerprint still blocks create when oneshot unused but reserved row exists", async () => {
+  await withTempCatalog(async (catalog) => {
+    const planted = buildSeoPlanningEditorialEvidenceTestFixtureDraft({
+      adminId: "admin_seo",
+      createIdFn: () => "seoplan_planted_fp",
+    });
+    await catalog.saveSeoPlanningDraft(planted);
+    assert.equal(await catalog.isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed(), false);
+
+    const blocked = await createSeoPlanningEditorialEvidenceTestFixture({
+      adminId: "admin_seo",
+      catalog,
+      testOnlyForceEnabled: true,
+      createIdFn: () => "seoplan_planted_fp_2",
+    });
+    assert.equal(blocked.ok, false);
+    if (!blocked.ok) {
+      assert.equal(blocked.code, "exists");
+      assert.equal(blocked.error, SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE);
     }
   });
 });
@@ -386,6 +465,7 @@ test("fixture permanent-delete policy — archive, confirm, identity, no genuine
     const activeDeny = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: created.draft,
       confirmation: seoPlanningPermanentDeleteConfirmToken(created.draft),
+      lineageStatus: "unlinked",
     });
     assert.equal(activeDeny.ok, false);
     if (!activeDeny.ok) assert.equal(activeDeny.code, "not_archived");
@@ -398,6 +478,7 @@ test("fixture permanent-delete policy — archive, confirm, identity, no genuine
     const badConfirm = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: fixtureArchived,
       confirmation: "wrong title",
+      lineageStatus: "unlinked",
     });
     assert.equal(badConfirm.ok, false);
     if (!badConfirm.ok) assert.equal(badConfirm.code, "confirm_mismatch");
@@ -405,6 +486,7 @@ test("fixture permanent-delete policy — archive, confirm, identity, no genuine
     const genuineDeny = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: genuine,
       confirmation: seoPlanningPermanentDeleteConfirmToken(genuine),
+      lineageStatus: "unlinked",
     });
     assert.equal(genuineDeny.ok, false);
     if (!genuineDeny.ok) assert.equal(genuineDeny.code, "not_fixture");
@@ -416,6 +498,7 @@ test("fixture permanent-delete policy — archive, confirm, identity, no genuine
     const linkedDeny = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: linked,
       confirmation: seoPlanningPermanentDeleteConfirmToken(linked),
+      lineageStatus: "unlinked",
     });
     assert.equal(linkedDeny.ok, false);
     if (!linkedDeny.ok) assert.equal(linkedDeny.code, "linked");
@@ -423,20 +506,322 @@ test("fixture permanent-delete policy — archive, confirm, identity, no genuine
     const lineageDeny = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: fixtureArchived,
       confirmation: seoPlanningPermanentDeleteConfirmToken(fixtureArchived),
-      lineageLinked: true,
+      lineageStatus: "linked",
     });
     assert.equal(lineageDeny.ok, false);
     if (!lineageDeny.ok) assert.equal(lineageDeny.code, "linked");
 
+    const unknownDeny = evaluateSeoPlanningTestFixturePermanentDelete({
+      draft: fixtureArchived,
+      confirmation: seoPlanningPermanentDeleteConfirmToken(fixtureArchived),
+      lineageStatus: "unknown",
+    });
+    assert.equal(unknownDeny.ok, false);
+    if (!unknownDeny.ok) {
+      assert.equal(unknownDeny.code, "rejected");
+      assert.equal(unknownDeny.error, SEO_PLANNING_TEST_FIXTURE_LINEAGE_UNKNOWN_MESSAGE);
+    }
+
     const allow = evaluateSeoPlanningTestFixturePermanentDelete({
       draft: fixtureArchived,
       confirmation: seoPlanningPermanentDeleteConfirmToken(fixtureArchived),
+      lineageStatus: "unlinked",
     });
     assert.equal(allow.ok, true);
-    const deleted = await catalog.deleteSeoPlanningDraftPermanently(fixtureArchived.id);
+
+    const genericBlocked = await catalog.deleteSeoPlanningDraftPermanently(fixtureArchived.id);
+    assert.equal(genericBlocked.ok, false);
+    if (!genericBlocked.ok) {
+      assert.equal(genericBlocked.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+    assert.ok(await catalog.getSeoPlanningDraftById(fixtureArchived.id));
+
+    const deleted = await catalog.deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic({
+      id: fixtureArchived.id,
+      confirmation: seoPlanningPermanentDeleteConfirmToken(fixtureArchived),
+    });
     assert.equal(deleted.ok, true);
     assert.equal(await catalog.getSeoPlanningDraftById(fixtureArchived.id), null);
     assert.ok(await catalog.getSeoPlanningDraftById(genuine.id));
+    assert.equal(await catalog.isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed(), true);
+
+    const recreate = await createSeoPlanningEditorialEvidenceTestFixture({
+      adminId: "admin_seo",
+      catalog,
+      testOnlyForceEnabled: true,
+      createIdFn: () => "seoplan_del_2",
+    });
+    assert.equal(recreate.ok, false);
+    if (!recreate.ok) {
+      assert.equal(recreate.code, "oneshot_consumed");
+      assert.equal(recreate.error, SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE);
+    }
+  });
+});
+
+test("create confirmation phrase and OFF-before-cleanup order are stable", () => {
+  assert.equal(confirmSeoPlanningTestFixtureCreate(SEO_PLANNING_TEST_FIXTURE_CREATE_CONFIRM), true);
+  assert.equal(confirmSeoPlanningTestFixtureCreate("nope"), false);
+  assert.deepEqual([...SEO_PLANNING_TEST_FIXTURE_OFF_BEFORE_CLEANUP_ORDER], [
+    "approved_on_release",
+    "create_one_fixture",
+    "approved_off_release",
+    "verify_off_without_mutating_create",
+    "evidence_acceptance_on_existing_id",
+    "archive_exact_id",
+    "fixture_specific_permanent_delete",
+  ]);
+});
+
+test("reserved/corrupt fixture fence — generic delete rejected; notes alone not protected", async () => {
+  await withTempCatalog(async (catalog) => {
+    async function archiveThenGenericDelete(id: string) {
+      const arch = await catalog.archiveSeoPlanningDraft(id);
+      assert.ok(arch.ok);
+      return catalog.deleteSeoPlanningDraftPermanently(id);
+    }
+
+    // 1) Exact fingerprint + valid marker (full fixture).
+    const valid = await createSeoPlanningEditorialEvidenceTestFixture({
+      adminId: "admin_seo",
+      catalog,
+      testOnlyForceEnabled: true,
+      createIdFn: () => "seoplan_fence_valid",
+    });
+    assert.ok(valid.ok);
+    if (!valid.ok) throw new Error("valid create");
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(valid.draft), true);
+    assert.equal(isSeoPlanningEditorialEvidenceTestFixture(valid.draft), true);
+    const validGeneric = await archiveThenGenericDelete(valid.draft.id);
+    assert.equal(validGeneric.ok, false);
+    if (!validGeneric.ok) {
+      assert.equal(validGeneric.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+    assert.ok(await catalog.getSeoPlanningDraftById(valid.draft.id));
+
+    // Clean via fixture-specific delete so later cases can reuse fingerprint.
+    const validArchived = await catalog.getSeoPlanningDraftById(valid.draft.id);
+    assert.ok(validArchived);
+    const cleaned = await catalog.deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic({
+      id: validArchived!.id,
+      confirmation: seoPlanningPermanentDeleteConfirmToken(validArchived!),
+    });
+    assert.equal(cleaned.ok, true);
+
+    // 2) Exact fingerprint + corrupted marker.
+    const corruptMarker = sanitizeSeoPlanningDraft({
+      ...buildSeoPlanningEditorialEvidenceTestFixtureDraft({
+        adminId: "admin_seo",
+        createIdFn: () => "seoplan_fence_corrupt",
+      }),
+      payload: {
+        [SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY]: { kind: "NOT_A_FIXTURE", broken: true },
+      },
+    });
+    assert.equal(isSeoPlanningEditorialEvidenceTestFixture(corruptMarker), false);
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(corruptMarker), true);
+    await catalog.saveSeoPlanningDraft(corruptMarker);
+    const corruptGeneric = await archiveThenGenericDelete(corruptMarker.id);
+    assert.equal(corruptGeneric.ok, false);
+    if (!corruptGeneric.ok) {
+      assert.equal(corruptGeneric.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+    const corruptSpecific = await catalog.deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic({
+      id: corruptMarker.id,
+      confirmation: seoPlanningPermanentDeleteConfirmToken(
+        (await catalog.getSeoPlanningDraftById(corruptMarker.id))!,
+      ),
+    });
+    assert.equal(corruptSpecific.ok, false);
+    if (!corruptSpecific.ok) assert.equal(corruptSpecific.code, "not_fixture");
+    assert.ok(await catalog.getSeoPlanningDraftById(corruptMarker.id));
+  });
+
+  await withTempCatalog(async (catalog) => {
+    async function archiveThenGenericDelete(id: string) {
+      const arch = await catalog.archiveSeoPlanningDraft(id);
+      assert.ok(arch.ok);
+      return catalog.deleteSeoPlanningDraftPermanently(id);
+    }
+
+    // Missing marker + reserved fingerprint.
+    const missingMarker = sanitizeSeoPlanningDraft({
+      id: "seoplan_fence_missing_marker",
+      recommendation: SEO_PLANNING_TEST_FIXTURE_RECOMMENDATION,
+      workflowStatus: "PLANNING",
+      fingerprint: SEO_PLANNING_TEST_FIXTURE_FINGERPRINT,
+      topic: SEO_PLANNING_TEST_FIXTURE_TOPIC,
+      workingTitle: SEO_PLANNING_TEST_FIXTURE_WORKING_TITLE,
+      proposedSlug: "",
+      targetPostId: null,
+      matchedPublicUrl: "",
+      restorePath: "",
+      searchIntent: "INFORMATIONAL",
+      linkedPostId: null,
+      createdBy: "admin_seo",
+      createdAt: "2026-10-22T00:00:00.000Z",
+      updatedAt: "2026-10-22T00:00:00.000Z",
+      archivedAt: null,
+      payload: { workspace: { humanNotes: "no marker key" } },
+    });
+    assert.equal(isSeoPlanningEditorialEvidenceTestFixture(missingMarker), false);
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(missingMarker), true);
+    await catalog.saveSeoPlanningDraft(missingMarker);
+    const missingGeneric = await archiveThenGenericDelete(missingMarker.id);
+    assert.equal(missingGeneric.ok, false);
+    if (!missingGeneric.ok) {
+      assert.equal(missingGeneric.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+    const missingSpecific = await catalog.deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic({
+      id: missingMarker.id,
+      confirmation: seoPlanningPermanentDeleteConfirmToken(
+        (await catalog.getSeoPlanningDraftById(missingMarker.id))!,
+      ),
+    });
+    assert.equal(missingSpecific.ok, false);
+    if (!missingSpecific.ok) assert.equal(missingSpecific.code, "not_fixture");
+  });
+
+  await withTempCatalog(async (catalog) => {
+    async function archiveThenGenericDelete(id: string) {
+      const arch = await catalog.archiveSeoPlanningDraft(id);
+      assert.ok(arch.ok);
+      return catalog.deleteSeoPlanningDraftPermanently(id);
+    }
+
+    // 4) Valid-looking marker + altered fingerprint.
+    const alteredFp = sanitizeSeoPlanningDraft({
+      id: "seoplan_fence_alt_fp",
+      recommendation: "REFRESH_EXISTING",
+      workflowStatus: "PLANNING",
+      fingerprint: "REFRESH_EXISTING:post_altered_fixture_probe",
+      topic: "Altered fingerprint probe",
+      workingTitle: "Altered fingerprint probe",
+      proposedSlug: "",
+      targetPostId: null,
+      matchedPublicUrl: "",
+      restorePath: "",
+      searchIntent: "INFORMATIONAL",
+      linkedPostId: null,
+      createdBy: "admin_seo",
+      createdAt: "2026-10-22T00:00:00.000Z",
+      updatedAt: "2026-10-22T00:00:00.000Z",
+      archivedAt: null,
+      payload: {
+        [SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY]: {
+          kind: SEO_PLANNING_TEST_FIXTURE_KIND,
+          purpose: SEO_PLANNING_TEST_FIXTURE_PURPOSE,
+          version: 1,
+          createdAt: "2026-10-22T00:00:00.000Z",
+          createdBy: "admin_seo",
+        },
+      },
+    });
+    assert.equal(isSeoPlanningEditorialEvidenceTestFixture(alteredFp), false);
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(alteredFp), true);
+    await catalog.saveSeoPlanningDraft(alteredFp);
+    const altGeneric = await archiveThenGenericDelete(alteredFp.id);
+    assert.equal(altGeneric.ok, false);
+    if (!altGeneric.ok) {
+      assert.equal(altGeneric.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+
+    // 5) Partial / malformed marker only.
+    const partial = sanitizeSeoPlanningDraft({
+      id: "seoplan_fence_partial",
+      recommendation: "NEW_BLOG",
+      workflowStatus: "PLANNING",
+      fingerprint: "NEW_BLOG:partial_marker_probe",
+      topic: "Partial marker probe",
+      workingTitle: "Partial marker probe",
+      proposedSlug: "",
+      targetPostId: null,
+      matchedPublicUrl: "",
+      restorePath: "",
+      searchIntent: "INFORMATIONAL",
+      linkedPostId: null,
+      createdBy: "admin_seo",
+      createdAt: "2026-10-22T00:00:00.000Z",
+      updatedAt: "2026-10-22T00:00:00.000Z",
+      archivedAt: null,
+      payload: {
+        [SEO_PLANNING_TEST_FIXTURE_PAYLOAD_KEY]: { kind: SEO_PLANNING_TEST_FIXTURE_KIND },
+      },
+    });
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(partial), true);
+    await catalog.saveSeoPlanningDraft(partial);
+    const partialGeneric = await archiveThenGenericDelete(partial.id);
+    assert.equal(partialGeneric.ok, false);
+    if (!partialGeneric.ok) {
+      assert.equal(partialGeneric.error, SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE);
+    }
+
+    // 8–10) Genuine archived Buffering / Firestick-style drafts remain deletable;
+    // "TEST" in notes alone is not protected.
+    const buffering = sanitizeSeoPlanningDraft({
+      ...genuineRefreshDraft(),
+      id: "seoplan_fence_buffering",
+      fingerprint: "REFRESH_EXISTING:post_buffering",
+      topic: "Diagnosing IPTV buffering",
+      workingTitle: "IPTV Buffering Guide",
+      targetPostId: "post_buffering",
+      payload: {
+        workspace: { humanNotes: "TEST notes must not fence this genuine draft" },
+        opportunity: {
+          topic: "Diagnosing IPTV buffering",
+          workingTitle: "IPTV Buffering Guide",
+          confidence: "HIGH",
+          whyNow: "Real",
+          webEvidence: "Real",
+        },
+      },
+    });
+    const firestick = sanitizeSeoPlanningDraft({
+      id: "seoplan_fence_firestick",
+      recommendation: "REFRESH_EXISTING",
+      workflowStatus: "PLANNING",
+      fingerprint: "REFRESH_EXISTING:post_firestick",
+      topic: "Firestick IPTV setup",
+      workingTitle: "Firestick IPTV setup",
+      proposedSlug: "",
+      targetPostId: "post_firestick",
+      matchedPublicUrl: "/blogs/firestick/",
+      restorePath: "",
+      searchIntent: "INFORMATIONAL",
+      linkedPostId: null,
+      createdBy: "admin_1",
+      createdAt: "2026-10-07T08:00:00.000Z",
+      updatedAt: "2026-10-07T08:00:00.000Z",
+      archivedAt: null,
+      payload: {
+        opportunity: {
+          topic: "Firestick IPTV setup",
+          workingTitle: "Firestick IPTV setup",
+          confidence: "HIGH",
+          whyNow: "Real",
+          webEvidence: "Real",
+        },
+      },
+    });
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(buffering), false);
+    assert.equal(isReservedOrFixtureMarkedSeoPlanningDraft(firestick), false);
+    await catalog.saveSeoPlanningDraft(buffering);
+    await catalog.saveSeoPlanningDraft(firestick);
+
+    const activeDeny = await catalog.deleteSeoPlanningDraftPermanently(buffering.id);
+    assert.equal(activeDeny.ok, false);
+
+    const bufferingDel = await archiveThenGenericDelete(buffering.id);
+    assert.equal(bufferingDel.ok, true);
+    assert.equal(await catalog.getSeoPlanningDraftById(buffering.id), null);
+
+    const firestickDel = await archiveThenGenericDelete(firestick.id);
+    assert.equal(firestickDel.ok, true);
+    assert.equal(await catalog.getSeoPlanningDraftById(firestick.id), null);
+
+    // Partial/altered fixture-marked rows still present (not deleted).
+    assert.ok(await catalog.getSeoPlanningDraftById(alteredFp.id));
+    assert.ok(await catalog.getSeoPlanningDraftById(partial.id));
   });
 });
 

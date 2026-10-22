@@ -48,9 +48,23 @@ import {
   type SeoPlanningEditorialEvidenceV1,
 } from "@/lib/cms/seo-planning/editorial-evidence";
 import {
+  buildSeoPlanningEditorialEvidenceTestFixtureDraft,
+  buildSeoPlanningTestFixtureOneshot,
+  evaluateSeoPlanningTestFixturePermanentDelete,
+  evaluateTestFixtureCreationGate,
+  isReservedOrFixtureMarkedSeoPlanningDraft,
   isSeoPlanningEditorialEvidenceTestFixture,
+  isSeoPlanningTestFixtureOneshotConsumed,
   preserveLockedTestFixtureIdentity,
   preserveTestFixtureMarkerInEvidencePayload,
+  SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_FINGERPRINT,
+  SEO_PLANNING_TEST_FIXTURE_LINKED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE,
+  SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY,
+  SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
+  type FixtureLineageStatus,
 } from "@/lib/cms/seo-planning/test-fixture";
 import { isSeoPlanningActionableRecommendation } from "@/lib/cms/seo-planning/constants";
 import {
@@ -344,6 +358,27 @@ function createPromptAcceptReaders(
       return lockedCategory ? [lockedCategory] : [];
     },
   };
+}
+
+async function probeFixtureLineageStatusOnConnection(
+  conn: PoolConnection,
+  planningId: string,
+): Promise<FixtureLineageStatus> {
+  try {
+    const [tables] = await conn.query<RowDataPacket[]>(
+      `SELECT TABLE_NAME AS name FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'seo_planning_decision_links'
+       LIMIT 1`,
+    );
+    if (!tables[0]) return "unlinked";
+    const [links] = await conn.query<RowDataPacket[]>(
+      "SELECT planning_draft_id FROM seo_planning_decision_links WHERE planning_draft_id = ? LIMIT 1",
+      [planningId],
+    );
+    return links[0] ? "linked" : "unlinked";
+  } catch {
+    return "unknown";
+  }
 }
 
 function mapPlanningDraft(row: PlanningRow): SeoPlanningDraft {
@@ -786,11 +821,187 @@ export class MysqlCatalogRepository implements CatalogRepository {
       );
       if (!rows[0]) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
       const latest = mapPlanningDraft(rows[0]);
+      // Reserved fingerprint or any fixture-marker evidence (incl. corrupt) — fail closed.
+      if (isReservedOrFixtureMarkedSeoPlanningDraft(latest)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_USE_FIXTURE_DELETE_MESSAGE,
+        };
+      }
       const gate = assertArchivedForPermanentDelete(latest);
       if (!gate.ok) return gate;
       await conn.execute("DELETE FROM seo_planning_drafts WHERE id = ?", [want]);
       return { ok: true as const };
     });
+  }
+
+  async isSeoPlanningEditorialEvidenceTestFixtureOneshotConsumed() {
+    await this.ready();
+    const [rows] = await getDbPool().query<RowDataPacket[]>(
+      "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1",
+      [SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY],
+    );
+    if (!rows[0]) return false;
+    try {
+      const parsed = JSON.parse(String(rows[0].setting_value || ""));
+      return isSeoPlanningTestFixtureOneshotConsumed(parsed);
+    } catch {
+      // Non-empty corrupt latch fails closed as consumed.
+      return String(rows[0].setting_value || "").trim().length > 0;
+    }
+  }
+
+  async createSeoPlanningEditorialEvidenceTestFixtureAtomic(args: {
+    adminId: string;
+    now?: string;
+    createIdFn?: (prefix?: string) => string;
+    testOnlyForceEnabled?: boolean;
+  }) {
+    await this.ready();
+    const gate = evaluateTestFixtureCreationGate({
+      testOnlyForceEnabled: args.testOnlyForceEnabled,
+    });
+    if (!gate.ok) {
+      return { ok: false as const, error: gate.error, code: "disabled" as const };
+    }
+
+    try {
+      return await withTransaction(async (conn) => {
+        // Durable latch row — INSERT IGNORE then FOR UPDATE so concurrent workers serialize.
+        await conn.execute(
+          "INSERT IGNORE INTO site_settings (setting_key, setting_value) VALUES (?, ?)",
+          [SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY, ""],
+        );
+        const [latchRows] = await conn.query<RowDataPacket[]>(
+          "SELECT setting_value FROM site_settings WHERE setting_key = ? LIMIT 1 FOR UPDATE",
+          [SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY],
+        );
+        const latchRaw = latchRows[0]?.setting_value;
+        // Any non-empty latch fails closed as consumed unless it is a valid unused empty seed.
+        if (String(latchRaw || "").trim()) {
+          return {
+            ok: false as const,
+            error: SEO_PLANNING_TEST_FIXTURE_ONESHOT_CONSUMED_MESSAGE,
+            code: "oneshot_consumed" as const,
+          };
+        }
+
+        const [fpRows] = await conn.query<PlanningRow[]>(
+          "SELECT * FROM seo_planning_drafts WHERE fingerprint = ? LIMIT 1 FOR UPDATE",
+          [SEO_PLANNING_TEST_FIXTURE_FINGERPRINT],
+        );
+        if (fpRows[0]) {
+          return {
+            ok: false as const,
+            error: SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
+            code: "exists" as const,
+          };
+        }
+
+        const draft = buildSeoPlanningEditorialEvidenceTestFixtureDraft({
+          adminId: args.adminId,
+          now: args.now,
+          createIdFn: args.createIdFn,
+        });
+        const safe = sanitizeSeoPlanningDraft(draft);
+        await conn.execute(
+          `INSERT INTO seo_planning_drafts (
+            id, recommendation, workflow_status, fingerprint, topic, working_title, proposed_slug,
+            target_post_id, matched_public_url, restore_path, search_intent, linked_post_id,
+            created_by, payload, archived_at, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            safe.id,
+            safe.recommendation,
+            safe.workflowStatus,
+            safe.fingerprint,
+            safe.topic,
+            safe.workingTitle,
+            safe.proposedSlug,
+            safe.targetPostId,
+            safe.matchedPublicUrl,
+            safe.restorePath,
+            safe.searchIntent,
+            safe.linkedPostId,
+            safe.createdBy,
+            JSON.stringify(safe.payload || {}),
+            null,
+            toMysqlDateTime(safe.createdAt),
+            toMysqlDateTime(safe.updatedAt),
+          ],
+        );
+
+        const oneshot = buildSeoPlanningTestFixtureOneshot({
+          adminId: args.adminId,
+          planningId: safe.id,
+          now: args.now || safe.createdAt,
+        });
+        await conn.execute(
+          "UPDATE site_settings SET setting_value = ? WHERE setting_key = ?",
+          [JSON.stringify(oneshot), SEO_PLANNING_TEST_FIXTURE_ONESHOT_KEY],
+        );
+
+        if (!isSeoPlanningEditorialEvidenceTestFixture(safe)) {
+          throw new Error(SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE);
+        }
+        return { ok: true as const, draft: safe, created: true as const };
+      });
+    } catch (error) {
+      if (error instanceof Error && /fingerprint/i.test(error.message)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_EXISTS_MESSAGE,
+          code: "exists" as const,
+        };
+      }
+      return {
+        ok: false as const,
+        error: SEO_PLANNING_TEST_FIXTURE_CREATE_FAILED_MESSAGE,
+        code: "rejected" as const,
+      };
+    }
+  }
+
+  async deleteSeoPlanningEditorialEvidenceTestFixturePermanentlyAtomic(args: {
+    id: string;
+    confirmation: string;
+  }) {
+    await this.ready();
+    const want = String(args.id || "").trim();
+    if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+    try {
+      return await withTransaction(async (conn) => {
+        const [rows] = await conn.query<PlanningRow[]>(
+          "SELECT * FROM seo_planning_drafts WHERE id = ? LIMIT 1 FOR UPDATE",
+          [want],
+        );
+        if (!rows[0]) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
+        const latest = mapPlanningDraft(rows[0]);
+        const lineageStatus = await probeFixtureLineageStatusOnConnection(conn, want);
+        const policy = evaluateSeoPlanningTestFixturePermanentDelete({
+          draft: latest,
+          confirmation: args.confirmation,
+          lineageStatus,
+        });
+        if (!policy.ok) return policy;
+        await conn.execute("DELETE FROM seo_planning_drafts WHERE id = ?", [want]);
+        return { ok: true as const };
+      });
+    } catch (error) {
+      // FK RESTRICT / fence — fail closed, no unlink.
+      if (error instanceof Error && /foreign key|1451|restrict|fence/i.test(error.message)) {
+        return {
+          ok: false as const,
+          error: SEO_PLANNING_TEST_FIXTURE_LINKED_MESSAGE,
+          code: "linked",
+        };
+      }
+      return {
+        ok: false as const,
+        error: "Could not permanently delete the editorial evidence test fixture. Please try again.",
+        code: "rejected",
+      };
+    }
   }
   async mergeSeoPlanningWritingPromptCache(args: {
     id: string;
