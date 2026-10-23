@@ -299,6 +299,40 @@ export {
   type ArticleApplyProductionGateResult,
 } from "@/lib/cms/seo-planning/article-apply-production-gate";
 export {
+  A2_APPLY_SCHEMA_NOT_READY_CODE,
+  A2_APPLY_SCHEMA_NOT_READY_MESSAGE,
+  A2_APPLY_SCHEMA_READINESS_SPEC,
+  evaluateA2ApplyDurableSchemaReadiness,
+  type A2ApplySchemaReadinessResult,
+} from "@/lib/cms/seo-planning/article-apply-schema-readiness";
+export {
+  SEO_AI_ARTICLE_APPLY_BOUNDED_EXECUTION_ACK,
+  SEO_AI_ARTICLE_CONTROLLED_APPLY_MESSAGES,
+  SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC,
+  assertTrustedApplyActor,
+  executeControlledSidhuNewBlogArticleApply,
+  ignoreClientSuppliedArticleApplyFlags,
+  parseControlledArticleApplyInput,
+  probeControlledApplyBlockersForDiagnostics,
+  type ControlledArticleApplyFailure,
+  type ControlledArticleApplyParsedInput,
+  type ControlledArticleApplyResult,
+  type ControlledArticleApplySuccess,
+} from "@/lib/cms/seo-planning/article-apply-controlled";
+export {
+  SEO_AI_ONESHOT_PUBLISHER_ACTIVATED,
+  SEO_AI_ONESHOT_PUBLISHER_LIMITS,
+  SEO_AI_ONESHOT_PUBLISHER_OFF_CODE,
+  SEO_AI_ONESHOT_PUBLISHER_OFF_MESSAGE,
+  SEO_AI_ONESHOT_PUBLISHER_SPEC,
+  inactiveOneshotArticlePublisher,
+  isOneshotPublisherActivated,
+  oneshotPublisherRejectsPublishedPost,
+  type OneshotArticlePublisher,
+  type OneshotPublisherRequest,
+  type OneshotPublisherResult,
+} from "@/lib/cms/seo-planning/article-oneshot-publisher";
+export {
   SEO_AI_ARTICLE_PRIVATE_APPLY_LOCAL_MESSAGES,
   SEO_AI_ARTICLE_PRIVATE_APPLY_LOCAL_SPEC,
   applyPrivateNewBlogArticleLocal,
@@ -380,3 +414,20 @@ export {
   type DurableMysqlTxnFacade,
   type InactiveMysqlCmsApplyDepsOptions,
 } from "@/lib/cms/seo-planning/article-apply-durable-mysql";
+export {
+  SEO_AI_ARTICLE_APPLY_PRODUCTION_DI_SPEC,
+  resolveCmsApplyProductionDeps,
+  __installCmsApplyDurableFacadeFactoryForActivation,
+  __peekCmsApplyDurableFacadeFactoryInstalled,
+  type CmsApplyProductionDiResolution,
+} from "@/lib/cms/seo-planning/article-apply-production-di";
+export {
+  SEO_AUTOMATION_MASTER_CONTROL_SPEC,
+  SEO_AUTOMATION_ELIGIBILITY_SPEC,
+  SEO_AUTOMATION_PILOT_LIMITS,
+  evaluateAutonomousNewBlogEligibility,
+  readSeoAutomationSwitchBoard,
+  buildSeoAutomationWorkspaceStatus,
+  planSeoAutomationDurableMigration,
+} from "@/lib/cms/seo-automation";
+

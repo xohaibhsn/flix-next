@@ -1,0 +1,37 @@
+﻿[
+    {
+        "file":  "lib/cms/seo-planning/article-apply-controlled.ts",
+        "sha256":  "AAC0DC746E9EBAD616FF3B8B0FDBBFE2F00EF7CF0A4F638E320992A0F929FD93",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "lib/cms/seo-planning/article-apply-schema-readiness.ts",
+        "sha256":  "42F2102241E069BF99332C301EC8C9D92913B4581A73161E2326A1ACEA3DC6CF",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "lib/cms/seo-planning/article-oneshot-publisher.ts",
+        "sha256":  "27B5D7AD6A848D6029F6525C2231DCDA81B8F1B712D95D5383BCCB5A646CABB0",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "lib/cms/seo-planning-actions.ts",
+        "sha256":  "C3146DD81028EE7AF3BA627F08F3F7ED2A2E5796645B9C69502C62E1C5F7B576",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "lib/cms/seo-planning/index.ts",
+        "sha256":  "A691E1B269E51D7BA3C9519FF755FD3D2D6592EFF3AC0CDCD3C6046CCABB64F2",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "tools/seo-planning-article-apply-controlled.test.ts",
+        "sha256":  "8E66CBDF4C81E4B107AAF3CB5B4FA5B9E250A0F834CA72A20371CE14D68772F6",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    },
+    {
+        "file":  "tools/seo-planning-article-apply-production-gate.test.ts",
+        "sha256":  "50DBF097C33B772BB0C290CF9782D7B9BEC8630EA7FCA6A16FA4C2EF121E67E0",
+        "source":  "flix-next-junaid-a2-apply-rc@33d8369+local"
+    }
+]

@@ -35,21 +35,30 @@ test("GATE: env / cookie / body / url flags cannot open Apply wiring", () => {
   assert.equal(result.envOverrideIgnored, true);
 });
 
-test("GATE: no production Apply Server Action or Apply UI wired", () => {
+test("GATE: controlled Apply Server Action is fail-closed; production wiring stays OFF", () => {
   const actions = readFileSync(path.join(root, "lib/cms/seo-planning-actions.ts"), "utf8");
-  assert.doesNotMatch(actions, /applyPrivateNewBlogArticleLocal/);
-  assert.doesNotMatch(actions, /applyPrivateArticleViaCmsAdapter/);
-  assert.doesNotMatch(actions, /evaluateArticleApplyProductionGate/);
+  assert.match(actions, /export async function applyNewBlogArticlePreviewToPrivateDraftAction/);
+  assert.match(actions, /executeControlledSidhuNewBlogArticleApply/);
+  // Direct unguarded local/memory Apply must not be called from the Server Action surface.
+  assert.doesNotMatch(actions, /applyPrivateNewBlogArticleLocal\s*\(/);
+  assert.doesNotMatch(actions, /applyPrivateArticleViaCmsAdapter\s*\(/);
+  assert.doesNotMatch(actions, /createMemoryCmsTrustStores/);
   assert.doesNotMatch(actions, /applyGeneratedArticleToNewBlogDraftAction/);
-  assert.doesNotMatch(actions, /applyGeneratedArticleToPrivateBlogDraft/);
+  assert.doesNotMatch(actions, /SEO_AI_ARTICLE_APPLY_PRODUCTION_WIRING_ENABLED\s*=\s*true/);
 
   const uiPath = path.join(root, "components/sidhu/SeoPlanningArticleGeneration.tsx");
   if (existsSync(uiPath)) {
     const ui = readFileSync(uiPath, "utf8");
     assert.doesNotMatch(ui, /Apply to Private Blog Draft/i);
+    assert.doesNotMatch(ui, /applyNewBlogArticlePreviewToPrivateDraftAction/);
     assert.doesNotMatch(ui, /applyPrivateArticleViaCmsAdapter/);
     assert.doesNotMatch(ui, /applyPrivateNewBlogArticleLocal/);
   }
 
+  // Legacy unscoped article-apply.ts remains unused; controlled module is the Sidhu entry.
   assert.equal(existsSync(path.join(root, "lib/cms/seo-planning/article-apply.ts")), false);
+  assert.equal(
+    existsSync(path.join(root, "lib/cms/seo-planning/article-apply-controlled.ts")),
+    true,
+  );
 });

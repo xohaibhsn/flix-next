@@ -801,7 +801,8 @@ export function createDurableCmsApplyUnavailableDeps(): {
 
 /**
  * Production-gated Apply entry. Does not accept injected fake stores/transactions.
- * Resolves only through durable-unavailable deps until real storage is approved and wired.
+ * Resolves through production DI (fail-closed unavailable deps until schema +
+ * fencing + facade factory + master apply writers are authorized).
  */
 export async function applyPrivateArticleViaCmsAdapterUntilDurableReady(args: {
   clientPreview: unknown;
@@ -817,8 +818,17 @@ export async function applyPrivateArticleViaCmsAdapterUntilDurableReady(args: {
   trustedEvidencePack?: TrustedArticleEvidencePackAssessment | unknown;
   now?: string;
   createIdFn?: (prefix?: string) => string;
+  /** Optional physical-schema probe result from a verified migration gate. */
+  physicalSchemaPresent?: boolean;
 }): Promise<CmsApplyAdapterResult> {
-  const deps = createDurableCmsApplyUnavailableDeps();
+  const { resolveCmsApplyProductionDeps } = await import(
+    "@/lib/cms/seo-planning/article-apply-production-di"
+  );
+  const deps = resolveCmsApplyProductionDeps({
+    physicalSchemaPresent: args.physicalSchemaPresent === true,
+    trustedEvidencePack: args.trustedEvidencePack,
+    evidencePackStatus: args.evidencePackStatus,
+  });
   return applyPrivateArticleViaCmsAdapter({
     clientPreview: args.clientPreview,
     previewSessionId: args.previewSessionId,

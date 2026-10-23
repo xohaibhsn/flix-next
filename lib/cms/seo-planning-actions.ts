@@ -17,6 +17,17 @@ import {
   type GenerateArticlePreviewResult,
 } from "@/lib/cms/seo-planning/article-generation";
 import {
+  executeControlledSidhuNewBlogArticleApply,
+  SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC,
+  type ControlledArticleApplyResult,
+} from "@/lib/cms/seo-planning/article-apply-controlled";
+import {
+  SEO_AI_ARTICLE_APPLY_PRODUCTION_DISABLED_MESSAGE,
+  SEO_AI_ARTICLE_APPLY_PRODUCTION_GATE_CODE,
+  SEO_AI_ARTICLE_APPLY_PRODUCTION_WIRING_SPEC,
+} from "@/lib/cms/seo-planning/article-apply-production-gate";
+import type { TrustedPrivateApplyActor } from "@/lib/cms/seo-planning/article-private-apply-local";
+import {
   parseSeoPlanningHandoffInput,
   SEO_PLANNING_HANDOFF_BLOG_PERMISSION_MESSAGE,
   type SeoPlanningHandoffResult,
@@ -755,11 +766,79 @@ export type GenerateNewBlogArticlePreviewActionResult = GenerateArticlePreviewRe
   featureEnabled?: boolean;
 };
 
+export type ApplyNewBlogArticlePreviewToPrivateDraftActionResult = ControlledArticleApplyResult & {
+  controlledSpec: typeof SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC;
+};
+
+function controlledApplyAuthFailure(
+  code: "unauthorized" | "access_denied" | typeof CMS_WRITE_FREEZE_CODE,
+  error: string,
+): ApplyNewBlogArticlePreviewToPrivateDraftActionResult {
+  return {
+    ok: false,
+    spec: SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC,
+    controlledSpec: SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC,
+    code,
+    error,
+    publicationReady: false,
+    realCmsWrite: false,
+    committed: false,
+    productionWiring: {
+      ok: false,
+      spec: SEO_AI_ARTICLE_APPLY_PRODUCTION_WIRING_SPEC,
+      code: SEO_AI_ARTICLE_APPLY_PRODUCTION_GATE_CODE,
+      error: SEO_AI_ARTICLE_APPLY_PRODUCTION_DISABLED_MESSAGE,
+      envOverrideIgnored: true,
+    },
+    schemaReadiness: null,
+    adapter: null,
+  };
+}
+
+/**
+ * A2 controlled Sidhu Apply entry — authenticated, fail-closed.
+ *
+ * Production wiring remains compile-time OFF (`SEO_AI_ARTICLE_APPLY_PRODUCTION_WIRING_ENABLED`).
+ * Durable A2 schema remains unregistered. This action never trusts client `approved=true`,
+ * never publishes, and never overwrites published Blog content.
+ *
+ * Requires SEO + Blog RBAC. Bounded execution acknowledgement is enforced only if the
+ * production gate is later opened by a separate activation patch.
+ */
+export async function applyNewBlogArticlePreviewToPrivateDraftAction(
+  rawInput: unknown,
+): Promise<ApplyNewBlogArticlePreviewToPrivateDraftActionResult> {
+  const actor = await requireAdminActor("seo");
+  if (!actor.ok) {
+    return controlledApplyAuthFailure(
+      actor.error === "Unauthorized" ? "unauthorized" : "access_denied",
+      actor.error,
+    );
+  }
+
+  const frozen = rejectIfCmsWriteFrozen();
+  if (frozen) {
+    return controlledApplyAuthFailure(CMS_WRITE_FREEZE_CODE, frozen.error);
+  }
+
+  const trustedActor: TrustedPrivateApplyActor = {
+    adminId: actor.user.id,
+    hasSeoPermission: adminHasPermission(actor.user, "seo"),
+    hasBlogPermission: adminHasPermission(actor.user, "blog"),
+  };
+
+  const result = await executeControlledSidhuNewBlogArticleApply({
+    actor: trustedActor,
+    rawInput,
+  });
+  return { ...result, controlledSpec: SEO_AI_ARTICLE_CONTROLLED_APPLY_SPEC };
+}
+
 /**
  * Phase A1 Preview-Only RC — closed-by-default Generate Article preview.
  * Inactive unless SEO_AI_ARTICLE_GENERATION_ENABLED=1. Never called from page render.
  * Does not save Blog content, publish, call Gemini, Research, or GSC.
- * Blog Apply is intentionally not exported in this release candidate.
+ * Blog Apply remains gated by applyNewBlogArticlePreviewToPrivateDraftAction (production OFF).
  */
 export async function generateNewBlogArticlePreviewAction(
   rawInput: unknown,

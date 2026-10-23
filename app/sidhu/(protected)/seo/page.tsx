@@ -1,6 +1,8 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
+import { SeoAutomationControlPanel } from "@/components/sidhu/SeoAutomationControlPanel";
 import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoOverviewHub } from "@/components/sidhu/SeoOverviewHub";
+import { buildSeoAutomationWorkspaceStatus } from "@/lib/cms/seo-automation/workspace-status";
 import { getSeoHealthState } from "@/lib/cms/seo-health-state";
 import { sidhuSeoOverviewRows } from "@/lib/cms/sidhu-seo-preview";
 import { cms } from "@/lib/cms/repository";
@@ -17,6 +19,7 @@ export default async function SidhuSeoPage() {
 
   const inventoryCount = sidhuSeoOverviewRows(settings, posts, categories).length;
   const openFindingCount = healthState.lastScanAt ? healthState.currentFindings.length : null;
+  const automationStatus = buildSeoAutomationWorkspaceStatus();
 
   return (
     <AdminShell
@@ -25,11 +28,14 @@ export default async function SidhuSeoPage() {
       breadcrumbs={[{ label: "SEO" }, { label: "Overview" }]}
     >
       <SeoModuleChrome>
-        <SeoOverviewHub
-          inventoryCount={inventoryCount}
-          lastScanAt={healthState.lastScanAt}
-          openFindingCount={openFindingCount}
-        />
+        <div className="space-y-5">
+          <SeoAutomationControlPanel status={automationStatus} />
+          <SeoOverviewHub
+            inventoryCount={inventoryCount}
+            lastScanAt={healthState.lastScanAt}
+            openFindingCount={openFindingCount}
+          />
+        </div>
       </SeoModuleChrome>
     </AdminShell>
   );
