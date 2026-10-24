@@ -3,8 +3,19 @@ import { SectionCard } from "@/components/sidhu/ui/SectionCard";
 import { sidhuButtonClass } from "@/components/sidhu/ui/Button";
 import type { SeoAutomationWorkspaceStatus } from "@/lib/cms/seo-automation/workspace-status";
 
+function eligibilityLabel(status: SeoAutomationWorkspaceStatus["newBlogEligibility"]): string {
+  if (status.status === "CURRENT") {
+    return `${status.eligibleNewBlogCount} eligible NEW_BLOG (current Ledger summary)`;
+  }
+  if (status.status === "UNKNOWN") {
+    return `UNKNOWN — ${status.reason}`;
+  }
+  return `Not currently verified — ${status.reason}`;
+}
+
 export function SeoAutomationControlPanel({ status }: { status: SeoAutomationWorkspaceStatus }) {
   const switches = status.switches;
+  const eligibility = status.newBlogEligibility;
   return (
     <SectionCard className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -54,6 +65,15 @@ export function SeoAutomationControlPanel({ status }: { status: SeoAutomationWor
           <dt className="text-xs text-muted">Timezone default</dt>
           <dd className="font-medium text-ink">{switches.timezone}</dd>
         </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <dt className="text-xs text-muted">NEW_BLOG eligibility (freshness)</dt>
+          <dd className="font-medium text-ink">{eligibilityLabel(eligibility)}</dd>
+          {"historicalLastAuditNote" in eligibility && eligibility.historicalLastAuditNote ? (
+            <dd className="mt-1 text-xs text-muted">
+              Historical note (not a live verdict): {eligibility.historicalLastAuditNote}
+            </dd>
+          ) : null}
+        </div>
       </dl>
 
       {status.blockers.length ? (
@@ -77,7 +97,7 @@ export function SeoAutomationControlPanel({ status }: { status: SeoAutomationWor
         <Link href="/sidhu/seo/planning/" className={sidhuButtonClass("secondary", "min-h-9")}>
           Planning
         </Link>
-        <Link href="/sidhu/blogs/" className={sidhuButtonClass("secondary", "min-h-9")}>
+        <Link href={status.cmsBlogListHref} className={sidhuButtonClass("secondary", "min-h-9")}>
           Blog drafts
         </Link>
       </div>
