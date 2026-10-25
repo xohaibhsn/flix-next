@@ -95,6 +95,51 @@ test("full schema failure → version NOT stored", async () => {
   assert.equal(written, false);
 });
 
+test("assertMutationAllowed blocks full-ensure before DDL and marker write", async () => {
+  let ddl = 0;
+  let marker = 0;
+  let asserts = 0;
+  await assert.rejects(
+    () =>
+      runSchemaVersionGate({
+        currentVersion: 2,
+        readLookup: async () => ({ status: "found", version: 1 }),
+        ensureSchema: async () => {
+          ddl += 1;
+        },
+        writeVersion: async () => {
+          marker += 1;
+        },
+        assertMutationAllowed: () => {
+          asserts += 1;
+          throw new Error("mutation_frozen");
+        },
+      }),
+    /mutation_frozen/,
+  );
+  assert.equal(asserts, 1);
+  assert.equal(ddl, 0);
+  assert.equal(marker, 0);
+});
+
+test("assertMutationAllowed is not invoked on fast-path", async () => {
+  let asserts = 0;
+  let ddl = 0;
+  const outcome = await runSchemaVersionGate({
+    currentVersion: 5,
+    readLookup: async () => ({ status: "found", version: 5 }),
+    ensureSchema: async () => {
+      ddl += 1;
+    },
+    assertMutationAllowed: () => {
+      asserts += 1;
+    },
+  });
+  assert.equal(outcome, "skipped");
+  assert.equal(asserts, 0);
+  assert.equal(ddl, 0);
+});
+
 test("current version fast-path → ensureCmsSchema not called", async () => {
   let ensureCalls = 0;
   let writes = 0;

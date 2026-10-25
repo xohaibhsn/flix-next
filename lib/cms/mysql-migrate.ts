@@ -62,6 +62,7 @@ import {
   type SchemaEnsureOutcome,
   type SchemaVersionLookup,
 } from "@/lib/cms/schema-version";
+import { assertCmsWritesAllowed } from "@/lib/cms/write-freeze";
 
 export const SITE_SETTINGS_KEY = "site";
 
@@ -204,6 +205,8 @@ async function ensureMissingColumns() {
 }
 
 export async function ensureCmsSchema() {
+  // Defense in depth: DDL entry must not run under CMS_WRITE_FREEZE even if called directly.
+  assertCmsWritesAllowed();
   const pool = getDbPool();
   await pool.query("SELECT 1");
   for (const statement of CMS_SCHEMA_STATEMENTS) {
@@ -257,12 +260,17 @@ async function writeCmsSchemaVersion(version: number = CURRENT_CMS_SCHEMA_VERSIO
 /**
  * Authoritative schema entry for cold start and standalone bootstrap.
  * Cheap version check first; full ensureCmsSchema only when required; marker written only on success.
+ *
+ * When CMS_WRITE_FREEZE is ACTIVE, the version lookup remains allowed (read-only).
+ * Any full-ensure DDL or schema-version marker write is rejected via assertCmsWritesAllowed
+ * before the first mutating statement.
  */
 export async function ensureCmsSchemaCurrent(): Promise<SchemaEnsureOutcome> {
   return runSchemaVersionGate({
     readLookup: readCmsSchemaVersionLookup,
     ensureSchema: ensureCmsSchemaSerialized,
     writeVersion: writeCmsSchemaVersion,
+    assertMutationAllowed: () => assertCmsWritesAllowed(),
   });
 }
 

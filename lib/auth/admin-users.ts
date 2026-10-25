@@ -248,6 +248,12 @@ export async function bootstrapAdminUsersAfterSchemaReady(options?: { allowEmerg
     emergencyResetAlreadyApplied: total === 0 ? false : await emergencyPasswordResetAlreadyApplied(),
   });
 
+  if (action === "none") return;
+
+  // Seed/bootstrap writes must honor CMS_WRITE_FREEZE (same parser as action guards).
+  const { assertCmsWritesAllowed } = await import("@/lib/cms/write-freeze");
+  assertCmsWritesAllowed();
+
   if (action === "insert") {
     await insertPrimaryAdminFromEnv(bootstrap.password);
     return;

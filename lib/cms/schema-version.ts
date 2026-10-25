@@ -62,22 +62,29 @@ export function isMissingRelationError(error: unknown): boolean {
 /**
  * Authoritative schema gate used by production via mysql-migrate.ensureCmsSchemaCurrent.
  * Injectable for unit tests — does not import server-only / MySQL.
+ *
+ * When `assertMutationAllowed` is provided, it runs immediately before any schema DDL
+ * or version-marker write. The schema version lookup remains read-only and is never gated.
  */
 export async function runSchemaVersionGate(deps: {
   currentVersion?: number;
   readLookup: () => Promise<SchemaVersionLookup>;
   ensureSchema: () => Promise<void>;
   writeVersion?: (version: number) => Promise<void>;
+  /** Fail-closed guard invoked before ensureSchema / writeVersion (e.g. CMS write freeze). */
+  assertMutationAllowed?: () => void;
 }): Promise<SchemaEnsureOutcome> {
   const currentVersion = deps.currentVersion ?? CURRENT_CMS_SCHEMA_VERSION;
   const decision = decideSchemaEnsureAction(await deps.readLookup(), currentVersion);
   if (decision.action === "fast-path") return "skipped";
 
+  deps.assertMutationAllowed?.();
   await deps.ensureSchema();
   if (decision.writeVersionAfterSuccess) {
     if (!deps.writeVersion) {
       throw new Error("writeVersion is required when recording a schema version marker.");
     }
+    deps.assertMutationAllowed?.();
     await deps.writeVersion(currentVersion);
   }
   return "ensured";

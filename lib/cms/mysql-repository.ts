@@ -31,6 +31,8 @@ import {
 } from "@/lib/cms/page-revision";
 import { ClientError } from "@/lib/security/errors";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
+import { runCmsReadyInitialization } from "@/lib/cms/schema-ensure-freeze";
+import { isCmsWriteFreezeActive, isCmsWriteFreezeError } from "@/lib/cms/write-freeze";
 
 type PageRow = RowDataPacket & {
   id: string;
@@ -125,19 +127,26 @@ export class MysqlCmsRepository {
   private async ensureReady() {
     if (!this.readyPromise) {
       this.readyPromise = (async () => {
-        await ensureCmsSchemaCurrent();
-        await seedCmsIfEmpty();
-        await migrateSubscriptionPageSlugIfNeeded();
-        await seedExtendedIfEmpty();
-        await seedManagedRedirectsIfNeeded();
-        await ensureBlogIndexRedirect();
-        await seedSeoLongformIfNeeded();
-        await cleanupKnownTestTaglineIfNeeded();
-        await migrateSubscriptionSeoMicrocopyIfNeeded();
-        const { bootstrapAdminUsersAfterSchemaReady } = await import("@/lib/auth/admin-users");
-        await bootstrapAdminUsersAfterSchemaReady({ allowEmergency: true });
+        await runCmsReadyInitialization({
+          ensureSchemaCurrent: () => ensureCmsSchemaCurrent(),
+          isFreezeActive: () => isCmsWriteFreezeActive(),
+          runPostSchemaMutations: async () => {
+            await seedCmsIfEmpty();
+            await migrateSubscriptionPageSlugIfNeeded();
+            await seedExtendedIfEmpty();
+            await seedManagedRedirectsIfNeeded();
+            await ensureBlogIndexRedirect();
+            await seedSeoLongformIfNeeded();
+            await cleanupKnownTestTaglineIfNeeded();
+            await migrateSubscriptionSeoMicrocopyIfNeeded();
+            const { bootstrapAdminUsersAfterSchemaReady } = await import("@/lib/auth/admin-users");
+            await bootstrapAdminUsersAfterSchemaReady({ allowEmergency: true });
+          },
+        });
       })().catch((error) => {
         this.readyPromise = null;
+        // Preserve freeze denial so callers/actions can map cms_write_freeze distinctly.
+        if (isCmsWriteFreezeError(error)) throw error;
         throw cmsDbError(error);
       });
     }
