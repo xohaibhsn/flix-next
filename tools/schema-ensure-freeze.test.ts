@@ -272,6 +272,7 @@ test("source wiring: ensureCmsSchemaCurrent and ensureReady use freeze guards", 
   assert.match(repo, /runCmsReadyInitialization/);
   assert.match(repo, /isCmsWriteFreezeActive/);
   assert.match(repo, /isCmsWriteFreezeError\(error\)/);
-  assert.match(admin, /assertCmsWritesAllowed\(\)/);
+  // Bootstrap seed path uses sink-level SCHEMA_SEED (covers CMS_WRITE_FREEZE).
+  assert.match(admin, /assertMutationAllowed\("SCHEMA_SEED"\)/);
   assert.match(gate, /assertMutationAllowed\?\.\(\)/);
 });

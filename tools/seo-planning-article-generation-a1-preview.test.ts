@@ -9,7 +9,7 @@
  */
 
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
@@ -1000,10 +1000,25 @@ test("SOURCE GUARDS: CMS schema version baseline unchanged from this RC's expect
 });
 
 test("SOURCE GUARDS: A1 Preview stays free of autonomy/Apply/ungated transactional writers", () => {
-  // seo-autonomy and flat lineage entry files must stay absent.
-  assert.equal(fileExists("lib/cms/seo-autonomy"), false);
+  // Flat lineage entry files must stay absent.
   assert.equal(fileExists("lib/cms/seo-planning/seo-planning-lineage.ts"), false);
   assert.equal(fileExists("lib/cms/seo-planning-lineage.ts"), false);
+
+  // lib/cms/seo-autonomy/ exists on production SHA as I/O-free evidence helpers only.
+  // Keep that inventory closed; ban activation/publisher/scheduler/apply modules.
+  const allowedAutonomy = new Set([
+    "evidence-pack.ts",
+    "first-party-site-fact-verify.ts",
+  ]);
+  assert.equal(fileExists("lib/cms/seo-autonomy"), true);
+  const autonomyNames = readdirSync(path.join(root, "lib/cms/seo-autonomy")).sort();
+  assert.deepEqual(autonomyNames, [...allowedAutonomy].sort());
+  for (const name of autonomyNames) {
+    const src = read(`lib/cms/seo-autonomy/${name}`);
+    assert.doesNotMatch(src, /getDbPool|withTransaction|INSERT INTO|UPDATE |DELETE FROM/);
+    assert.doesNotMatch(src, /SEO_AI_ONESHOT_PUBLISHER_ACTIVATED\s*=\s*true/);
+    assert.doesNotMatch(src, /SEO_AUTOMATION_SCHEDULER_ENABLED\s*=\s*true/);
+  }
 
   const actions = read("lib/cms/seo-planning-actions.ts");
   const articleMod = read("lib/cms/seo-planning/article-generation.ts");

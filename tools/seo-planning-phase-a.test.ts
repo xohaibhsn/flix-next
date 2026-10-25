@@ -825,8 +825,11 @@ test("Planning list/detail admin UI has no publish/create/restore actions", () =
   assert.match(detail, /Private planning draft/);
   assert.match(detail, /Not published/);
   for (const src of [list, detail, listPage, detailPage]) {
-    // Ban publish/create-post wording; allow intentional handoff CTA "Create Blog Draft".
-    assert.doesNotMatch(src, /\bPublish\b|Create Blog(?! Draft)|savePost|Restore now|saveRedirect/);
+    // Ban actionable publish/create-post controls; allow handoff CTA "Create Blog Draft"
+    // and negative explanatory copy such as "Not published" / "No Apply, Publish, Schedule".
+    assert.doesNotMatch(src, /Create Blog(?! Draft)|savePost|Restore now|saveRedirect/);
+    assert.doesNotMatch(src, /<(button|a)\b[^>]*>\s*Publish\s*</i);
+    assert.doesNotMatch(src, /publishPost|publishBlog|schedulePublish/i);
   }
 
   const draft: SeoPlanningDraft = {
@@ -872,7 +875,10 @@ test("Planning list/detail admin UI has no publish/create/restore actions", () =
   assert.match(detailHtml, /Private planning draft/);
   // "Create Blog Draft" is the intentional Content Handoff CTA (private draft, not publish).
   assert.match(detailHtml, /Create Blog Draft/);
-  assert.doesNotMatch(detailHtml, /\bPublish\b|Create Blog(?! Draft)|Restore now/);
+  // Safety disclaimer may mention Publish as a denied capability; ban actionable CTAs.
+  assert.match(detailHtml, /No Apply, Publish, Schedule/);
+  assert.doesNotMatch(detailHtml, /Create Blog(?! Draft)|Restore now/);
+  assert.doesNotMatch(detailHtml, /<(button|a)\b[^>]*>\s*Publish\s*</i);
 });
 
 test("Planning has no public blog/sitemap surface", () => {

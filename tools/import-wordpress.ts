@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 import { applyWordpressPlan, readWordpressDump } from "@/lib/cms/wordpress/apply";
 import { WORDPRESS_SELF_TEST_SQL, buildWordpressPlan } from "@/lib/cms/wordpress/extract";
+import {
+  assertMutationAllowed,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-fence";
 
 function loadEnvFiles() {
   for (const file of [".env.local", ".env"]) {
@@ -46,9 +50,10 @@ Usage:
   npx tsx tools/import-wordpress.ts --sql tmp/wordpress/backup.sql
   npx tsx tools/import-wordpress.ts --sql tmp/wordpress/backup.sql --report tmp/wordpress/report.json
   npx tsx tools/import-wordpress.ts --self-test
-  npx tsx tools/import-wordpress.ts --sql tmp/wordpress/backup.sql --apply --media-root tmp/wordpress/public_html
+  npx tsx tools/import-wordpress.ts --sql tmp/wordpress/backup.sql --apply --i-understand-writes --media-root tmp/wordpress/public_html
 
-Dry-run is the default. --apply writes to MySQL and requires an explicit flag.
+Dry-run is the default. --apply writes to MySQL and also requires --i-understand-writes.
+An active CMS_WRITE_FREEZE always blocks apply (acknowledgement cannot override freeze).
 Pages are never auto-merged into the page builder. Blog posts can be imported with --apply.
 Place dumps in tmp/wordpress/ (gitignored). Do not commit .sql backups.
 `);
@@ -92,8 +97,28 @@ async function main() {
   }
 
   if (!hasFlag("apply")) {
-    console.log("Dry-run only. No database writes. Re-run with --apply to import blog posts.");
+    console.log("Dry-run only. No database writes. Re-run with --apply --i-understand-writes to import blog posts.");
     return;
+  }
+
+  if (!hasFlag("i-understand-writes")) {
+    console.error(
+      "Refusing MySQL writes: pass --i-understand-writes together with --apply after reviewing the dry-run report.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  try {
+    // Fail closed before opening a DB connection when freeze/generation denies writes.
+    assertMutationAllowed("CLI_MAINTENANCE");
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      console.error(`Refusing MySQL writes: ${error.message}`);
+      process.exitCode = 1;
+      return;
+    }
+    throw error;
   }
 
   const result = await applyWordpressPlan(plan, {

@@ -8,6 +8,7 @@ import {
   type SeoHealthStateV1,
 } from "@/lib/cms/seo-health-memory";
 import { dataFile, writeJsonFile } from "@/lib/cms/json-store";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { getDbPool } from "@/lib/db/pool";
 import type { RowDataPacket } from "mysql2";
@@ -36,6 +37,7 @@ async function readMysqlState(): Promise<SeoHealthStateV1> {
 }
 
 async function writeMysqlState(state: SeoHealthStateV1) {
+  assertMutationAllowed("SEO_HEALTH");
   await getDbPool().execute(
     `INSERT INTO site_settings (setting_key, setting_value)
      VALUES (?, ?)
@@ -67,6 +69,7 @@ export async function getSeoHealthState(): Promise<SeoHealthStateV1> {
 }
 
 export async function saveSeoHealthState(state: SeoHealthStateV1): Promise<void> {
+  assertMutationAllowed("SEO_HEALTH");
   const next = sanitizeSeoHealthState(state);
   if (isDatabaseConfigured()) {
     await writeMysqlState(next);

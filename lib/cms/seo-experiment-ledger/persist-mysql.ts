@@ -8,6 +8,12 @@ import "server-only";
 
 import type { PoolConnection } from "mysql2/promise";
 import { createId } from "@/lib/cms/ids";
+import {
+  assertMutationAllowed,
+  CMS_WRITE_FREEZE_CODE,
+  CMS_WRITE_FREEZE_MESSAGE,
+  isCmsWriteFreezeError,
+} from "@/lib/cms/write-fence";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { withTransaction } from "@/lib/db/pool";
 import { mapResearchSnapshotToLedgerPlan } from "@/lib/cms/seo-experiment-ledger/map";
@@ -163,11 +169,21 @@ export async function insertResearchRunWithDecisions(
 
   const tx = deps?.withTransaction ?? withTransaction;
   try {
+    // Sink fence before first INSERT — freeze rejects without partial row writes.
+    assertMutationAllowed("LEDGER");
     await tx(async (conn) => {
       await insertRun(conn, mapped.plan.run);
       await insertDecisions(conn, mapped.plan.decisions);
     });
   } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      return {
+        ok: false,
+        status: "WRITE_ERROR",
+        errorCode: CMS_WRITE_FREEZE_CODE,
+        errorMessage: CMS_WRITE_FREEZE_MESSAGE,
+      };
+    }
     const sanitized = sanitizeWriteError(error);
     return {
       ok: false,

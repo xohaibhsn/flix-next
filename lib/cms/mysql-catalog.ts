@@ -85,6 +85,7 @@ import {
   wouldCreateRedirectLoop,
 } from "@/lib/cms/redirects";
 import { getDbPool, withTransaction } from "@/lib/db/pool";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import type {
   BlogCategory,
   BlogPost,
@@ -419,6 +420,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async savePlan(plan: PricingPlan) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizePricingPlan(plan);
     await getDbPool().execute(
       `INSERT INTO pricing_plans
@@ -448,6 +450,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deletePlan(id: string) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     await getDbPool().execute("DELETE FROM pricing_plans WHERE id = ?", [id]);
   }
   async listFaqs() {
@@ -457,6 +460,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async saveFaq(item: FaqItem) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizeFaq(item);
     await getDbPool().execute(
       `INSERT INTO faqs (id, question, answer, category, sort_order, is_visible)
@@ -470,6 +474,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deleteFaq(id: string) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     await getDbPool().execute("DELETE FROM faqs WHERE id = ?", [id]);
   }
   async listCategories() {
@@ -479,6 +484,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async saveCategory(category: BlogCategory) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizeCategory(category);
     await getDbPool().execute(
       `INSERT INTO blog_categories (
@@ -516,6 +522,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deleteCategory(id: string) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     await getDbPool().execute("DELETE FROM blog_categories WHERE id = ?", [id]);
   }
   async listPosts() {
@@ -535,6 +542,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async savePost(post: BlogPost) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizePost(post);
     const [dupes] = await getDbPool().query<PostRow[]>("SELECT id FROM blog_posts WHERE slug = ? AND id <> ? LIMIT 1", [
       safe.slug,
@@ -582,6 +590,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deletePost(id: string) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     await getDbPool().execute("DELETE FROM blog_posts WHERE id = ?", [id]);
   }
   async listRedirects() {
@@ -604,6 +613,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async saveRedirect(rule: RedirectRule) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizeRedirect(rule);
     if (!safe.sourcePath || isReservedRedirectSource(safe.sourcePath)) {
       throw new ClientError(REDIRECT_ERRORS.reserved);
@@ -632,6 +642,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deleteRedirect(id: string) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     await getDbPool().execute("DELETE FROM redirects WHERE id = ?", [id]);
   }
   async listMessages() {
@@ -641,6 +652,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async addMessage(message: ContactMessage) {
     await this.ready();
+    assertMutationAllowed("CATALOG");
     const safe = sanitizeMessage(message);
     await getDbPool().execute(
       `INSERT INTO contact_messages (id, name, email, phone, subject, message, created_at)
@@ -679,6 +691,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async saveSeoPlanningDraft(draft: SeoPlanningDraft) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const safe = sanitizeSeoPlanningDraft(draft);
     if (!safe.id || !safe.fingerprint) {
       throw new Error("Planning draft requires id and fingerprint.");
@@ -770,6 +783,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async archiveSeoPlanningDraft(id: string) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const want = String(id || "").trim();
     if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
     return withTransaction(async (conn) => {
@@ -791,6 +805,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async restoreSeoPlanningDraft(id: string) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const want = String(id || "").trim();
     if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
     return withTransaction(async (conn) => {
@@ -812,6 +827,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async deleteSeoPlanningDraftPermanently(id: string) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const want = String(id || "").trim();
     if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
     return withTransaction(async (conn) => {
@@ -858,6 +874,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     testOnlyForceEnabled?: boolean;
   }) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const gate = evaluateTestFixtureCreationGate({
       testOnlyForceEnabled: args.testOnlyForceEnabled,
     });
@@ -967,6 +984,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     confirmation: string;
   }) {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const want = String(args.id || "").trim();
     if (!want) return { ok: false as const, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE };
     try {
@@ -1013,6 +1031,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningWritingPromptResult> {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const id = String(args.id || "").trim();
     if (!id) return { ok: false, reason: "not_found" };
     if (args.provider !== "gemini" && args.provider !== "openai") {
@@ -1080,6 +1099,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     ) => boolean | Promise<boolean>;
   }): Promise<MergeSeoPlanningImagePromptResult> {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const id = String(args.id || "").trim();
     if (!id) return { ok: false, reason: "not_found" };
     if (args.provider !== "gemini" && args.provider !== "openai") {
@@ -1128,6 +1148,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
     evidence: SeoPlanningEditorialEvidenceV1 | null;
   }): Promise<MergeSeoPlanningEditorialEvidenceResult> {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const id = String(args.id || "").trim();
     const expected = String(args.expectedEvidenceRevision || "").trim();
     if (!id) return { ok: false, reason: "not_found" };
@@ -1181,6 +1202,7 @@ export class MysqlCatalogRepository implements CatalogRepository {
   }
   async handoffSeoPlanningToBlog(planningDraftId: string): Promise<SeoPlanningHandoffResult> {
     await this.ready();
+    assertMutationAllowed("PLANNING");
     const id = String(planningDraftId || "").trim();
     if (!id) {
       return { ok: false, error: SEO_PLANNING_MISSING_DRAFT_MESSAGE, code: "planning_not_found" };

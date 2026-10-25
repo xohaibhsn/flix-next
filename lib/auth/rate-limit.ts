@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
+import { assertMutationAllowed, isCmsWriteFreezeError } from "@/lib/cms/write-fence";
 import { isDatabaseConfigured } from "@/lib/db/config";
 
 type AttemptState = {
@@ -73,6 +74,7 @@ async function mysqlLoginFail(ip: string) {
   const inWindow = row && Number.isFinite(resetAt) && resetAt > now;
   const nextCount = inWindow ? Number(row.fail_count) + 1 : 1;
   const nextReset = inWindow ? resetAt : now + WINDOW_MS;
+  assertMutationAllowed("AUTH_SIDE_EFFECT");
   await getDbPool().execute(
     `INSERT INTO login_attempts (ip_hash, fail_count, reset_at)
      VALUES (?, ?, ?)
@@ -83,6 +85,7 @@ async function mysqlLoginFail(ip: string) {
 
 async function mysqlLoginClear(ip: string) {
   const { getDbPool } = await import("@/lib/db/pool");
+  assertMutationAllowed("AUTH_SIDE_EFFECT");
   await getDbPool().execute("DELETE FROM login_attempts WHERE ip_hash = ?", [hashIp(ip)]);
 }
 
@@ -102,7 +105,9 @@ export async function recordFailedLogin(ip: string) {
     try {
       await mysqlLoginFail(ip);
       return;
-    } catch {
+    } catch (error) {
+      // Freeze must not silently fall through to an alternate DB write path.
+      if (isCmsWriteFreezeError(error)) throw error;
       memoryFail(attempts, ip, WINDOW_MS);
       return;
     }
@@ -115,8 +120,9 @@ export async function clearLoginRateLimit(ip: string) {
   if (isDatabaseConfigured()) {
     try {
       await mysqlLoginClear(ip);
-    } catch {
-      /* keep going */
+    } catch (error) {
+      if (isCmsWriteFreezeError(error)) throw error;
+      /* keep going for transient DB errors */
     }
   }
 }

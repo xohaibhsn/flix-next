@@ -62,6 +62,7 @@ import {
   type SchemaEnsureOutcome,
   type SchemaVersionLookup,
 } from "@/lib/cms/schema-version";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import { assertCmsWritesAllowed } from "@/lib/cms/write-freeze";
 
 export const SITE_SETTINGS_KEY = "site";
@@ -293,6 +294,9 @@ export async function seedCmsIfEmpty() {
     return { seeded: false as const };
   }
 
+  // Sink fence: direct seed entry must honor freeze even outside ensureReady.
+  assertMutationAllowed("SCHEMA_SEED");
+
   const pagesFile = await readJsonFile<PagesFile>("pages.json", { pages: defaultPages() });
   const settings = await readJsonFile<SiteSettings>("site-settings.json", defaultSettings());
   const mediaFile = await readJsonFile<MediaFile>("media.json", { assets: [] });
@@ -421,6 +425,7 @@ async function countTable(table: string) {
 }
 
 export async function seedExtendedIfEmpty() {
+  assertMutationAllowed("SCHEMA_SEED");
   const pool = getDbPool();
   if ((await countTable("pricing_plans")) === 0) {
     for (const plan of defaultPricingPlans()) {
@@ -567,6 +572,7 @@ export async function seedManagedRedirectsIfNeeded() {
   );
   if (flagRows[0]) return;
 
+  assertMutationAllowed("SCHEMA_SEED");
   for (const rule of MANAGED_REDIRECTS) {
     const [existing] = await pool.query<Array<RowDataPacket & { id: string }>>(
       "SELECT id FROM redirects WHERE source_path = ? LIMIT 1",
@@ -804,6 +810,7 @@ export async function seedSeoLongformIfNeeded() {
     hasCompleted: hasMigrationFlag,
     markCompleted: markMigrationFlag,
     run: async () => {
+      assertMutationAllowed("SCHEMA_SEED");
       const pool = getDbPool();
       for (const id of ["page-home", SUBSCRIPTION_PAGE_ID, "page-contact"]) {
         const [pages] = await pool.query<

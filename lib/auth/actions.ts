@@ -22,6 +22,7 @@ import {
 } from "@/lib/auth/admin-users";
 import { requireAdminActor } from "@/lib/auth/guards";
 import { clearAdminSession, createAdminSession, getAdminSession } from "@/lib/auth/session";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import {
   assertCmsWritesAllowed,
   CMS_WRITE_FREEZE_MESSAGE,
@@ -39,6 +40,10 @@ function rejectIfCmsWriteFrozen(): FormState | null {
     throw error;
   }
 }
+
+/** Same user-facing copy as authenticate "unavailable" — no account-existence signal. */
+const LOGIN_TEMPORARILY_UNAVAILABLE =
+  "Admin login is temporarily unavailable. Try again shortly.";
 
 export type LoginState = {
   error?: string;
@@ -67,6 +72,20 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     redirect(firstAllowedPath(existing.role, existing.permissions));
   }
 
+  // When MySQL is configured, login requires AUTH_SIDE_EFFECT writes (rate-limit
+  // cleanup and/or last_login_at). Refuse before credential success + session issue
+  // so a freeze cannot authenticate then fail an obligatory tracking write.
+  if (isDatabaseConfigured()) {
+    try {
+      assertMutationAllowed("AUTH_SIDE_EFFECT");
+    } catch (error) {
+      if (isCmsWriteFreezeError(error)) {
+        return { error: LOGIN_TEMPORARILY_UNAVAILABLE };
+      }
+      throw error;
+    }
+  }
+
   const headerStore = await headers();
   const ip = clientIp(headerStore);
   const limit = await checkLoginRateLimit(ip);
@@ -80,15 +99,30 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
   if (!result.ok) {
     if (result.error === "not_configured") return { error: NOT_CONFIGURED };
     if (result.error === "unavailable") {
-      return { error: "Admin login is temporarily unavailable. Try again shortly." };
+      return { error: LOGIN_TEMPORARILY_UNAVAILABLE };
     }
-    await recordFailedLogin(ip);
+    try {
+      await recordFailedLogin(ip);
+    } catch (error) {
+      if (isCmsWriteFreezeError(error)) {
+        return { error: LOGIN_TEMPORARILY_UNAVAILABLE };
+      }
+      throw error;
+    }
     return { error: INVALID_LOGIN };
   }
 
-  await clearLoginRateLimit(ip);
-  if (isDatabaseConfigured() && result.id !== "env-admin") {
-    await markAdminLogin(result.id);
+  try {
+    await clearLoginRateLimit(ip);
+    if (isDatabaseConfigured() && result.id !== "env-admin") {
+      await markAdminLogin(result.id);
+    }
+  } catch (error) {
+    if (isCmsWriteFreezeError(error)) {
+      // Do not issue a session after a required side-effect write was denied.
+      return { error: LOGIN_TEMPORARILY_UNAVAILABLE };
+    }
+    throw error;
   }
   await createAdminSession({
     id: result.id,

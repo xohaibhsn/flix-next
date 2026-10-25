@@ -79,6 +79,7 @@ test("mutating CMS Server Actions and media mutations wire the freeze gate", () 
   assert.match(auth, /setUserActiveAction[\s\S]*?rejectIfCmsWriteFrozen/);
   assert.match(auth, /resetUserPasswordAction[\s\S]*?rejectIfCmsWriteFrozen/);
   assert.match(auth, /changeOwnPasswordAction[\s\S]*?rejectIfCmsWriteFrozen/);
+  assert.match(auth, /loginAction[\s\S]*?assertMutationAllowed\("AUTH_SIDE_EFFECT"\)/);
 });
 
 test("write-freeze module documents old-worker limitation", () => {

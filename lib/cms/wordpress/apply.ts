@@ -6,6 +6,7 @@ import { createId } from "@/lib/cms/ids";
 import { slugify } from "@/lib/cms/slug";
 import { sanitizeCategory, sanitizePost } from "@/lib/cms/validation";
 import type { WordpressImportPlan, WpPostPlan } from "@/lib/cms/wordpress/extract";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import { getDbConfig } from "@/lib/db/config";
 import { isCloudinaryConfigured, uploadImageBuffer } from "@/lib/cloudinary";
 
@@ -54,6 +55,8 @@ export async function readWordpressDump(path: string) {
 }
 
 export async function applyWordpressPlan(plan: WordpressImportPlan, options: ApplyOptions = {}): Promise<ApplyResult> {
+  // CLI/maintenance sink — never bypass CMS_WRITE_FREEZE; flag cannot override freeze.
+  assertMutationAllowed("CLI_MAINTENANCE");
   const config = getDbConfig();
   if (!config) {
     throw new Error("MySQL is not configured. Set DB_HOST, DB_PORT, DB_NAME, DB_USER, and DB_PASSWORD.");

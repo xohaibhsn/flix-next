@@ -19,6 +19,7 @@ import { createId } from "@/lib/cms/ids";
 import { fromMysqlDateTime } from "@/lib/cms/mysql-migrate";
 import { envPasswordBootstrapAction } from "@/lib/auth/bootstrap-policy";
 import { ensureSchemaThenBootstrap } from "@/lib/auth/bootstrap-schema-gate";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import { isDatabaseConfigured } from "@/lib/db/config";
 import { getDbPool } from "@/lib/db/pool";
 import type { PublicAdminUser } from "@/lib/auth/types";
@@ -171,6 +172,7 @@ async function insertAdminUser(user: {
   permissions: Permission[];
   createdBy: string | null;
 }) {
+  assertMutationAllowed("AUTH_ADMIN");
   await getDbPool().execute(
     `INSERT INTO admin_users
       (id, username, display_name, password_hash, role, permissions, is_active, session_version, created_by)
@@ -221,6 +223,7 @@ async function restorePrimaryAdminFromEnv(password: string) {
   const existing = await getAdminUserByUsername(username);
   const passwordHash = await hashPassword(password);
   if (existing) {
+    assertMutationAllowed("AUTH_ADMIN");
     const [result] = await getDbPool().execute<ResultSetHeader>(
       `UPDATE admin_users
        SET role = 'super_admin', is_active = 1, password_hash = ?, session_version = session_version + 1
@@ -250,9 +253,8 @@ export async function bootstrapAdminUsersAfterSchemaReady(options?: { allowEmerg
 
   if (action === "none") return;
 
-  // Seed/bootstrap writes must honor CMS_WRITE_FREEZE (same parser as action guards).
-  const { assertCmsWritesAllowed } = await import("@/lib/cms/write-freeze");
-  assertCmsWritesAllowed();
+  // Seed/bootstrap writes must honor CMS_WRITE_FREEZE via SCHEMA_SEED sink fence.
+  assertMutationAllowed("SCHEMA_SEED");
 
   if (action === "insert") {
     await insertPrimaryAdminFromEnv(bootstrap.password);
@@ -308,10 +310,12 @@ export async function bootstrapAdminUsersIfNeeded(options?: { allowEmergency?: b
 }
 
 export async function markAdminLogin(id: string) {
+  assertMutationAllowed("AUTH_SIDE_EFFECT");
   await getDbPool().execute("UPDATE admin_users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
 }
 
 export async function bumpAdminSessionVersion(id: string) {
+  assertMutationAllowed("AUTH_ADMIN");
   await getDbPool().execute(
     "UPDATE admin_users SET session_version = session_version + 1 WHERE id = ?",
     [id],
@@ -319,6 +323,7 @@ export async function bumpAdminSessionVersion(id: string) {
 }
 
 export async function updateAdminPassword(id: string, passwordHash: string) {
+  assertMutationAllowed("AUTH_ADMIN");
   const [result] = await getDbPool().execute<ResultSetHeader>(
     "UPDATE admin_users SET password_hash = ?, session_version = session_version + 1 WHERE id = ?",
     [passwordHash, id],
@@ -386,6 +391,7 @@ export async function updateAdminUser(
     nextRole === "custom"
       ? parsePermissions(patch.permissions ?? current.permissions).filter((item) => item !== "users_security")
       : [];
+  assertMutationAllowed("AUTH_ADMIN");
   await getDbPool().execute(
     `UPDATE admin_users
      SET display_name = ?, role = ?, permissions = ?, is_active = ?
@@ -414,5 +420,6 @@ export async function deleteAdminUser(id: string, actorId: string) {
   if (current.role === "super_admin" && current.active && (await countActiveSuperAdmins(id)) < 1) {
     throw new Error("At least one active Super Admin is required.");
   }
+  assertMutationAllowed("AUTH_ADMIN");
   await getDbPool().execute("DELETE FROM admin_users WHERE id = ?", [id]);
 }

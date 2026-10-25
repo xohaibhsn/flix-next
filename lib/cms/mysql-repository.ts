@@ -30,8 +30,9 @@ import {
   PageConflictError,
 } from "@/lib/cms/page-revision";
 import { ClientError } from "@/lib/security/errors";
-import { getDbPool, withTransaction } from "@/lib/db/pool";
+import { getDbPool, withFencedTransaction } from "@/lib/db/pool";
 import { runCmsReadyInitialization } from "@/lib/cms/schema-ensure-freeze";
+import { assertMutationAllowed } from "@/lib/cms/write-fence";
 import { isCmsWriteFreezeActive, isCmsWriteFreezeError } from "@/lib/cms/write-freeze";
 
 type PageRow = RowDataPacket & {
@@ -207,7 +208,7 @@ export class MysqlCmsRepository {
     const safe = sanitizePage(page);
     let savedRevision = expectedRevision;
     try {
-      await withTransaction(async (conn) => {
+      await withFencedTransaction("CMS_EDITORIAL", async (conn) => {
         const [lockedRows] = await conn.query<PageRow[]>(
           "SELECT id, content_revision FROM pages WHERE id = ? FOR UPDATE",
           [safe.id],
@@ -278,6 +279,7 @@ export class MysqlCmsRepository {
 
   async saveSettings(settings: SiteSettings) {
     await this.ensureReady();
+    assertMutationAllowed("CMS_EDITORIAL");
     const safe = applyPublicCopyCleanupToSettings(sanitizeSettings(settings)).settings;
     await getDbPool().execute(
       `INSERT INTO site_settings (setting_key, setting_value)
@@ -314,6 +316,7 @@ export class MysqlCmsRepository {
 
   async addMedia(asset: MediaAsset) {
     await this.ensureReady();
+    assertMutationAllowed("CMS_EDITORIAL");
     const conn = await getDbPool().getConnection();
     try {
       await insertMediaRow(conn, asset);
@@ -325,6 +328,7 @@ export class MysqlCmsRepository {
 
   async updateMediaAlt(id: string, alt: string) {
     await this.ensureReady();
+    assertMutationAllowed("CMS_EDITORIAL");
     const current = await this.getMediaById(id);
     if (!current) return null;
     await getDbPool().execute("UPDATE media_assets SET alt = ? WHERE id = ?", [alt, id]);
@@ -333,6 +337,7 @@ export class MysqlCmsRepository {
 
   async removeMedia(id: string) {
     await this.ensureReady();
+    assertMutationAllowed("CMS_EDITORIAL");
     await getDbPool().execute("DELETE FROM media_assets WHERE id = ?", [id]);
   }
 }
