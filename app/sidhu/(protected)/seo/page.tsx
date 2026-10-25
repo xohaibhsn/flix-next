@@ -1,4 +1,5 @@
 import { AdminShell } from "@/components/sidhu/AdminShell";
+import { CmsWriteFreezeDiagnosticPanel } from "@/components/sidhu/CmsWriteFreezeDiagnosticPanel";
 import { SeoAutomationControlPanel } from "@/components/sidhu/SeoAutomationControlPanel";
 import { SeoModuleChrome } from "@/components/sidhu/SeoModuleChrome";
 import { SeoOverviewHub } from "@/components/sidhu/SeoOverviewHub";
@@ -30,6 +31,7 @@ export default async function SidhuSeoPage() {
       <SeoModuleChrome>
         <div className="space-y-5">
           <SeoAutomationControlPanel status={automationStatus} />
+          <CmsWriteFreezeDiagnosticPanel />
           <SeoOverviewHub
             inventoryCount={inventoryCount}
             lastScanAt={healthState.lastScanAt}
